@@ -1,0 +1,96 @@
+# Supabase: what it is and how it runs
+
+Final Meal keeps all of its data (people, dishes, places, picks, lists) in a Supabase backend, which is a Postgres database plus sign-in, file storage and serverless functions. On a laptop it runs inside Docker, started with one command and thrown away or rebuilt at will; in production it runs as a Supabase Cloud project. To keep the two identical, **everything about the backend is written down as files in git**: database structure and rules in `supabase/migrations/`, settings in `supabase/config.toml`, functions in `supabase/functions/`. Nobody edits the backend by hand in Studio. This page is the runbook for moving those files from the laptop to production, plus an inventory of what exists today.
+
+## Local development
+
+| Command | What it does |
+|---|---|
+| `pnpm db:start` | Starts the local backend in Docker (first run downloads images). API `http://127.0.0.1:54321`, Studio `http://127.0.0.1:54323`, inbox `http://127.0.0.1:54324`. |
+| `pnpm db:stop` | Stops it. |
+| `pnpm db:reset` | Wipes the local database and re-applies every migration, then `seed.sql` if present. |
+| `pnpm db:test` | Runs the database tests in `supabase/tests/database/` (pgTAP). |
+
+## Rules
+
+- Schema, policies and functions change **only** through files in `supabase/migrations/`. Create one with `supabase migration new <name>`. If you explore in Studio, turn the result into a migration before committing.
+- Auth, storage and API settings live in `supabase/config.toml`.
+- Edge Functions live in `supabase/functions/`.
+- `supabase/seed.sql` is sample data for local development only. It never runs in production.
+- Every new setting, extension, bucket or secret gets a line in the inventory below.
+- Secrets are listed here by name only. Never commit `.env` or `.env.local` files.
+
+## Local to production runbook
+
+Production setup happens in Phase 8. These are the steps then.
+
+1. `supabase login`
+2. `supabase link --project-ref <project-ref>`: ties this folder to the cloud project.
+3. `supabase db push`: applies any migrations the cloud project has not seen. Never run `seed.sql` against production.
+4. `supabase config push`: applies the settings in `config.toml` (auth, storage, API) to the cloud project.
+5. `supabase functions deploy`: deploys everything in `supabase/functions/`.
+6. `supabase secrets set --env-file <file>`: sets function secrets from a local file kept outside git. Names are listed in the Secrets inventory below.
+7. Extensions are created by the migrations themselves, so nothing to enable in the dashboard.
+
+## Inventory
+
+### `config.toml` settings changed from default
+
+| Setting | Value | Why |
+|---|---|---|
+| `project_id` | `finalmeal` | Names the local Docker containers and volumes. |
+
+### Extensions
+
+All installed into the `extensions` schema by `20261026233813_extensions_and_types.sql`.
+
+| Extension | Used for |
+|---|---|
+| `postgis` | `geography` columns and distance queries (places, home location) |
+| `pg_trgm` | Fuzzy search on place and dish names |
+| `unaccent` | Removing accents when normalising dish names |
+| `citext` | Case-insensitive usernames and list slugs |
+
+`pgtap` (database tests) is created inside the test files, not in a migration.
+
+### Enums (schema `public`)
+
+| Enum | Values |
+|---|---|
+| `profile_visibility` | `public`, `private` |
+| `trust_level` | `new`, `trusted`, `flagged` |
+| `place_source` | `fsq`, `custom` |
+| `pick_tier` | `final`, `honorable` |
+| `tag_kind` | `food_type`, `dietary`, `personal` |
+| `follow_status` | `active`, `requested` |
+| `activity_type` | `added_final`, `added_honorable`, `dethroned`, `promoted`, `followed`, `saved_pick`, `saved_from_list` |
+| `report_target` | `pick`, `profile`, `list`, `place` |
+| `report_status` | `open`, `actioned`, `dismissed` |
+
+### Functions and triggers
+
+| Name | Purpose |
+|---|---|
+| `public.set_updated_at()` | Trigger function that refreshes `updated_at` on update. |
+| `public.normalize_dish_name(text)` | Immutable. Turns a dish name into its comparison key: accents removed, lower case, punctuation collapsed, simple plurals folded. |
+| `dishes_set_name_key` | Before insert/update on `dishes`: fills `name_key`. |
+| `pick_tags_check_owner` | Before insert/update on `pick_tags`: raises `personal_tag_not_owned` if a personal tag is put on someone else's pick. |
+
+### Tables (schema `public`, row-level security on)
+
+Migrations: `20261026234036_core_tables.sql` and `20261026234037_social_tables.sql`. Policies arrive in a later migration; until then no one but the service role can read or write.
+
+- Core: `profiles`, `places`, `dishes`, `picks`, `tags`, `pick_tags`
+- Social and operations: `follows`, `saves`, `blocks`, `shared_lists`, `activities`, `notifications`, `push_tokens`, `device_attestations`, `reports`
+
+### Storage buckets
+
+None yet.
+
+### Edge Functions
+
+None yet.
+
+### Secrets (names only)
+
+None yet.
