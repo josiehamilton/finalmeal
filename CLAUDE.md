@@ -23,7 +23,8 @@ A social food app (iOS, Android, web). Each person picks the five dishes for the
 ## Current status
 
 - 2026-10-26: the MVP design spec is **approved**.
-- **Next step:** the Phase 1 (Foundations) implementation plan in `docs/superpowers/plans/`, for Josie's review, then build.
+- **Phase 1 (Foundations) plan:** `docs/superpowers/plans/2026-10-26-phase-1-foundations.md`, awaiting Josie's review, then build on branch `phase-1-foundations`.
+- **iOS testing:** Josie's iPhone 17 simulator (in the app sidebar), via the iOS Simulator tool.
 - No product code exists yet.
 
 ## Working rules
