@@ -39,4 +39,5 @@ A social food app (iOS, Android, web). Each person picks the five dishes for the
   4. Copy `gen.py` back into `design/canvas-generator/` and refresh the snapshot in `design/canvas/project/`.
   5. Before publishing, check whether the canvas has a newer version (Josie may hand-edit). If it does, read the changed boards and merge first.
 - **Commits:** small, descriptive, and ending with the co-author line. Never commit `.env` files or secrets.
+- **Supabase is codified:** schema and policy changes go only through `supabase/migrations/`, settings through `supabase/config.toml`, and functions through `supabase/functions/`; record each one in `docs/ops/supabase.md` (the local→prod runbook). `seed.sql` is dev-only. No hand edits in Studio. This keeps local and prod in sync.
 - **Local first:** the backend runs in Docker via `supabase start`; cloud setup happens in Phase 8.

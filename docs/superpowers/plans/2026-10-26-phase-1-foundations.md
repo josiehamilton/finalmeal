@@ -36,6 +36,11 @@
 - **Local only:** no cloud services, no real emails. Seed emails use `@example.com`.
 - **Never commit:** `.env` / `.env.local` files. `.env.example` files are committed.
 - **Commits:** every commit message ends with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` (or the implementing model's line).
+- **Supabase is fully codified (Josie's rule):** local dev must be reproducible in prod.
+  - Schema, policies and functions change only through files in `supabase/migrations/`. No hand edits in Studio. If you explore in Studio, turn the result into a migration before committing.
+  - Auth, storage and API settings live in `supabase/config.toml`; Edge Functions in `supabase/functions/`.
+  - `supabase/seed.sql` is dev-only sample data and never runs in prod.
+  - Every new setting, extension, bucket or secret gets a line in `docs/ops/supabase.md`. That file holds the local→prod runbook (`supabase link`, `supabase db push`, `supabase config push`, secrets) and an inventory of what exists. Secrets are listed by name only.
 - **Branching:** all Phase 1 work happens on branch `phase-1-foundations` (created at execution start). Task 8 pushes it, confirms CI is green, then merges into `main`.
 - **iOS testing:** use Josie's **iPhone 17** simulator (shown in the app sidebar) through the iOS Simulator tool: `attach` first, then screenshot to verify.
 - **If Docker isn't running:** run `open -a Docker` and wait for `docker info` to succeed. If Docker still won't start, stop and tell Josie.
@@ -89,6 +94,7 @@
 - Create: `supabase/config.toml` (via `supabase init`; set `project_id = "finalmeal"`)
 - Create: `supabase/migrations/<ts>_extensions_and_types.sql`, `<ts>_core_tables.sql`, `<ts>_social_tables.sql`
 - Test: `supabase/tests/database/schema.test.sql`, `supabase/tests/database/normalize.test.sql`
+- Create: `docs/ops/supabase.md`. Write the runbook and inventory: extensions, enums, tables, and the `config.toml` settings changed from default. Later tasks append to it.
 - Modify: root `package.json` scripts: `db:start` (`supabase start`), `db:stop`, `db:reset` (`supabase db reset`), `db:test` (`supabase test db`)
 
 **Interfaces:**
