@@ -22,12 +22,13 @@ A social food app (iOS, Android, web). Each person picks the five dishes for the
 
 ## Current status
 
-- 2026-10-26: the MVP design spec was written and is **awaiting Josie's review**.
-- **Next step:** once she approves it, write the Phase 1 (Foundations) implementation plan in `docs/superpowers/plans/`, have her review it, then build.
+- 2026-10-26: the MVP design spec is **approved**.
+- **Next step:** the Phase 1 (Foundations) implementation plan in `docs/superpowers/plans/`, for Josie's review, then build.
 - No product code exists yet.
 
 ## Working rules
 
+- **Models:** use Opus 5.5 for planning, specs and reviews; Sonnet 5.5 for implementation (e.g. Sonnet subagents run the tasks in an implementation plan).
 - **Spec first.** Don't build features that aren't in the spec without asking Josie. If something in the spec changes, update the spec in the same change.
 - **The canvas is the visual source of truth.** Screens should match their artboards. Brand: ember `#C04B28`, ember glow `#E8693F` (no other accent colours); Instrument Serif wordmark, Newsreader display, Manrope UI; the skull marks Final Meal only.
 - **Updating the canvas:**
