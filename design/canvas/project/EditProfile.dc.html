@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Edit profile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400;1,6..72,500&amp;family=Playfair+Display:ital,wght@0,400;1,400&amp;family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;0,9..144,700;1,9..144,300;1,9..144,400&amp;family=Instrument+Serif&amp;family=Bricolage+Grotesque:opsz,wght@12..96,800&amp;family=Syne:wght@800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0B0A09}
+a{color:#E8693F;text-decoration:none}a:hover{color:#F08A62}
+input::placeholder,textarea::placeholder{color:#8C847A}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding-top: 47px; background: #0B0A09; color: #F3EDE4; font-family: 'Manrope',system-ui,sans-serif; position: relative; overflow: hidden; display: flex; flex-direction: column"><header style="display: flex; align-items: center; gap: 4px; height: 56px; padding: 0 12px 0 6px; flex-shrink: 0"><a href="Settings.dc.html" aria-label="Back" style="position: relative; width: 44px; height: 44px; border-radius: 50%; background: transparent; color: #F3EDE4; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg aria-hidden="true" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="m15 18-6-6 6-6"/></svg></a><h1 style="margin: 0; flex: 1; font-size: 17px; font-weight: 700; letter-spacing: 0.01em">Edit profile</h1><a href="Profile.dc.html" style="font-size: 15px; font-weight: 700; color: #E8693F; padding: 8px">Save</a></header>
+<div style="flex: 1; display: flex; flex-direction: column; gap: 20px; padding: 12px 24px 0">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 10px"><span style="position: relative"><span style="width: 96px; height: 96px; border-radius: 50%; background: #0079A3; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center; font-size: 35px; font-weight: 700; flex-shrink: 0; letter-spacing: 0.02em">JH</span><span style="position: absolute; right: -2px; bottom: -2px; width: 32px; height: 32px; border-radius: 50%; background: #221F1B; border: 2px solid #0B0A09; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span></span><button type="button" style="height: 36px; border: 0; background: transparent; color: #E8693F; font-family: 'Manrope',system-ui,sans-serif; font-size: 14px; font-weight: 700">Change photo</button></div>
+<div style="display: flex; flex-direction: column; gap: 8px"><label for="en" style="font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #8C847A">Name</label><div style="display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 16px; border-radius: 14px; background: #171513; border: 1px solid rgba(243,237,228,0.16); box-sizing: border-box"><input id="en" type="text" value="Josie Hamilton" placeholder="" style="flex: 1; min-width: 0; height: 100%; background: transparent; border: 0; outline: none; color: #F3EDE4; font-family: 'Manrope',system-ui,sans-serif; font-size: 17px; font-weight: 500"></div></div>
+<div style="display: flex; flex-direction: column; gap: 8px"><label for="eu" style="font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #8C847A">Username</label><div style="display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 16px; border-radius: 14px; background: #171513; border: 1px solid rgba(243,237,228,0.16); box-sizing: border-box"><span style="color: #A39B91; font-size: 17px; font-weight: 500">@</span><input id="eu" type="text" value="josiehamilton" placeholder="" style="flex: 1; min-width: 0; height: 100%; background: transparent; border: 0; outline: none; color: #F3EDE4; font-family: 'Manrope',system-ui,sans-serif; font-size: 17px; font-weight: 500"></div></div>
+<div style="display: flex; flex-direction: column; gap: 8px"><label for="eb" style="font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #8C847A">Bio</label><textarea id="eb" rows="2" style="padding: 14px 16px; border-radius: 14px; background: #171513; border: 1px solid rgba(243,237,228,0.16); color: #F3EDE4; font-family: 'Newsreader',Georgia,serif; font-style: italic; font-size: 17px; line-height: 1.45; resize: none; outline: none; box-sizing: border-box">Chasing the perfect meal.</textarea><span style="align-self: flex-end; font-size: 12px; color: #8C847A">25 / 100</span></div>
+<div style="display: flex; flex-direction: column; gap: 8px"><label for="ec" style="font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #8C847A">Home city</label><div style="display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 16px; border-radius: 14px; background: #171513; border: 1px solid rgba(243,237,228,0.16); box-sizing: border-box"><input id="ec" type="text" value="Vancouver, BC" placeholder="" style="flex: 1; min-width: 0; height: 100%; background: transparent; border: 0; outline: none; color: #F3EDE4; font-family: 'Manrope',system-ui,sans-serif; font-size: 17px; font-weight: 500"></div></div>
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview": {"width": 390, "height": 844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

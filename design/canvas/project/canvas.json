@@ -1,0 +1,531 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-10-25T21:04:36Z"
+ },
+ "title": "Final Meal — App Screens",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1280,
+   "h": 900,
+   "title": "Brand foundations"
+  },
+  "Wordmark.dc.html": {
+   "x": 1360,
+   "y": 0,
+   "w": 1280,
+   "h": 900,
+   "title": "Wordmark explorations"
+  },
+  "Splash.dc.html": {
+   "x": 0,
+   "y": 1320,
+   "w": 390,
+   "h": 844,
+   "title": "01 Splash",
+   "is_interactive": true
+  },
+  "Welcome.dc.html": {
+   "x": 470,
+   "y": 1320,
+   "w": 390,
+   "h": 844,
+   "title": "02 Welcome",
+   "is_interactive": true
+  },
+  "OnbEmail.dc.html": {
+   "x": 940,
+   "y": 1320,
+   "w": 390,
+   "h": 844,
+   "title": "03 Email",
+   "is_interactive": true
+  },
+  "OnbOtp.dc.html": {
+   "x": 1410,
+   "y": 1320,
+   "w": 390,
+   "h": 844,
+   "title": "04 Email code",
+   "is_interactive": true
+  },
+  "OnbName.dc.html": {
+   "x": 1880,
+   "y": 1320,
+   "w": 390,
+   "h": 844,
+   "title": "05 Name",
+   "is_interactive": true
+  },
+  "OnbUsername.dc.html": {
+   "x": 2350,
+   "y": 1320,
+   "w": 390,
+   "h": 844,
+   "title": "06 Username",
+   "is_interactive": true
+  },
+  "OnbLocation.dc.html": {
+   "x": 2820,
+   "y": 1320,
+   "w": 390,
+   "h": 844,
+   "title": "07 Home city",
+   "is_interactive": true
+  },
+  "OnbPhoto.dc.html": {
+   "x": 3290,
+   "y": 1320,
+   "w": 390,
+   "h": 844,
+   "title": "08 Photo",
+   "is_interactive": true
+  },
+  "OnbFirstPick.dc.html": {
+   "x": 3760,
+   "y": 1320,
+   "w": 390,
+   "h": 844,
+   "title": "09 The hard part",
+   "is_interactive": true
+  },
+  "OnbAddFirst.dc.html": {
+   "x": 4230,
+   "y": 1320,
+   "w": 390,
+   "h": 844,
+   "title": "10 First pick",
+   "is_interactive": true
+  },
+  "OnbTransition.dc.html": {
+   "x": 4700,
+   "y": 1320,
+   "w": 390,
+   "h": 844,
+   "title": "11 Loading",
+   "is_interactive": true
+  },
+  "FirstLand.dc.html": {
+   "x": 5170,
+   "y": 1320,
+   "w": 390,
+   "h": 844,
+   "title": "12 First landing",
+   "is_interactive": true
+  },
+  "Feed.dc.html": {
+   "x": 0,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "13 Feed",
+   "is_interactive": true
+  },
+  "FeedAd.dc.html": {
+   "x": 470,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "14 Feed — Honorable + ad",
+   "is_interactive": true
+  },
+  "FeedEmpty.dc.html": {
+   "x": 940,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "15 Feed — empty",
+   "is_interactive": true
+  },
+  "AddDish.dc.html": {
+   "x": 1410,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "16 Add a dish",
+   "is_interactive": true
+  },
+  "AddDishTags.dc.html": {
+   "x": 1880,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "17 Add a dish — tags open",
+   "is_interactive": true
+  },
+  "TagSearch.dc.html": {
+   "x": 2350,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "18 Find a tag",
+   "is_interactive": true
+  },
+  "Swap.dc.html": {
+   "x": 2820,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "19 Swap (list full)",
+   "is_interactive": true
+  },
+  "PickDetail.dc.html": {
+   "x": 3290,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "20 Pick detail",
+   "is_interactive": true
+  },
+  "Discover.dc.html": {
+   "x": 3760,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "21 Discover map",
+   "is_interactive": true
+  },
+  "DiscoverHM.dc.html": {
+   "x": 4230,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "22 Discover — Honorable selected",
+   "is_interactive": true
+  },
+  "DiscoverFilters.dc.html": {
+   "x": 4700,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "23 Filters",
+   "is_interactive": true
+  },
+  "DiscoverSearch.dc.html": {
+   "x": 5170,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "24 Discover search",
+   "is_interactive": true
+  },
+  "Search.dc.html": {
+   "x": 5640,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "25 People search",
+   "is_interactive": true
+  },
+  "Notifications.dc.html": {
+   "x": 6110,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "26 Activity",
+   "is_interactive": true
+  },
+  "Saved.dc.html": {
+   "x": 6580,
+   "y": 2544,
+   "w": 390,
+   "h": 844,
+   "title": "27 Saved",
+   "is_interactive": true
+  },
+  "ShareHub.dc.html": {
+   "x": 0,
+   "y": 3768,
+   "w": 390,
+   "h": 844,
+   "title": "28 Share — what to share",
+   "is_interactive": true
+  },
+  "ShareList.dc.html": {
+   "x": 470,
+   "y": 3768,
+   "w": 390,
+   "h": 844,
+   "title": "29 Share — city list (link)",
+   "is_interactive": true
+  },
+  "ShareImage.dc.html": {
+   "x": 940,
+   "y": 3768,
+   "w": 390,
+   "h": 844,
+   "title": "30 Share — food type (image)",
+   "is_interactive": true
+  },
+  "ShareCard.dc.html": {
+   "x": 1410,
+   "y": 3768,
+   "w": 390,
+   "h": 844,
+   "title": "31 Share — Final Meal (image)",
+   "is_interactive": true
+  },
+  "SharedList.dc.html": {
+   "x": 1880,
+   "y": 3768,
+   "w": 390,
+   "h": 844,
+   "title": "32 Friend opens a shared list",
+   "is_interactive": true
+  },
+  "WebList.dc.html": {
+   "x": 0,
+   "y": 4992,
+   "w": 390,
+   "h": 844,
+   "title": "33 Web — list view",
+   "is_interactive": true
+  },
+  "WebMap.dc.html": {
+   "x": 470,
+   "y": 4992,
+   "w": 390,
+   "h": 844,
+   "title": "34 Web — map view",
+   "is_interactive": true
+  },
+  "WebSignup.dc.html": {
+   "x": 940,
+   "y": 4992,
+   "w": 390,
+   "h": 844,
+   "title": "35 Web — join prompt",
+   "is_interactive": true
+  },
+  "WebDesktop.dc.html": {
+   "x": 1410,
+   "y": 4992,
+   "w": 1280,
+   "h": 1260,
+   "title": "36 Web — desktop",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "Profile.dc.html": {
+   "x": 0,
+   "y": 6632,
+   "w": 390,
+   "h": 844,
+   "title": "37 Profile — Final Meal",
+   "is_interactive": true
+  },
+  "ProfileHM.dc.html": {
+   "x": 470,
+   "y": 6632,
+   "w": 390,
+   "h": 844,
+   "title": "38 Profile — Honorable, Vancouver (by restaurant)",
+   "is_interactive": true
+  },
+  "ProfileMap.dc.html": {
+   "x": 940,
+   "y": 6632,
+   "w": 390,
+   "h": 844,
+   "title": "39 Profile — Map, Sushi filter",
+   "is_interactive": true
+  },
+  "MyLists.dc.html": {
+   "x": 1410,
+   "y": 6632,
+   "w": 390,
+   "h": 844,
+   "title": "40 Your lists",
+   "is_interactive": true
+  },
+  "MyList.dc.html": {
+   "x": 1880,
+   "y": 6632,
+   "w": 390,
+   "h": 844,
+   "title": "41 Your Vancouver list",
+   "is_interactive": true
+  },
+  "OtherProfile.dc.html": {
+   "x": 2350,
+   "y": 6632,
+   "w": 390,
+   "h": 844,
+   "title": "42 Someone else",
+   "is_interactive": true
+  },
+  "Followers.dc.html": {
+   "x": 2820,
+   "y": 6632,
+   "w": 390,
+   "h": 844,
+   "title": "43 Followers",
+   "is_interactive": true
+  },
+  "Settings.dc.html": {
+   "x": 0,
+   "y": 7856,
+   "w": 390,
+   "h": 844,
+   "title": "44 Settings",
+   "is_interactive": true
+  },
+  "RemoveAds.dc.html": {
+   "x": 470,
+   "y": 7856,
+   "w": 390,
+   "h": 844,
+   "title": "45 Remove ads — $5",
+   "is_interactive": true
+  },
+  "EditProfile.dc.html": {
+   "x": 940,
+   "y": 7856,
+   "w": 390,
+   "h": 844,
+   "title": "46 Edit profile",
+   "is_interactive": true
+  },
+  "NotificationSettings.dc.html": {
+   "x": 1410,
+   "y": 7856,
+   "w": 390,
+   "h": 844,
+   "title": "47 Notifications",
+   "is_interactive": true
+  },
+  "Privacy.dc.html": {
+   "x": 1880,
+   "y": 7856,
+   "w": 390,
+   "h": 844,
+   "title": "48 Privacy & safety",
+   "is_interactive": true
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "Wordmark.dc.html",
+  "Splash.dc.html",
+  "Welcome.dc.html",
+  "OnbEmail.dc.html",
+  "OnbOtp.dc.html",
+  "OnbName.dc.html",
+  "OnbUsername.dc.html",
+  "OnbLocation.dc.html",
+  "OnbPhoto.dc.html",
+  "OnbFirstPick.dc.html",
+  "OnbAddFirst.dc.html",
+  "OnbTransition.dc.html",
+  "FirstLand.dc.html",
+  "Feed.dc.html",
+  "FeedAd.dc.html",
+  "FeedEmpty.dc.html",
+  "AddDish.dc.html",
+  "AddDishTags.dc.html",
+  "TagSearch.dc.html",
+  "Swap.dc.html",
+  "PickDetail.dc.html",
+  "Discover.dc.html",
+  "DiscoverHM.dc.html",
+  "DiscoverFilters.dc.html",
+  "DiscoverSearch.dc.html",
+  "Search.dc.html",
+  "Notifications.dc.html",
+  "Saved.dc.html",
+  "ShareHub.dc.html",
+  "ShareList.dc.html",
+  "ShareImage.dc.html",
+  "ShareCard.dc.html",
+  "SharedList.dc.html",
+  "WebList.dc.html",
+  "WebMap.dc.html",
+  "WebSignup.dc.html",
+  "WebDesktop.dc.html",
+  "Profile.dc.html",
+  "ProfileHM.dc.html",
+  "ProfileMap.dc.html",
+  "MyLists.dc.html",
+  "MyList.dc.html",
+  "OtherProfile.dc.html",
+  "Followers.dc.html",
+  "Settings.dc.html",
+  "RemoveAds.dc.html",
+  "EditProfile.dc.html",
+  "NotificationSettings.dc.html",
+  "Privacy.dc.html"
+ ],
+ "notes": {
+  "brandtitle": {
+   "x": 0,
+   "y": -300,
+   "text": "Final Meal — brand & screens",
+   "kind": "title1",
+   "maxW": 2640
+  },
+  "questions": {
+   "x": 2720,
+   "y": 0,
+   "w": 440,
+   "fill": "orange",
+   "text": "Open questions\n\n1. Skull: keep as-is, soften, or pair with a plate/knife mark?\n2. Private members: can followers still see their name? Can they be followed at all?\n3. Ads: how often in the feed (every 5th card?), and sold directly to restaurants or through an ad network?\n4. Web link domain + list URL format."
+  },
+  "decided": {
+   "x": 3220,
+   "y": 0,
+   "w": 440,
+   "fill": "green",
+   "text": "Decided\n\n• Name: Final Meal\n• Wordmark: Instrument Serif\n• Colour: ember + ember glow only\n• Skull marks Final Meal only; Honorable is a bone dot / outline badge\n• Sharing is link-first; shared lists are live\n• Links open on the web unless the app is installed; the web page pushes sign-up\n• Welcome: map version\n• Sign-in: Apple, Google or email code; no phone number\n• Everyone starts Public; Private is a setting (private picks stay on the map without a name)\n• Add a dish is one step; tags expand inline\n• Lists and Honorable are grouped by restaurant; the Final Meal tab always shows the five separately\n• Photo, note and tags are all optional\n• Tags: fixed list (searchable, larger) + personal custom tags\n• Money: ads in the feed; $5 one-time to remove"
+  },
+  "t_onb": {
+   "x": 0,
+   "y": 1060,
+   "text": "Welcome & sign-up",
+   "kind": "title1",
+   "maxW": 5560
+  },
+  "t_core": {
+   "x": 0,
+   "y": 2284,
+   "text": "Feed, adding & discovering",
+   "kind": "title1",
+   "maxW": 6970
+  },
+  "t_share": {
+   "x": 0,
+   "y": 3508,
+   "text": "Sharing lists",
+   "kind": "title1",
+   "maxW": 2270
+  },
+  "t_web": {
+   "x": 0,
+   "y": 4732,
+   "text": "Shared lists on the web (no app needed)",
+   "kind": "title1",
+   "maxW": 2690
+  },
+  "t_social": {
+   "x": 0,
+   "y": 6372,
+   "text": "Profile & social",
+   "kind": "title1",
+   "maxW": 3210
+  },
+  "t_settings": {
+   "x": 0,
+   "y": 7596,
+   "text": "Settings & account",
+   "kind": "title1",
+   "maxW": 2270
+  }
+ },
+ "designSystems": []
+}
