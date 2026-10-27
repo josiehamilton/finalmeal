@@ -167,8 +167,10 @@ Migration: `20261027052232_profiles_onboarding.sql`; tests: `supabase/tests/data
 
 - **New columns:** `onboarded_at timestamptz` (null until onboarding finishes) and `show_home_city boolean not null default true`.
 - **Grants:** `insert` and `update` on `public.profiles` are revoked from `anon` and `authenticated`; `authenticated` gets `update (display_name, username, bio, avatar_path, visibility, show_home_city)` only. So `trust_level`, `is_business_affiliated`, `affiliation_note`, `onboarded_at`, `home_*` and `id` cannot be written directly (error `42501`); the home fields change through `set_my_home_city`. The `profiles_insert_own` policy was dropped; `profiles_update_own` stays (row-level, owner only) alongside the column grants.
-- **Functions** (`is_username_available`, `create_my_profile`, `set_my_home_city`, `finish_onboarding`, `city_label`): see Functions and triggers. They are `security definer` with `search_path = ''`. Execute is granted to `authenticated` only and explicitly revoked from `anon` (Supabase grants new functions to `anon` by default). Error messages are the contract with `packages/api`: `profile_exists`, `username_taken`, `invalid_username`, `city_not_found`, `profile_not_found`.
-- Remaining `profiles` column protection (Phase 3/7): `follows.status`, see Known gaps above.
+- **Functions** (`is_username_available`, `create_my_profile`, `set_my_home_city`, `finish_onboarding`): see Functions and triggers. They are `security definer` with `search_path = ''`. Execute is granted to `authenticated` only and explicitly revoked from `anon` (Supabase grants new functions to `anon` by default). Error messages are the contract with `packages/api`: `profile_exists`, `username_taken`, `invalid_username`, `city_not_found`, `profile_not_found`.
+- `city_label` is not one of these: it is a plain immutable security-invoker function, executable by anyone, and PostgREST exposes it as a computed column on `cities`.
+- **`profiles_avatar_path_own` check:** `avatar_path` must be null or `<own id>/avatar-<unix-ms>.jpg`, so a profile cannot point at someone else's file (a violation is `23514`).
+- Remaining column protection (Phase 3/7): `follows.status`, see Known gaps above.
 
 ### Sign-in emails
 
@@ -191,7 +193,7 @@ Migration (policies): `20261027052235_avatars_storage.sql`; tests: `supabase/tes
 
 - **`avatars`**: declared in `config.toml` as `[storage.buckets.avatars]` (public, `2MiB`, `image/jpeg` only). `supabase start`, `db reset` and `config push` create the bucket from that setting; the migration holds only the policies, so the bucket row is not duplicated in SQL. Public read comes from the bucket being public (no read policy for anonymous visitors).
 - **Object path:** `<uid>/avatar-<unix-ms>.jpg`, one folder per person.
-- **Policies on `storage.objects`** (`authenticated`): `avatars_insert_own`, `avatars_update_own` and `avatars_delete_own` allow the operation only where `bucket_id = 'avatars'` and the first folder of the path is the caller's id. `avatars_select_own` lets the caller see their own folder through the API; the Storage API cannot delete or replace a file without it. Nobody can list other people's files through the API.
+- **Policies on `storage.objects`** (`authenticated`): `avatars_insert_own`, `avatars_update_own` and `avatars_delete_own` allow the operation only where `bucket_id = 'avatars'` and the first folder of the path is the caller's id; insert and update also require the whole name to match `<uid>/avatar-<digits>.jpg`, so `<uid>/evil.png` is refused. `avatars_select_own` lets the caller see their own folder through the API; the Storage API cannot delete or replace a file without it. Nobody can list other people's files through the API.
 - Direct SQL deletes from `storage.objects` are blocked by Supabase itself (use the Storage API), so the tests check the delete policy exists instead of running a delete.
 
 ### Edge Functions

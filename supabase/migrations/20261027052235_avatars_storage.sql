@@ -1,5 +1,5 @@
 -- Avatars: one folder per person inside the public "avatars" bucket.
--- Object path: <uid>/avatar-<unix-ms>.jpg
+-- Object path: <uid>/avatar-<unix-ms>.jpg (enforced for insert and update, not just the folder)
 -- The bucket itself (public, 2 MiB, image/jpeg) is declared in supabase/config.toml
 -- ([storage.buckets.avatars]); reads need no policy because the bucket is public.
 
@@ -19,6 +19,7 @@ create policy avatars_insert_own on storage.objects
   with check (
     bucket_id = 'avatars'
     and (storage.foldername(name))[1] = (select auth.uid())::text
+    and name ~ ('^' || (select auth.uid())::text || '/avatar-[0-9]+\.jpg$')
   );
 
 create policy avatars_update_own on storage.objects
@@ -30,6 +31,7 @@ create policy avatars_update_own on storage.objects
   with check (
     bucket_id = 'avatars'
     and (storage.foldername(name))[1] = (select auth.uid())::text
+    and name ~ ('^' || (select auth.uid())::text || '/avatar-[0-9]+\.jpg$')
   );
 
 create policy avatars_delete_own on storage.objects

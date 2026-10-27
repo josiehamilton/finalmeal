@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(34);
+select plan(37);
 
 -- Start from an empty database: the dev seed is deleted here and comes back
 -- when this transaction rolls back.
@@ -52,6 +52,13 @@ select lives_ok($$update public.profiles set bio = 'x' where id = '00000000-0000
 select is((select bio from public.profiles where id = '00000000-0000-0000-0000-00000000000a'),
   'x', 'the bio changed');
 
+select lives_ok($$update public.profiles set avatar_path = '00000000-0000-0000-0000-00000000000a/avatar-1730000000000.jpg' where id = '00000000-0000-0000-0000-00000000000a'$$,
+  'can point avatar_path at own avatar file');
+select throws_ok($$update public.profiles set avatar_path = '00000000-0000-0000-0000-00000000000b/avatar-1730000000000.jpg' where id = '00000000-0000-0000-0000-00000000000a'$$,
+  '23514', null, 'avatar_path cannot point at another person''s file');
+select throws_ok($$update public.profiles set avatar_path = '00000000-0000-0000-0000-00000000000a/evil.png' where id = '00000000-0000-0000-0000-00000000000a'$$,
+  '23514', null, 'avatar_path must match the avatar-<unix-ms>.jpg pattern');
+
 select is(public.is_username_available('anab'), true, 'own username counts as available (any case)');
 select is(public.is_username_available('a b'), false, 'invalid usernames are not available');
 
@@ -95,14 +102,21 @@ select is(
 );
 
 select public.finish_onboarding();
-select set_config('test.first_onboarded',
-  (select onboarded_at::text from public.profiles where id = '00000000-0000-0000-0000-00000000000a'), true);
-select isnt(current_setting('test.first_onboarded'), '', 'finish_onboarding sets onboarded_at');
-select pg_sleep(0.01);
+select isnt(
+  (select onboarded_at from public.profiles where id = '00000000-0000-0000-0000-00000000000a'), null,
+  'finish_onboarding sets onboarded_at');
+
+-- now() is fixed inside this transaction, so to prove the second call does not overwrite,
+-- back-date the value as the superuser first.
+reset role;
+update public.profiles set onboarded_at = '2000-01-01T00:00:00Z' where id = '00000000-0000-0000-0000-00000000000a';
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
 select public.finish_onboarding();
 select is(
-  (select onboarded_at::text from public.profiles where id = '00000000-0000-0000-0000-00000000000a'),
-  current_setting('test.first_onboarded'),
+  (select onboarded_at from public.profiles where id = '00000000-0000-0000-0000-00000000000a'),
+  '2000-01-01T00:00:00Z'::timestamptz,
   'a second finish_onboarding leaves onboarded_at unchanged'
 );
 

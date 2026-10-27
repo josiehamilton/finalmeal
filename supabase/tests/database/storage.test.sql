@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(9);
+select plan(12);
 
 delete from auth.users;
 insert into auth.users (id) values
@@ -31,6 +31,10 @@ select throws_ok($$
   insert into storage.objects (bucket_id, name)
   values ('other', '00000000-0000-0000-0000-00000000000a/avatar-1.jpg')
 $$, '42501', null, 'A cannot write to another bucket');
+select throws_ok($$
+  insert into storage.objects (bucket_id, name)
+  values ('avatars', '00000000-0000-0000-0000-00000000000a/evil.png')
+$$, '42501', null, 'A cannot upload a file that is not avatar-<unix-ms>.jpg, even in A''s own folder');
 select is((select count(*)::int from storage.objects where bucket_id = 'avatars'), 1,
   'A sees A''s own object');
 select lives_ok($$
@@ -42,6 +46,15 @@ select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
 select is((select count(*)::int from storage.objects where bucket_id = 'avatars'), 0,
   'B does not see A''s object through the API');
+select lives_ok($$
+  update storage.objects set metadata = '{"x":2}'::jsonb
+  where bucket_id = 'avatars' and name = '00000000-0000-0000-0000-00000000000a/avatar-1.jpg'
+$$, 'B''s update of A''s object runs without error (and affects 0 rows)');
+reset role;
+select is(
+  (select metadata::text from storage.objects
+   where bucket_id = 'avatars' and name = '00000000-0000-0000-0000-00000000000a/avatar-1.jpg'),
+  '{"x": 1}', 'B''s update changed nothing');
 
 -- Direct deletes from storage.objects are blocked for everyone by Supabase (use the Storage API),
 -- so check that the delete policy exists and is scoped to the caller's folder.

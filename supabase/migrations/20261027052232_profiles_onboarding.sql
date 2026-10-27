@@ -8,6 +8,13 @@ alter table public.profiles
   add column onboarded_at timestamptz,
   add column show_home_city boolean not null default true;
 
+-- avatar_path may only point at the person's own avatar file (<uid>/avatar-<unix-ms>.jpg),
+-- never at someone else's object.
+alter table public.profiles
+  add constraint profiles_avatar_path_own check (
+    avatar_path is null or avatar_path ~ ('^' || id::text || '/avatar-[0-9]+\.jpg$')
+  );
+
 -- ---------------------------------------------------------------- grants
 drop policy profiles_insert_own on public.profiles;
 revoke insert, update on public.profiles from anon, authenticated;
