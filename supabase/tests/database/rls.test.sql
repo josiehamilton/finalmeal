@@ -3,6 +3,12 @@ create extension if not exists pgtap with schema extensions;
 
 select plan(85);
 
+-- Start from an empty database: the dev seed is deleted here and comes back
+-- when this transaction rolls back.
+delete from auth.users;
+delete from public.places;
+delete from public.tags;
+
 -- Fixtures (inserted as the superuser, so RLS does not apply yet).
 -- Users: A = ...0a, B = ...0b, C = ...0c.
 insert into auth.users (id) values

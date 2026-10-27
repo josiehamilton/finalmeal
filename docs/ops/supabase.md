@@ -16,7 +16,7 @@ Final Meal keeps all of its data (people, dishes, places, picks, lists) in a Sup
 - Schema, policies and functions change **only** through files in `supabase/migrations/`. Create one with `supabase migration new <name>`. If you explore in Studio, turn the result into a migration before committing.
 - Auth, storage and API settings live in `supabase/config.toml`.
 - Edge Functions live in `supabase/functions/`.
-- `supabase/seed.sql` is sample data for local development only. It never runs in production.
+- `supabase/seed.sql` is sample data for local development only. It never runs in production: `supabase db push` does not run it, so never run it against the cloud project. It mirrors the design canvas: 6 people (`@example.com` emails, fixed ids `00000000-0000-4000-8000-00000000000N`, josie is `...0001`), 14 places, 17 dishes, 28 picks, the global food-type and dietary tags, Josie's personal tags, follows, 2 shared lists, and a few activities with notifications. `pnpm db:reset` loads it. The other database tests empty these tables inside their own rolled-back transaction, so they stay independent of the seed.
 - Every new setting, extension, bucket or secret gets a line in the inventory below.
 - Secrets are listed here by name only. Never commit `.env` or `.env.local` files.
 

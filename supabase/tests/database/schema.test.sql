@@ -3,6 +3,12 @@ create extension if not exists pgtap with schema extensions;
 
 select plan(37);
 
+-- Start from an empty database: the dev seed is deleted here and comes back
+-- when this transaction rolls back.
+delete from auth.users;
+delete from public.places;
+delete from public.tags;
+
 -- All 15 tables exist
 select has_table('public', t, t || ' exists')
 from unnest(array[
