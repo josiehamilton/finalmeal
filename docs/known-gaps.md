@@ -22,3 +22,5 @@ Things that are deliberately unfinished or must be revisited, with the phase tha
 - Use development builds instead of Expo Go.
 - Verify the splash background colour on real devices.
 - Work through the production configuration checklist in `docs/ops/supabase.md` ("Before the first production push").
+- Add the "City data © GeoNames (CC BY 4.0)" line to the About screen.
+- Run `pnpm db:import-cities` once against the production database (see "Cities" in `docs/ops/supabase.md`).

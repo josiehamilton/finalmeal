@@ -1,20 +1,55 @@
 -- Dev-only sample data that mirrors the design canvas. Runs on `supabase db reset`
 -- (after the migrations) and never in production. Emails are @example.com.
 
+-- ---------------------------------------------------------------- cities
+-- 24 real GeoNames cities (ids, names and populations from cities15000), so a full
+-- `pnpm db:import-cities` upserts over them cleanly. City data © GeoNames (CC BY 4.0).
+insert into public.cities
+  (geoname_id, name, ascii_name, region_code, region_name, country, country_name, population, location)
+select
+  geoname_id, name, ascii_name, region_code, region_name, country, country_name, population,
+  extensions.st_setsrid(extensions.st_makepoint(lng, lat), 4326)::extensions.geography
+from (values
+  (6173331, 'Vancouver', 'Vancouver', 'BC', 'British Columbia', 'CA', 'Canada', 662248, 49.24966, -123.11934),
+  (5814616, 'Vancouver', 'Vancouver', 'WA', 'Washington', 'US', 'United States', 196442, 45.63873, -122.66149),
+  (6174041, 'Victoria', 'Victoria', 'BC', 'British Columbia', 'CA', 'Canada', 289625, 48.4359, -123.35155),
+  (6167865, 'Toronto', 'Toronto', 'ON', 'Ontario', 'CA', 'Canada', 2794356, 43.70643, -79.39864),
+  (6077243, 'Montréal', 'Montreal', 'QC', 'Quebec', 'CA', 'Canada', 1762949, 45.50884, -73.58781),
+  (6141256, 'Saskatoon', 'Saskatoon', 'SK', 'Saskatchewan', 'CA', 'Canada', 266141, 52.13238, -106.66892),
+  (5128581, 'New York City', 'New York City', 'NY', 'New York', 'US', 'United States', 8804190, 40.71427, -74.00597),
+  (4975802, 'Portland', 'Portland', 'ME', 'Maine', 'US', 'United States', 66881, 43.65737, -70.2589),
+  (5746545, 'Portland', 'Portland', 'OR', 'Oregon', 'US', 'United States', 652503, 45.52345, -122.67621),
+  (5391959, 'San Francisco', 'San Francisco', 'CA', 'California', 'US', 'United States', 827526, 37.77493, -122.41942),
+  (5368361, 'Los Angeles', 'Los Angeles', 'CA', 'California', 'US', 'United States', 3820914, 34.05223, -118.24368),
+  (4887398, 'Chicago', 'Chicago', 'IL', 'Illinois', 'US', 'United States', 2664452, 41.85003, -87.65005),
+  (3530597, 'Mexico City', 'Mexico City', null, 'Mexico City', 'MX', 'Mexico', 12294193, 19.42847, -99.12766),
+  (2643743, 'London', 'London', null, 'England', 'GB', 'United Kingdom', 8961989, 51.50853, -0.12574),
+  (2988507, 'Paris', 'Paris', null, 'Île-de-France', 'FR', 'France', 2138551, 48.85341, 2.3488),
+  (2950159, 'Berlin', 'Berlin', null, 'State of Berlin', 'DE', 'Germany', 3426354, 52.52437, 13.41053),
+  (1850147, 'Tokyo', 'Tokyo', null, 'Tokyo', 'JP', 'Japan', 9733276, 35.6895, 139.69171),
+  (1853909, 'Osaka', 'Osaka', null, 'Osaka', 'JP', 'Japan', 2753862, 34.69379, 135.50107),
+  (1835848, 'Seoul', 'Seoul', null, 'Seoul', 'KR', 'South Korea', 10349312, 37.566, 126.9784),
+  (1609350, 'Bangkok', 'Bangkok', null, 'Bangkok', 'TH', 'Thailand', 5104476, 13.75398, 100.50144),
+  (1566083, 'Ho Chi Minh City', 'Ho Chi Minh City', null, 'Ho Chi Minh City (HCMC)', 'VN', 'Vietnam', 14002598, 10.82302, 106.62965),
+  (1880252, 'Singapore', 'Singapore', null, null, 'SG', 'Singapore', 5638700, 1.28967, 103.85007),
+  (2147714, 'Sydney', 'Sydney', 'NSW', 'New South Wales', 'AU', 'Australia', 5638830, -33.86785, 151.20732),
+  (2158177, 'Melbourne', 'Melbourne', 'VIC', 'Victoria', 'AU', 'Australia', 5435590, -37.814, 144.96332)
+) as v(geoname_id, name, ascii_name, region_code, region_name, country, country_name, population, lat, lng);
+
 -- ---------------------------------------------------------------- people
 -- Fixed ids so later phases and tests can refer to people:
 -- josie ...0001, mike ...0002, ari ...0003, alli ...0004, dev ...0005, sam ...0006
 create temp table seed_people (
   id uuid, username text, display_name text, bio text,
-  home_text text, lat float8, lng float8, trust public.trust_level
+  home_geoname_id integer, trust public.trust_level
 ) on commit drop;
 insert into seed_people values
-  ('00000000-0000-4000-8000-000000000001', 'josiehamilton', 'Josie Hamilton', 'Chasing the perfect meal.', 'Vancouver, BC', 49.2827, -123.1207, 'trusted'),
-  ('00000000-0000-4000-8000-000000000002', 'mikebrennan',   'Mike Brennan',   'Tokyo → NYC. Always hungry.', 'New York, NY', 40.7128, -74.0060, 'trusted'),
-  ('00000000-0000-4000-8000-000000000003', 'arimitchell',   'Ari Mitchell',   'Professional eater. Amateur chef.', 'Vancouver, BC', 49.2827, -123.1207, 'trusted'),
-  ('00000000-0000-4000-8000-000000000004', 'allimercer',    'Alli Mercer',    'Spice level: nuclear.', 'Saskatoon, SK', 52.1332, -106.6700, 'trusted'),
-  ('00000000-0000-4000-8000-000000000005', 'devpatel',      'Dev Patel',      null, 'Vancouver, BC', 49.2827, -123.1207, 'trusted'),
-  ('00000000-0000-4000-8000-000000000006', 'samokafor',     'Sam Okafor',     null, 'Vancouver, BC', 49.2827, -123.1207, 'new');
+  ('00000000-0000-4000-8000-000000000001', 'josiehamilton', 'Josie Hamilton', 'Chasing the perfect meal.', 6173331, 'trusted'),
+  ('00000000-0000-4000-8000-000000000002', 'mikebrennan',   'Mike Brennan',   'Tokyo → NYC. Always hungry.', 5128581, 'trusted'),
+  ('00000000-0000-4000-8000-000000000003', 'arimitchell',   'Ari Mitchell',   'Professional eater. Amateur chef.', 6173331, 'trusted'),
+  ('00000000-0000-4000-8000-000000000004', 'allimercer',    'Alli Mercer',    'Spice level: nuclear.', 6141256, 'trusted'),
+  ('00000000-0000-4000-8000-000000000005', 'devpatel',      'Dev Patel',      null, 6173331, 'trusted'),
+  ('00000000-0000-4000-8000-000000000006', 'samokafor',     'Sam Okafor',     null, 6173331, 'new');
 
 insert into auth.users (
   instance_id, id, aud, role, email, email_confirmed_at,
@@ -35,12 +70,17 @@ select
   'email', now(), now(), now()
 from seed_people;
 
-insert into public.profiles (id, username, display_name, bio, home_place_text, home_location, trust_level)
+-- Home city label: name, then region_code (US/CA/AU only, otherwise region_name), then country.
+insert into public.profiles (id, username, display_name, bio, home_city_id, home_place_text, home_location, trust_level)
 select
-  id, username, display_name, bio, home_text,
-  extensions.st_setsrid(extensions.st_makepoint(lng, lat), 4326)::extensions.geography,
-  trust
-from seed_people;
+  sp.id, sp.username, sp.display_name, sp.bio, c.id,
+  concat_ws(', ', c.name,
+    case when c.country in ('US', 'CA', 'AU') then c.region_code else c.region_name end,
+    c.country_name),
+  c.location,
+  sp.trust
+from seed_people sp
+join public.cities c on c.geoname_id = sp.home_geoname_id;
 
 -- ---------------------------------------------------------------- places
 insert into public.places (source, name, area, city, region, country, location)
