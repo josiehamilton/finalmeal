@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import { BackHandler, StyleSheet, Text } from 'react-native';
 import { ApiError, friendlyMessage, sendEmailCode } from '@finalmeal/api';
 import { isPlausibleEmail, normalizeEmail } from '@finalmeal/core';
 import { colors } from '@finalmeal/ui-tokens';
@@ -39,12 +39,30 @@ export default function EmailStep() {
     }
   }
 
+  // Resumed after a relaunch and sent back here, there is nothing behind this screen; Back then goes to Welcome.
+  const goBack = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/welcome');
+  }, [router]);
+
+  // The Android back button does the same, instead of leaving the app from a sign-up step.
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (router.canGoBack()) return false; // the stack handles it
+        goBack();
+        return true;
+      });
+      return () => subscription.remove();
+    }, [router, goBack]),
+  );
+
   return (
     <OnboardingScreen
       step={1}
       title="What’s your email?"
       subtitle="We’ll send a code to sign you in. No passwords to remember."
-      onBack={() => router.back()}
+      onBack={goBack}
       cta={{ label: 'Send code', onPress: send, busy }}
       footer={<Text style={styles.footer}>We never share your email.</Text>}
     >

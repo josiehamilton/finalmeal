@@ -3,7 +3,13 @@ import { BackHandler } from 'react-native';
 import { signOut } from '@finalmeal/api';
 import Name from '../../app/(onboarding)/name';
 
-const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
+const mockRouter = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  dismissTo: jest.fn(),
+  canGoBack: jest.fn(),
+};
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
   useLocalSearchParams: () => ({}),
@@ -22,6 +28,7 @@ const cta = () => screen.getByRole('button', { name: 'Continue' });
 describe('Name step', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRouter.canGoBack.mockReturnValue(false);
     mockSignOut.mockResolvedValue(undefined);
   });
 
@@ -94,6 +101,15 @@ describe('Name step', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(mockRouter.replace).toHaveBeenCalledWith('/email');
     expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(mockSignOut).toHaveBeenCalledWith({ fake: 'client' }, 'local');
+  });
+
+  it('returns to the Email screen already in the history instead of adding a second one', async () => {
+    mockRouter.canGoBack.mockReturnValue(true); // Welcome and Email are behind this screen
+    await render(<Name />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(mockRouter.dismissTo).toHaveBeenCalledWith('/email');
+    expect(mockRouter.replace).not.toHaveBeenCalled();
     expect(mockSignOut).toHaveBeenCalledWith({ fake: 'client' }, 'local');
   });
 

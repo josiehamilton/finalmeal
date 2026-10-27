@@ -1,11 +1,14 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { BackHandler } from 'react-native';
 import { ApiError, sendEmailCode } from '@finalmeal/api';
 import Email from '../../app/(onboarding)/email';
 
-const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
+const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn() };
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
   useLocalSearchParams: () => ({}),
+  useFocusEffect: (cb: () => void) =>
+    jest.requireActual<typeof import('react')>('react').useEffect(cb, [cb]),
 }));
 jest.mock('@finalmeal/api', () => ({
   ...jest.requireActual('@finalmeal/api'),
@@ -22,7 +25,43 @@ const sendButton = () => screen.getByRole('button', { name: 'Send code' });
 describe('Email step', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRouter.canGoBack.mockReturnValue(true);
     mockSend.mockResolvedValue(undefined);
+  });
+
+  describe('Back', () => {
+    it('goes back when there is a screen to go back to', async () => {
+      mockRouter.canGoBack.mockReturnValue(true);
+      await render(<Email />);
+      await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+      expect(mockRouter.back).toHaveBeenCalledTimes(1);
+      expect(mockRouter.replace).not.toHaveBeenCalled();
+    });
+
+    it('goes to Welcome when there is nothing behind it (after Back from Name)', async () => {
+      mockRouter.canGoBack.mockReturnValue(false);
+      await render(<Email />);
+      await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+      expect(mockRouter.replace).toHaveBeenCalledWith('/welcome');
+      expect(mockRouter.back).not.toHaveBeenCalled();
+    });
+  });
+
+  it('treats the Android back button like Back when nothing is behind it, and leaves it alone otherwise', async () => {
+    let handler: (...args: never[]) => boolean | null | undefined = () => false;
+    const add = jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, cb) => {
+      handler = cb;
+      return { remove: jest.fn() };
+    });
+    mockRouter.canGoBack.mockReturnValue(false);
+    await render(<Email />);
+    expect(handler()).toBe(true);
+    expect(mockRouter.replace).toHaveBeenCalledWith('/welcome');
+    mockRouter.replace.mockClear();
+    mockRouter.canGoBack.mockReturnValue(true);
+    expect(handler()).toBe(false);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+    add.mockRestore();
   });
 
   it('shows the title, subtitle, placeholder and footer', async () => {

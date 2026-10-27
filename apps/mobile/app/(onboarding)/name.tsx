@@ -34,8 +34,12 @@ export default function NameStep() {
 
   // The account exists from the code step on, but the profile does not yet. Going back means
   // starting over, so end this device's sign-in (it also works offline) and begin at Email.
+  // Normally Welcome and Email are behind this screen: pop back to that Email rather than adding a
+  // second one (its Back would then lead to a stale copy). Resumed after a relaunch there is
+  // nothing behind, so Email replaces this screen (and its own Back goes to Welcome).
   const goBack = useCallback(async () => {
-    router.replace('/email');
+    if (router.canGoBack()) router.dismissTo('/email');
+    else router.replace('/email');
     try {
       await signOut(getSupabase(), 'local');
     } catch (e) {
