@@ -46,7 +46,7 @@ create table public.dishes (
   id uuid primary key default gen_random_uuid(),
   place_id uuid not null references public.places on delete cascade,
   name text not null check (char_length(name) between 1 and 80),
-  name_key text not null,
+  name_key text not null check (name_key <> ''),
   merged_into_id uuid references public.dishes,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

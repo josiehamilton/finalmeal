@@ -59,7 +59,7 @@ Do these before the first `supabase db push` and `supabase config push` (Phase 8
   - a sensible `minimum_password_length` (local is 6)
   - email rate limits (`[auth.rate_limit] email_sent`; local is 2 per hour)
   - SMTP (`[auth.email.smtp]`) with a real sender, since the built-in cloud mailer is heavily limited
-- [ ] **Database locale must match local.** `normalize_dish_name` uses `[:alnum:]`, whose meaning depends on the locale. Local uses ICU `en_US.UTF-8`; confirm the production database reports the same (`select datcollate, datctype, datlocprovider from pg_database where datname = 'postgres'`) before any dish data is written.
+- [ ] **Database locale must match local.** `normalize_dish_name` uses the `[:space:]`, `[:punct:]` and `[:cntrl:]` character classes, whose meaning depends on the locale. Local uses ICU `en_US.UTF-8`; confirm the production database reports the same (`select datcollate, datctype, datlocprovider from pg_database where datname = 'postgres'`) before any dish data is written.
 - [ ] **`NEXT_PUBLIC_*` values are baked in at `next build`.** Build the production web app with production values; a build made with local values will point at the local database.
 - [ ] **The seed never runs in production.** `seed.sql` is sample data for local development only; `db push` does not run it, and it must never be run by hand against the cloud project.
 
@@ -103,7 +103,7 @@ All installed into the `extensions` schema by `20261026233813_extensions_and_typ
 | Name | Purpose |
 |---|---|
 | `public.set_updated_at()` | Trigger function that refreshes `updated_at` on update. |
-| `public.normalize_dish_name(text)` | Immutable. Turns a dish name into its comparison key: accents removed, lower case, punctuation collapsed, simple plurals folded. |
+| `public.normalize_dish_name(text)` | Immutable. Turns a dish name into its comparison key: accents removed, lower case, split into words on whitespace, punctuation, symbols and emoji (combining marks such as Thai tone marks stay inside their word), simple plurals folded. A name that normalises to empty is rejected by the `dishes.name_key <> ''` check. |
 | `dishes_set_name_key` | Before insert/update on `dishes`: fills `name_key`. |
 | `pick_tags_check_owner` | Before insert/update on `pick_tags`: raises `personal_tag_not_owned` if a personal tag is put on someone else's pick. |
 

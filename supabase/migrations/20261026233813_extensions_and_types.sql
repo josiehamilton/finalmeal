@@ -30,8 +30,17 @@ begin
 end;
 $$;
 
--- Dish name normalisation: unaccent, lower-case, collapse punctuation and
--- whitespace, trim, then fold simple plurals (words > 3 chars ending in s but not ss).
+-- Dish name normalisation: unaccent, lower-case, split into words on whitespace,
+-- punctuation, control characters and symbols (including emoji), then fold simple
+-- plurals (words > 3 chars ending in s but not ss).
+-- Words are split on separators rather than "anything that is not a letter", so combining
+-- marks (Thai tone marks, Devanagari vowel signs, ...) stay inside their word. The symbol
+-- ranges are explicit because the database's [:punct:] class covers punctuation only, not
+-- symbols: ASCII symbols, Latin-1 symbols, general punctuation, currency, arrows, maths,
+-- technical, shapes and dingbats, CJK symbols, fullwidth punctuation, emoji and tags.
+-- U+200C/U+200D (zero-width joiners, needed inside Persian/Indic words) are kept; those left
+-- at the edge of a word by an emoji sequence are trimmed. A name with no letters or digits
+-- normalises to '' and is rejected by the dishes.name_key check.
 create function public.normalize_dish_name(input text)
 returns text
 language sql
@@ -46,11 +55,13 @@ as $$
     ' ' order by ord
   ), '')
   from regexp_split_to_table(
-    btrim(regexp_replace(
+    regexp_replace(
       lower(extensions.unaccent('extensions.unaccent'::regdictionary, input)),
-      '[^[:alnum:]]+', ' ', 'g'
-    )),
+      '[[:space:][:punct:][:cntrl:]$+<=>^`|~\u00A0-\u00A9\u00AB-\u00B4\u00B6-\u00B9\u00BB-\u00BF\u00D7\u00F7\u2000-\u200B\u200E-\u206F\u20A0-\u20CF\u2100-\u214F\u2190-\u2BFF\u2E00-\u2E7F\u3000-\u3004\u3008-\u3020\u3030\u3036-\u3037\u303D-\u303F\u3200-\u33FF\u4DC0-\u4DFF\uFE00-\uFE0F\uFE10-\uFE1F\uFE30-\uFE6F\uFEFF\uFF01-\uFF0F\uFF1A-\uFF20\uFF3B-\uFF40\uFF5B-\uFF65\uFFE0-\uFFEE\uFFFC\uFFFD\U0001F000-\U0001FAFF\U000E0000-\U000E007F]+',
+      ' ', 'g'
+    ),
     ' '
-  ) with ordinality as t(w, ord)
+  ) with ordinality as t(raw, ord),
+  lateral (select btrim(raw, chr(8204) || chr(8205)) as w) trimmed
   where w <> '';
 $$;

@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(37);
+select plan(38);
 
 -- Start from an empty database: the dev seed is deleted here and comes back
 -- when this transaction rolls back.
@@ -83,6 +83,11 @@ insert into public.dishes (place_id, name) values ('10000000-0000-0000-0000-0000
 select throws_ok($$
   insert into public.dishes (place_id, name) values ('10000000-0000-0000-0000-000000000001', 'Banh Mi')
 $$, '23505', null, 'Banh Mi duplicates Bánh Mì at the same place');
+
+-- A dish name that normalises to nothing (punctuation or emoji only) is rejected
+select throws_ok($$
+  insert into public.dishes (place_id, name) values ('10000000-0000-0000-0000-000000000001', '!!!')
+$$, '23514', null, 'a punctuation-only dish name is rejected');
 
 select is(
   (select name_key from public.dishes where name = 'Bánh Mì'),
