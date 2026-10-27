@@ -35,4 +35,13 @@ describe('CodeInput', () => {
     expect(input.props.textContentType).toBe('oneTimeCode');
     expect(input.props.autoComplete).toBe('one-time-code');
   });
+
+  it('finds the code in a long paste', async () => {
+    const onComplete = jest.fn();
+    await render(<CodeInput onComplete={onComplete} />);
+    const input = screen.getByTestId('code-input');
+    expect(input.props.maxLength).toBeUndefined();
+    await fireEvent.changeText(input, 'Your code is 123456');
+    expect(onComplete).toHaveBeenCalledWith('123456');
+  });
 });

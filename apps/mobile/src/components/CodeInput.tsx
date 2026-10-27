@@ -76,7 +76,6 @@ export function CodeInput({
         keyboardType="number-pad"
         textContentType="oneTimeCode"
         autoComplete="one-time-code"
-        maxLength={CODE_LENGTH * 2}
         caretHidden
         selectionColor="transparent"
         style={styles.hiddenInput}

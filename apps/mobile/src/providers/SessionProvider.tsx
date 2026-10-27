@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
-import { friendlyMessage, getMyProfile } from '@finalmeal/api';
+import { friendlyMessage, getMyProfile, throwIfError } from '@finalmeal/api';
 import type { FinalMealClient, MyProfile } from '@finalmeal/api';
 import { getSupabase } from '../lib/supabase';
 
@@ -23,7 +23,12 @@ export interface SessionState {
   loading: boolean;
   /** Friendly copy when the profile could not be loaded (or the app is misconfigured). */
   error: string | null;
-  /** Reloads the profile; resolves to it (null when there is none yet or loading failed). */
+  /**
+   * Reloads the profile for whoever the client says is signed in. Resolves to the profile, or
+   * null only when it is genuinely absent (signed out, or signed in with no profile row yet).
+   * Rejects when the load fails (the friendly text is also in `error`), so callers must not
+   * treat a failure as "no profile": use friendlyMessage(e) on the rejection.
+   */
   refreshProfile(): Promise<MyProfile | null>;
 }
 
@@ -47,9 +52,9 @@ export function SessionProvider({ client, children }: SessionProviderProps) {
   const [result, setResult] = useState<ProfileResult | null>(null);
   const [setupError, setSetupError] = useState<string | null>(null);
   const clientRef = useRef<FinalMealClient | null>(null);
-  const userIdRef = useRef<string | null>(null);
   const requestRef = useRef(0);
 
+  /** Loads and stores the profile. On failure it stores the friendly error, then rethrows. */
   const loadProfile = useCallback(async (userId: string): Promise<MyProfile | null> => {
     const active = clientRef.current;
     if (!active) return null;
@@ -67,7 +72,7 @@ export function SessionProvider({ client, children }: SessionProviderProps) {
           error: friendlyMessage(e),
         }));
       }
-      return null;
+      throw e;
     }
   }, []);
 
@@ -87,7 +92,6 @@ export function SessionProvider({ client, children }: SessionProviderProps) {
   }, [client]);
 
   const userId = session === undefined ? undefined : (session?.user.id ?? null);
-  userIdRef.current = userId ?? null;
 
   useEffect(() => {
     if (userId === undefined) return;
@@ -96,11 +100,18 @@ export function SessionProvider({ client, children }: SessionProviderProps) {
       setResult(null);
       return;
     }
-    void loadProfile(userId);
+    // A failure is already stored as `error` by loadProfile.
+    loadProfile(userId).catch(() => {});
   }, [userId, loadProfile]);
 
   const refreshProfile = useCallback(async () => {
-    const id = userIdRef.current;
+    const active = clientRef.current;
+    if (!active) return null;
+    // Ask the client, not React state: right after verifyOtp resolves, the auth event that
+    // updates our state may not have been rendered yet.
+    const { data, error } = await active.auth.getSession();
+    throwIfError(error);
+    const id = data.session?.user.id;
     return id ? loadProfile(id) : null;
   }, [loadProfile]);
 

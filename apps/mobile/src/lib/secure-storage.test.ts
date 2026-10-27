@@ -39,6 +39,14 @@ describe('LargeSecureStore', () => {
     expect(await store.getItem('k')).toBeNull();
   });
 
+  it('returns null, rather than throwing, when the stored key does not match the ciphertext', async () => {
+    const store = new LargeSecureStore();
+    // Long enough that wrongly decrypted bytes are certain not to be valid UTF-8.
+    await store.setItem('k3', JSON.stringify({ token: 'y'.repeat(400) }));
+    await SecureStore.setItemAsync('k3', 'ab'.repeat(32));
+    await expect(store.getItem('k3')).resolves.toBeNull();
+  });
+
   it('removes both halves', async () => {
     const store = new LargeSecureStore();
     await store.setItem('k2', 'hello');

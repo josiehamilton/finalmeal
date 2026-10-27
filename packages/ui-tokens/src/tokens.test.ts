@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { colors, contrastRatio, cssVariables, skull } from './index';
+import { colors, contrastRatio, cssVariables, map, skull } from './index';
 
 const ALLOWED_HEX = [
   '#0B0A09',
@@ -65,5 +65,14 @@ describe('contrast', () => {
   it('computes known reference values', () => {
     expect(contrastRatio('#000000', '#FFFFFF')).toBeCloseTo(21, 5);
     expect(contrastRatio('#FFFFFF', '#FFFFFF')).toBeCloseTo(1, 5);
+  });
+});
+
+describe('map', () => {
+  it('has the canvas map-art tones, apart from the brand colours', () => {
+    expect(map).toEqual({ land: '#141210', water: '#0F1A1F', park: '#16201A' });
+    for (const hex of Object.values(map)) {
+      expect(Object.values(colors)).not.toContain(hex);
+    }
   });
 });

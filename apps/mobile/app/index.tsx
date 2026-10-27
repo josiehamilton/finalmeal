@@ -21,10 +21,19 @@ export default function Index() {
       <WelcomeScreen
         notice={error}
         retrying={retrying}
-        onRetry={() => {
-          setRetrying(true);
-          void refreshProfile().finally(() => setRetrying(false));
-        }}
+        // A setup error (no session) cannot be fixed by retrying, so offer Try again only
+        // when a profile load failed.
+        onRetry={
+          session
+            ? () => {
+                setRetrying(true);
+                // A failure stays visible through `error`.
+                refreshProfile()
+                  .catch(() => {})
+                  .finally(() => setRetrying(false));
+              }
+            : undefined
+        }
       />
     );
   }

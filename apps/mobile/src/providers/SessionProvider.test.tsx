@@ -3,6 +3,7 @@ import { Pressable, Text } from 'react-native';
 import { getMyProfile } from '@finalmeal/api';
 import type { FinalMealClient, MyProfile } from '@finalmeal/api';
 import { SessionProvider, useSession } from './SessionProvider';
+import type { SessionState } from './SessionProvider';
 
 jest.mock('@finalmeal/api', () => ({
   ...jest.requireActual('@finalmeal/api'),
@@ -27,9 +28,11 @@ type Listener = (event: string, session: unknown) => void;
 
 function fakeClient(initial: unknown) {
   let listener: Listener = () => {};
+  let current = initial;
   const unsubscribe = jest.fn();
   const client = {
     auth: {
+      getSession: async () => ({ data: { session: current }, error: null }),
       onAuthStateChange: (cb: Listener) => {
         listener = cb;
         cb('INITIAL_SESSION', initial);
@@ -37,13 +40,23 @@ function fakeClient(initial: unknown) {
       },
     },
   } as unknown as FinalMealClient;
-  return { client, emit: (event: string, s: unknown) => listener(event, s), unsubscribe };
+  return {
+    client,
+    emit: (event: string, s: unknown) => {
+      current = s;
+      listener(event, s);
+    },
+    unsubscribe,
+  };
 }
 
 const SESSION = { user: { id: 'u1' } };
 
+let latest: SessionState;
+
 function Probe() {
-  const { session, profile, loading, error, refreshProfile } = useSession();
+  latest = useSession();
+  const { session, profile, loading, error, refreshProfile } = latest;
   return (
     <>
       <Text testID="state">
@@ -54,7 +67,7 @@ function Probe() {
           error,
         })}
       </Text>
-      <Pressable testID="refresh" onPress={() => void refreshProfile()} />
+      <Pressable testID="refresh" onPress={() => refreshProfile().catch(() => {})} />
     </>
   );
 }
@@ -130,5 +143,59 @@ describe('SessionProvider', () => {
     expect(state()).toEqual({ session: false, profile: null, loading: false, error: null });
     await view.unmount();
     expect(unsubscribe).toHaveBeenCalled();
+  });
+
+  it('refreshProfile finds the profile in the same tick as a sign-in', async () => {
+    mockGetMyProfile.mockResolvedValue(PROFILE);
+    const { client, emit } = fakeClient(null);
+    await render(
+      <SessionProvider client={client}>
+        <Probe />
+      </SessionProvider>,
+    );
+    await waitFor(() => expect(state().loading).toBe(false));
+
+    let refreshed: Promise<MyProfile | null> | undefined;
+    await act(async () => {
+      emit('SIGNED_IN', SESSION);
+      // Before React has rendered the new session.
+      refreshed = latest.refreshProfile();
+    });
+    await expect(refreshed).resolves.toEqual(PROFILE);
+    await waitFor(() => expect(state().profile).toBe('josie'));
+  });
+
+  it('refreshProfile resolves null when signed in but no profile exists yet', async () => {
+    mockGetMyProfile.mockResolvedValue(null);
+    const { client } = fakeClient(SESSION);
+    await render(
+      <SessionProvider client={client}>
+        <Probe />
+      </SessionProvider>,
+    );
+    await waitFor(() => expect(state().loading).toBe(false));
+    await expect(latest.refreshProfile()).resolves.toBeNull();
+    expect(state().error).toBeNull();
+  });
+
+  it('refreshProfile rejects, rather than resolving null, when the load fails', async () => {
+    mockGetMyProfile.mockResolvedValueOnce(PROFILE);
+    const { client } = fakeClient(SESSION);
+    await render(
+      <SessionProvider client={client}>
+        <Probe />
+      </SessionProvider>,
+    );
+    await waitFor(() => expect(state().profile).toBe('josie'));
+
+    mockGetMyProfile.mockRejectedValueOnce(new TypeError('fetch failed'));
+    let failure: unknown;
+    await act(async () => {
+      await latest.refreshProfile().catch((e: unknown) => (failure = e));
+    });
+    expect(failure).toBeInstanceOf(TypeError);
+    expect(state().error).toBe('Can’t reach the kitchen right now.');
+    // The last good profile is kept.
+    expect(state().profile).toBe('josie');
   });
 });

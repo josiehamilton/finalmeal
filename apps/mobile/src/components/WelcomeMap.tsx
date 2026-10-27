@@ -1,19 +1,12 @@
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
-import { colors, skull } from '@finalmeal/ui-tokens';
+import { colors, map, skull } from '@finalmeal/ui-tokens';
 import { fontFamily } from '../lib/fonts';
 
 // The map art is drawn once on a 390 x 400 board (the top of design/canvas-generator/gen.py
 // `map_svg`) and scaled with `slice`, so every phone width shows it edge to edge.
 const BOARD_WIDTH = 390;
 export const MAP_HEIGHT = 400;
-
-// Map-only tones from the canvas art. They are not brand colours and are used nowhere else.
-const MAP = {
-  land: '#141210',
-  water: '#0F1A1F',
-  park: '#16201A',
-} as const;
 
 const [, , SKULL_W = 1, SKULL_H = 1] = skull.viewBox.split(' ').map(Number);
 
@@ -89,12 +82,12 @@ export function WelcomeMap() {
         viewBox={`0 0 ${BOARD_WIDTH} ${MAP_HEIGHT}`}
         preserveAspectRatio="xMidYMin slice"
       >
-        <Rect width={BOARD_WIDTH} height={MAP_HEIGHT} fill={MAP.land} />
+        <Rect width={BOARD_WIDTH} height={MAP_HEIGHT} fill={map.land} />
         <Path
           d="M0 520 C 80 500 120 560 210 540 S 340 470 390 500 L 390 640 C 300 660 240 610 160 640 S 40 690 0 660 Z"
-          fill={MAP.water}
+          fill={map.water}
         />
-        <Path d="M260 0 C 270 80 330 120 390 130 L 390 0 Z" fill={MAP.water} />
+        <Path d="M260 0 C 270 80 330 120 390 130 L 390 0 Z" fill={map.water} />
         <G stroke={colors.bone} strokeOpacity={0.07} strokeWidth={1.5} fill="none">
           <Path d="M0 120 L390 160" />
           <Path d="M0 260 L390 230" />
@@ -107,7 +100,7 @@ export function WelcomeMap() {
           <Path d="M0 330 C 120 300 240 340 390 300" />
           <Path d="M120 0 C 140 200 100 400 140 844" />
         </G>
-        <Rect x={190} y={280} width={70} height={60} rx={6} fill={MAP.park} />
+        <Rect x={190} y={280} width={70} height={60} rx={6} fill={map.park} />
         {HONORABLE_PINS.map((pin) => (
           <HonorablePin key={`${pin.x}-${pin.y}`} {...pin} />
         ))}
@@ -123,7 +116,7 @@ export function WelcomeMap() {
 }
 
 const styles = StyleSheet.create({
-  container: { height: MAP_HEIGHT, overflow: 'hidden', backgroundColor: MAP.land },
+  container: { height: MAP_HEIGHT, overflow: 'hidden', backgroundColor: map.land },
   label: {
     position: 'absolute',
     paddingVertical: 6,

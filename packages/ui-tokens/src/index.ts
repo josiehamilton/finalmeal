@@ -1,4 +1,5 @@
 export { colors, type ColorName } from './colors';
+export { map } from './map';
 export { fonts, typeScale, WORDMARK_TEXT } from './typography';
 export { radii, space } from './layout';
 export { skull } from './skull';
