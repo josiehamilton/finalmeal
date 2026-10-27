@@ -28,12 +28,16 @@ Apps must only ever be given the publishable key. The service-role key is never 
 
 `@finalmeal/api` tests: `pnpm --filter @finalmeal/api test` (unit, no Supabase needed) and `pnpm --filter @finalmeal/api test:integration` (needs Supabase running, seeded, and `pnpm env:local` run). After a schema change, refresh `packages/api/src/database.types.ts` with `pnpm --filter @finalmeal/api gen:types`.
 
+## Supabase CLI version
+
+The CLI is a pinned root devDependency (`supabase` in the root `package.json`, currently exactly `2.121.0`), installed by `pnpm install`; its postinstall download is allowed through `pnpm.onlyBuiltDependencies`. The `pnpm db:*` scripts, `pnpm env:local` and CI all use that copy, so local and CI always run the same version. To use the CLI directly, run `pnpm exec supabase ...`. Upgrade it by changing the version in the root `package.json` and running `pnpm install`; check `pnpm db:reset && pnpm db:test` afterwards. Do not rely on a global (Homebrew) install.
+
 ## Rules
 
 - Schema, policies and functions change **only** through files in `supabase/migrations/`. Create one with `supabase migration new <name>`. If you explore in Studio, turn the result into a migration before committing.
 - Auth, storage and API settings live in `supabase/config.toml`.
 - Edge Functions live in `supabase/functions/`.
-- `supabase/seed.sql` is sample data for local development only. It never runs in production: `supabase db push` does not run it, so never run it against the cloud project. It mirrors the design canvas: 6 people (`@example.com` emails, fixed ids `00000000-0000-4000-8000-00000000000N`, josie is `...0001`), 14 places, 17 dishes, 28 picks, the global food-type and dietary tags, Josie's personal tags, follows, 2 shared lists, and a few activities with notifications. `pnpm db:reset` loads it. The other database tests empty these tables inside their own rolled-back transaction, so they stay independent of the seed.
+- `supabase/seed.sql` is sample data for local development only. It never runs in production: `supabase db push` does not run it, so never run it against the cloud project. It mirrors the design canvas: 6 people (`@example.com` emails, fixed ids `00000000-0000-4000-8000-00000000000N`, josie is `...0001`), 14 places, 17 dishes, 28 picks, the global food-type and dietary tags, Josie's personal tags, follows, 2 shared lists, one save, and a few activities with notifications. `pnpm db:reset` loads it. The other database tests empty these tables inside their own rolled-back transaction, so they stay independent of the seed.
 - Every new setting, extension, bucket or secret gets a line in the inventory below.
 - Secrets are listed here by name only. Never commit `.env` or `.env.local` files.
 
@@ -133,7 +137,12 @@ Migration: `20261027000454_rls_baseline.sql`; tests: `supabase/tests/database/rl
 | `notifications` | none | read and update own |
 | `reports` | none | insert as yourself; cannot read |
 
-Known gaps left for Phase 3/7: users can edit their own `profiles.trust_level` and `is_business_affiliated`, and set their own follow `status`, because policies are row-level, not column-level.
+Known gaps (full carry-forward list with the phase that closes each: `docs/known-gaps.md`):
+
+- **Trust level and business flag.** Policies are row-level, not column-level. `profiles_insert_own` lets a user *insert or edit* their own profile, so they can create it with `trust_level = 'trusted'` (or `is_business_affiliated = true`). Phase 2 must create profiles through a security-definer function or column grants; Phase 3/7 adds column-level protection.
+- **Follow status.** A user can set their own follow `status`, for the same reason.
+- **Default TRUNCATE grants.** `anon` and `authenticated` hold the default `TRUNCATE` grant on public tables. It is not reachable through PostgREST (no HTTP verb maps to it), but a later migration should revoke it.
+- **`notifications_update_own` is row-level.** A user can rewrite `activity_id` on their own notifications (the policy only checks `user_id`). Tighten with a column grant limited to `read_at`.
 
 ### Storage buckets
 

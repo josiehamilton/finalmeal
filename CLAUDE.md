@@ -17,6 +17,7 @@ A social food app (iOS, Android, web). Each person picks the five dishes for the
 | Screen designs (snapshot in git) | `design/canvas/project/*.dc.html` + `canvas.json`, a copy of every board for offline reference |
 | Canvas generator | `design/canvas-generator/gen.py` (see its README) |
 | Brand marks (skull logo) | `design/brand/` |
+| Known gaps and what each phase must close | `docs/known-gaps.md` |
 | Remote | https://github.com/josiehamilton/finalmeal |
 | Old Flutter prototype | archived separately ("Final Meal Archive" repo); nothing from it is reused |
 
