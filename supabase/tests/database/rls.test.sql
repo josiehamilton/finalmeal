@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(80);
+select plan(85);
 
 -- Fixtures (inserted as the superuser, so RLS does not apply yet).
 -- Users: A = ...0a, B = ...0b, C = ...0c.
@@ -170,8 +170,27 @@ select lives_ok($$update public.notifications set read_at = now() where id = '70
 select lives_ok($$delete from public.follows where followee_id = '00000000-0000-0000-0000-00000000000b'$$,
   'B can delete a follow where B is the followee');
 
--- ===== Signed in as A =====
+-- ===== Back to the superuser, before A acts: what B's attempts really did =====
 reset role;
+
+select is((select note from public.picks where id = '30000000-0000-0000-0000-00000000000a'),
+  'original note', 'B''s update of A''s pick changed nothing');
+select is((select count(*)::int from public.picks where id = '30000000-0000-0000-0000-00000000000a'),
+  1, 'B''s delete of A''s pick removed nothing');
+select is((select title from public.shared_lists where id = '50000000-0000-0000-0000-000000000001'),
+  'Active list', 'B''s update of A''s list changed nothing');
+select is((select display_name from public.profiles where id = '00000000-0000-0000-0000-00000000000a'),
+  'Alice', 'B''s update of A''s profile changed nothing');
+select is((select count(*)::int from public.follows
+   where follower_id = '00000000-0000-0000-0000-00000000000a' and followee_id = '00000000-0000-0000-0000-00000000000c'),
+  1, 'B''s delete of the follow between A and C removed nothing');
+select is((select count(*)::int from public.follows
+   where follower_id = '00000000-0000-0000-0000-00000000000a' and followee_id = '00000000-0000-0000-0000-00000000000b'),
+  0, 'B removed the follow where B is the followee');
+select isnt((select read_at from public.notifications where id = '70000000-0000-0000-0000-00000000000b'),
+  null, 'B''s read_at update landed');
+
+-- ===== Signed in as A =====
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
@@ -253,24 +272,20 @@ select throws_ok($$
   values ('00000000-0000-0000-0000-00000000000a', 'ios', 'passed')
 $$, '42501', null, 'users cannot write their own attestations');
 
--- ===== Back to the superuser: what B and A's attempts really did =====
+-- ===== Back to the superuser, after A acts =====
 reset role;
 
 select is((select note from public.picks where id = '30000000-0000-0000-0000-00000000000a'),
-  'edited by A', 'B''s update and delete of A''s pick changed nothing; A''s edit landed');
+  'edited by A', 'A''s edit of A''s pick landed');
 select is((select title from public.shared_lists where id = '50000000-0000-0000-0000-000000000001'),
-  'Renamed', 'B''s update of A''s list changed nothing; A''s rename landed');
-select is((select display_name from public.profiles where id = '00000000-0000-0000-0000-00000000000a'),
-  'Alice', 'B''s update of A''s profile changed nothing');
+  'Renamed', 'A''s rename of A''s list landed');
 select is((select is_featured from public.tags where id = '40000000-0000-0000-0000-000000000001'),
   false, 'A''s update of a global tag changed nothing');
 select is((select count(*)::int from public.follows where followee_id = '00000000-0000-0000-0000-00000000000b'
    and follower_id = '00000000-0000-0000-0000-00000000000a'), 1,
   'A''s follow of B exists (re-added after B removed the old one)');
 select is((select count(*)::int from public.follows where followee_id = '00000000-0000-0000-0000-00000000000c'), 0,
-  'A removed the follow of C; B''s attempt on it did nothing');
-select isnt((select read_at from public.notifications where id = '70000000-0000-0000-0000-00000000000b'),
-  null, 'B''s read_at update landed');
+  'A removed the follow of C');
 
 select * from finish();
 rollback;
