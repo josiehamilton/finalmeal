@@ -16,6 +16,6 @@ export {
 export type { MyProfile, ProfilePatch } from './profile';
 export { formatCityLabel, nearestCity, searchCities } from './cities';
 export type { City } from './cities';
-export { uploadMyAvatar } from './avatar';
+export { looksLikeJpeg, uploadMyAvatar } from './avatar';
 export { formatStats, getFoundationStats } from './stats';
 export type { FoundationStats } from './stats';
