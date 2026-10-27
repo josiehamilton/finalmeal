@@ -129,8 +129,9 @@ All installed into the `extensions` schema by `20261026233813_extensions_and_typ
 | `public.tag_slug(text)` | Immutable. A tag's slug: accents removed, lower case, runs of non-letters/digits become one dash (`Korean BBQ` becomes `korean-bbq`; same result as the Phase 1 rule for every seeded name). Used by the vocabulary and `create_personal_tag`. |
 | `public.apply_tag_vocabulary()` | Upserts the global `food_type` and `dietary` tags by `(kind, slug)` (name, aliases, featured and display order are overwritten). Called once by the `tag_vocabulary` migration; safe to call again (tests do). Not executable by `anon` or `authenticated`. |
 | `public.popular_tags(p_kind)` | Stable, security invoker. The TagSearch "Popular" list: featured tags of the kind by `display_order` (nulls last, then name); for `personal`, the caller's own tags by name. |
-| `public.search_tags(p_kind, p_q, p_lim default 10)` | Stable, security invoker. Tag type-ahead over `name` and `aliases`, accent- and case-insensitive: name prefix first, then alias prefix (shorter names first), then trigram typo matches by similarity. An empty or blank query returns `popular_tags(p_kind)` in full (`p_lim` does not shorten it). `personal` searches only the caller's own tags. `p_lim` is capped at 50. Open to `anon` and `authenticated`. |
+| `public.search_tags(p_kind, p_q, p_lim default 10)` | Stable, security invoker. Tag type-ahead over `name` and `aliases`, accent- and case-insensitive: whole-name prefix first, then whole-alias prefix, then the start of any word in the name or an alias (`fried` finds Korean fried chicken), shorter names first within these, then trigram typo matches by similarity. An empty or blank query returns `popular_tags(p_kind)` in full (`p_lim` does not shorten it). `personal` searches only the caller's own tags. `p_lim` is capped at 50. Open to `anon` and `authenticated`. |
 | `public.create_personal_tag(p_name)` | Security definer, `authenticated` only. Trims and collapses whitespace, then creates the caller's personal tag, or returns the one with the same slug (idempotent; the first spelling is kept). Raises `P0001` with message `invalid_tag_name` outside 1-40 characters, or `profile_not_found`. |
+| `tags_set_personal_slug` | Before insert, or update of name, slug or kind, on `tags`: for personal tags, trims and collapses whitespace in `name` and sets `slug = tag_slug(name)`. |
 | `pick_tags_check_owner` | Before insert/update on `pick_tags`: raises `personal_tag_not_owned` if a personal tag is put on someone else's pick. |
 
 ### Tables (schema `public`, row-level security on)
@@ -194,12 +195,12 @@ Migration: `20261027050402_cities.sql`; tests: `supabase/tests/database/cities.t
 
 ### Tags
 
-Migration: `20261027172000_tag_vocabulary.sql`; tests: `supabase/tests/database/tags.test.sql`.
+Migrations: `20261027172000_tag_vocabulary.sql` and `20261027172829_tag_slug_trigger_and_word_search.sql`; tests: `supabase/tests/database/tags.test.sql`.
 
 - **The global vocabulary is reference data, so it is in the migration, not `seed.sql`.** `supabase db push` therefore gives production the same `food_type` (125) and `dietary` (12) tags as a local `db reset`. The migration calls `public.apply_tag_vocabulary()`, which upserts by `(kind, slug)`, so a database that already holds the Phase 1 seeded tags converges on the same rows (no duplicates), and the call is safe to repeat. To add or rename a tag later, write a new migration that upserts the changed rows (do not edit this one once it is on main).
 - **New columns on `tags`**: `aliases text[] not null default '{}'` (extra search words, e.g. Ramen: `ramen noodles`; Low-FODMAP: `fodmap`, `ibs`) and `display_order integer` (position in the "Popular" list, null for tags that are not in it).
 - **Featured / Popular**: food types Ramen, Noodles, Japanese, Soup, Pork, Sushi, Burgers, Tacos, Pizza, BBQ, Bakery, Seafood (in that order); dietary Vegan, Vegetarian, Gluten-free, Low-FODMAP, Dairy-free, Nut-free, Halal.
-- **Search and personal tags**: `search_tags`, `popular_tags` and `create_personal_tag` (see Functions and triggers). A personal tag is only ever created through `create_personal_tag`, which keeps one row per person and slug.
+- **Search and personal tags**: `search_tags`, `popular_tags` and `create_personal_tag` (see Functions and triggers). A personal tag's name is tidied (trimmed, inner whitespace collapsed) and its slug is always `tag_slug(name)`, on every write path: the `tags_set_personal_slug` trigger (migration `tag_slug_trigger_and_word_search`) sets both on insert and on update of the name, slug or kind, so `(owner_id, slug)` stays unique and consistent even when a person inserts or renames their own tag directly (RLS still allows that); a clash is a `unique_violation` (23505). `create_personal_tag` is the idempotent door: it returns the existing row instead of raising.
 - **Dev seed**: `seed.sql` no longer inserts global tags; it keeps Josie's four personal tags and the pick tags, which refer to the global ones by slug.
 
 ### Storage buckets

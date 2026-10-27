@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(50);
+select plan(59);
 
 -- ---------------------------------------------------------------- structure
 select has_column('public', 'tags', 'aliases', 'tags.aliases exists');
@@ -98,6 +98,19 @@ select is((select name from public.search_tags('food_type', 'CREPE') limit 1), '
   'search ignores case and accents');
 select is((select name from public.search_tags('food_type', 'ramne') limit 1), 'Ramen',
   'a typo still finds the tag by trigram similarity');
+-- the start of any word counts, after whole-name prefixes
+select is(
+  (select array_agg(name) from (select name from public.search_tags('food_type', 'fried') limit 2) s),
+  array['Fried chicken', 'Korean fried chicken'],
+  '"fried" finds Fried chicken, then Korean fried chicken (a word start inside the name)'
+);
+select is(
+  (select array_agg(name) from (select name from public.search_tags('food_type', 'bbq') limit 2) s),
+  array['BBQ', 'Korean BBQ'],
+  '"bbq" finds BBQ first, then Korean BBQ'
+);
+select is((select count(*)::int from public.search_tags('food_type', '%')), 0,
+  'a lone LIKE wildcard matches nothing');
 select is((select count(*)::int from public.search_tags('dietary', 'kor')), 0,
   'search stays inside the kind it was asked for');
 select is((select count(*)::int from public.search_tags('food_type', '   ')), 12,
@@ -163,6 +176,33 @@ select throws_ok($$select public.create_personal_tag(null)$$, 'P0001', 'invalid_
 select throws_ok($$select public.create_personal_tag(repeat('x', 41))$$, 'P0001', 'invalid_tag_name',
   '41 characters is invalid_tag_name');
 select lives_ok($$select public.create_personal_tag(repeat('x', 40))$$, '40 characters is fine');
+
+-- Every write path keeps the slug in step with the name, so direct inserts and renames
+-- cannot make a second row that create_personal_tag would not see.
+insert into public.tags (kind, name, slug, owner_id)
+  values ('personal', 'Sunday roast', 'bogus', '00000000-0000-0000-0000-00000000000a');
+select is((select slug from public.tags where name = 'Sunday roast'), 'sunday-roast',
+  'a direct insert gets the slug of its name, whatever slug was given');
+insert into public.tags (kind, name, slug, owner_id)
+  values ('personal', 'Date night', 'dn', '00000000-0000-0000-0000-00000000000a');
+select public.create_personal_tag('Date night');
+select is(
+  (select count(*)::int from public.tags
+    where owner_id = '00000000-0000-0000-0000-00000000000a' and slug = 'date-night'),
+  1, 'a direct insert then create_personal_tag leaves exactly one "Date night"'
+);
+update public.tags set name = 'Late lunch' where name = 'Date night';
+select is((select slug from public.tags where name = 'Late lunch'), 'late-lunch',
+  'renaming a personal tag changes its slug');
+select throws_ok($$insert into public.tags (kind, name, slug, owner_id)
+  values ('personal', 'Late  Lunch', 'whatever', '00000000-0000-0000-0000-00000000000a')$$,
+  '23505', null, 'a second "Late  Lunch" is a unique_violation');
+select throws_ok($$update public.tags set name = 'Sunday  roast' where name = 'Late lunch'$$,
+  '23505', null, 'renaming onto another of the owner''s tags is a unique_violation');
+insert into public.tags (kind, name, slug, owner_id)
+  values ('personal', '  Big   bowl ', 'x', '00000000-0000-0000-0000-00000000000a');
+select is((select name from public.tags where slug = 'big-bowl'), 'Big bowl',
+  'a direct insert has its whitespace tidied');
 
 -- another user cannot see it
 reset role;
