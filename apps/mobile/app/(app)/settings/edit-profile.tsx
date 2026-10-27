@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
+import type { ComponentRef } from 'react';
+import type { LayoutChangeEvent } from 'react-native';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,6 +19,7 @@ import { colors, typeScale } from '@finalmeal/ui-tokens';
 import { Avatar } from '../../../src/components/Avatar';
 import { AvailableBadge } from '../../../src/components/AvailableBadge';
 import { Icon } from '../../../src/components/Icon';
+import { KeyboardAvoider } from '../../../src/components/KeyboardAvoider';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
 import { TextField } from '../../../src/components/TextField';
 import { prepareAvatar } from '../../../src/lib/avatar';
@@ -50,6 +51,28 @@ function EditProfileForm({ profile }: { profile: MyProfile }) {
   const [busy, setBusy] = useState(false);
   // The photo that is already uploaded, so a retry after a later failure does not upload it again.
   const uploaded = useRef<string | null>(null);
+
+  // Keep the focused field in view: the keyboard shrinks the scroll area, so scroll to the field
+  // when it gets focus and again whenever the area changes size (the keyboard arriving or leaving).
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+  const tops = useRef<Record<string, number>>({});
+  const focused = useRef<string | null>(null);
+  const track = (key: string) => ({
+    onLayout: (e: LayoutChangeEvent) => {
+      tops.current[key] = e.nativeEvent.layout.y;
+    },
+  });
+  const revealFocused = () => {
+    const top = focused.current === null ? undefined : tops.current[focused.current];
+    if (top !== undefined) scroll.current?.scrollTo({ y: Math.max(0, top - 12), animated: true });
+  };
+  const onFocusField = (key: string) => () => {
+    focused.current = key;
+    revealFocused();
+  };
+  const onBlurField = (key: string) => () => {
+    if (focused.current === key) focused.current = null;
+  };
 
   const usernameChanged = username !== profile.username;
   const handle = useUsernameAvailability(username, usernameChanged);
@@ -136,12 +159,12 @@ function EditProfileForm({ profile }: { profile: MyProfile }) {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.screen}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoider>
         <ScreenHeader title="Edit profile" onBack={() => router.back()} right={saveAction} />
         <ScrollView
+          ref={scroll}
+          testID="edit-profile-scroll"
+          onLayout={revealFocused}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -170,54 +193,66 @@ function EditProfileForm({ profile }: { profile: MyProfile }) {
             {notice ? <Text style={styles.notice}>{notice}</Text> : null}
           </View>
 
-          <TextField
-            label="Name"
-            value={name}
-            onChangeText={setName}
-            maxLength={DISPLAY_NAME_MAX}
-            autoCapitalize="words"
-            autoComplete="name"
-            textContentType="name"
-          />
-          <TextField
-            label="Username"
-            prefix="@"
-            value={username}
-            onChangeText={(text) => setUsername(text.replace(/^@+/, ''))}
-            error={usernameChanged ? handle.error : null}
-            suffix={
-              usernameChanged && handle.status === 'available' ? <AvailableBadge /> : undefined
-            }
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="username"
-            textContentType="username"
-          />
-          <TextField
-            label="Bio"
-            value={bio}
-            onChangeText={setBio}
-            maxLength={BIO_MAX}
-            counter={`${bio.length} / ${BIO_MAX}`}
-            multiline
-            autoCapitalize="sentences"
-          />
-          <View style={styles.cityField}>
-            <Text style={styles.cityLabel}>Home city</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Home city, ${profile.homeCity?.label ?? 'Not set'}`}
-              onPress={() => router.push('/settings/home-city')}
-              style={styles.cityBox}
-            >
-              <Text
-                style={[styles.cityValue, !profile.homeCity && styles.cityEmpty]}
-                numberOfLines={1}
+          <View {...track('name')}>
+            <TextField
+              label="Name"
+              onFocus={onFocusField('name')}
+              onBlur={onBlurField('name')}
+              value={name}
+              onChangeText={setName}
+              maxLength={DISPLAY_NAME_MAX}
+              autoCapitalize="words"
+              autoComplete="name"
+              textContentType="name"
+            />
+          </View>
+          <View {...track('username')}>
+            <TextField
+              label="Username"
+              onFocus={onFocusField('username')}
+              onBlur={onBlurField('username')}
+              prefix="@"
+              value={username}
+              onChangeText={(text) => setUsername(text.replace(/^@+/, ''))}
+              error={usernameChanged ? handle.error : null}
+              suffix={
+                usernameChanged && handle.status === 'available' ? <AvailableBadge /> : undefined
+              }
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="username"
+              textContentType="username"
+            />
+          </View>
+          <View testID="edit-profile-lower" style={styles.lower} {...track('bio')}>
+            <TextField
+              label="Bio"
+              onFocus={onFocusField('bio')}
+              onBlur={onBlurField('bio')}
+              value={bio}
+              onChangeText={setBio}
+              maxLength={BIO_MAX}
+              counter={`${bio.length} / ${BIO_MAX}`}
+              multiline
+              autoCapitalize="sentences"
+            />
+            <View style={styles.cityField}>
+              <Text style={styles.cityLabel}>Home city</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Home city, ${profile.homeCity?.label ?? 'Not set'}`}
+                onPress={() => router.push('/settings/home-city')}
+                style={styles.cityBox}
               >
-                {profile.homeCity?.label ?? 'Not set'}
-              </Text>
-              <Icon name="chev" size={18} color={colors.dim} />
-            </Pressable>
+                <Text
+                  style={[styles.cityValue, !profile.homeCity && styles.cityEmpty]}
+                  numberOfLines={1}
+                >
+                  {profile.homeCity?.label ?? 'Not set'}
+                </Text>
+                <Icon name="chev" size={18} color={colors.dim} />
+              </Pressable>
+            </View>
           </View>
 
           {error ? (
@@ -226,7 +261,7 @@ function EditProfileForm({ profile }: { profile: MyProfile }) {
             </Text>
           ) : null}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }
@@ -271,6 +306,7 @@ const styles = StyleSheet.create({
     color: colors.smoke,
     textAlign: 'center',
   },
+  lower: { gap: 20 },
   cityField: { gap: 8 },
   cityLabel: {
     fontFamily: fontFamily.uiBold,

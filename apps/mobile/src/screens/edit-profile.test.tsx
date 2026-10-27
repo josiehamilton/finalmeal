@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { Alert, ScrollView } from 'react-native';
 import type { AlertButton } from 'react-native';
 import { isUsernameAvailable, updateMyProfile, uploadMyAvatar } from '@finalmeal/api';
 import EditProfile from '../../app/(app)/settings/edit-profile';
@@ -254,5 +254,30 @@ describe('Edit profile', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(mockRouter.back).toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  describe('keyboard', () => {
+    it('keeps the form above the keyboard and taps working while it is open', async () => {
+      await render(<EditProfile />);
+      const avoider = screen.getByTestId('keyboard-avoider');
+      expect(within(avoider).getByLabelText('Bio')).toBeOnTheScreen();
+      expect(screen.getByTestId('edit-profile-scroll')).toHaveProp(
+        'keyboardShouldPersistTaps',
+        'handled',
+      );
+    });
+
+    it('scrolls the bio and the home city under it into view when the bio gets focus', async () => {
+      const scrollTo = jest
+        .spyOn(ScrollView.prototype as unknown as { scrollTo: unknown }, 'scrollTo' as never)
+        .mockImplementation((() => {}) as never);
+      await render(<EditProfile />);
+      // Layout positions that the device would report: the bio and home city group starts 300 down.
+      await fireEvent(screen.getByTestId('edit-profile-lower'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 300, width: 300, height: 260 } },
+      });
+      await fireEvent(screen.getByLabelText('Bio'), 'focus');
+      expect(scrollTo).toHaveBeenCalledWith({ y: 288, animated: true });
+    });
   });
 });

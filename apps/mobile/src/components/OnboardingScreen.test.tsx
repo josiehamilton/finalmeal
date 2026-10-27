@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { Text } from 'react-native';
 import { OnboardingScreen } from './OnboardingScreen';
 
@@ -82,5 +82,37 @@ describe('OnboardingScreen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Skip' }));
     expect(onBack).toHaveBeenCalledTimes(1);
     expect(onSkip).toHaveBeenCalledTimes(1);
+  });
+
+  describe('keyboard', () => {
+    it('wraps the whole screen content, button included, in the keyboard-avoiding view', async () => {
+      await render(
+        <OnboardingScreen title="t" cta={{ label: 'Continue', onPress: jest.fn() }}>
+          <Text>field goes here</Text>
+        </OnboardingScreen>,
+      );
+      const avoider = screen.getByTestId('keyboard-avoider');
+      expect(within(avoider).getByText('field goes here')).toBeOnTheScreen();
+      expect(within(avoider).getByRole('button', { name: 'Continue' })).toBeOnTheScreen();
+    });
+
+    it('keeps taps working with the keyboard open: the scroll area handles taps instead of swallowing them', async () => {
+      const onPress = jest.fn();
+      await render(
+        <OnboardingScreen title="t" cta={{ label: 'Continue', onPress }}>
+          <Text>x</Text>
+        </OnboardingScreen>,
+      );
+      expect(screen.getByTestId('onboarding-scroll')).toHaveProp(
+        'keyboardShouldPersistTaps',
+        'handled',
+      );
+      // The button sits outside the scroll area, so it is always tappable.
+      expect(
+        within(screen.getByTestId('onboarding-scroll')).queryByRole('button', { name: 'Continue' }),
+      ).toBeNull();
+      await fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+      expect(onPress).toHaveBeenCalledTimes(1);
+    });
   });
 });

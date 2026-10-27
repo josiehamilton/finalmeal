@@ -1,17 +1,10 @@
 import type { ReactNode } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { colors, typeScale } from '@finalmeal/ui-tokens';
 import { fontFamily } from '../lib/fonts';
+import { KeyboardAvoider } from './KeyboardAvoider';
 import { PrimaryButton } from './PrimaryButton';
 
 const STEPS = [1, 2, 3, 4, 5, 6] as const;
@@ -41,10 +34,7 @@ export function OnboardingScreen({
 }: OnboardingScreenProps) {
   return (
     <SafeAreaView style={styles.screen}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoider>
         <View style={styles.topBar}>
           <View style={styles.side}>
             {onBack ? (
@@ -104,6 +94,7 @@ export function OnboardingScreen({
         </View>
 
         <ScrollView
+          testID="onboarding-scroll"
           style={styles.flex}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
@@ -125,7 +116,7 @@ export function OnboardingScreen({
           <PrimaryButton {...cta} />
           {footer}
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }
