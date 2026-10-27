@@ -1,0 +1,26 @@
+Foursquare Open Source Places (FSQ OS Places)
+
+Copyright 2024 Foursquare Labs, Inc. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Dataset: https://huggingface.co/datasets/foursquare/fsq-os-places
+Documentation: https://docs.foursquare.com/data-products/docs/access-fsq-os-places
+
+Used by Final Meal for the place search list (public.places rows with source 'fsq'),
+imported by scripts/import-places.mjs.
+
+Note: the text above is the copyright and license notice published on Foursquare's
+documentation page. The dataset's own README and NOTICE are behind a Hugging Face login;
+when the real extract is generated (needs HF_TOKEN), compare this file with the NOTICE
+shipped in the dataset and replace it with the dataset's text if it differs.

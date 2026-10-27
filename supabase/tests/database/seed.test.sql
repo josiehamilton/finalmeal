@@ -5,7 +5,7 @@ select plan(25);
 
 -- Counts
 select is((select count(*)::int from public.profiles), 6, '6 profiles');
-select is((select count(*)::int from public.places), 14, '14 places');
+select is((select count(*)::int from public.places where source = 'custom'), 14, '14 canvas places');
 select is((select count(*)::int from public.dishes), 17, '17 dishes');
 select is((select count(*)::int from public.picks), 28, '28 picks');
 

@@ -24,6 +24,13 @@ Each item names the phase that closes it.
 - **Phase 8:** verify, on the first production deploy, that the remote `avatars` bucket really is created. `supabase config push` may not create buckets from `[storage.buckets.*]`; if it does not, run `supabase seed buckets --linked`.
 - **Phase 3:** `cities` has no `created_at` / `updated_at` columns (it is reference data written only by the import script), although spec section 4 says every table has them. Add them if a later phase needs to know when a city changed; otherwise note the exception in the spec.
 
+## Phase 3 carry-forward: places
+
+- **Pending Josie:** generate the real Metro Vancouver extract. It needs her Hugging Face token (`HF_TOKEN` in the root `.env.local`) and the `duckdb` program: `pnpm db:import-places -- --bbox vancouver`, then commit `supabase/seed/places_vancouver.sql`. Until then that file is an empty placeholder and dev search shows only the 14 canvas places. The DuckDB path has never run against the live dataset (no token yet); check its first run (release folder, categories file, column names).
+- **Phase 5:** geocode custom-spot addresses so they get real map pins. Today a custom place sits on its city's point and the address is only text.
+- **Later:** merge custom places into Foursquare ones when the same restaurant exists in both (the dev canvas "Marutama" and a Foursquare "Marutama" appear side by side).
+- **Phase 8:** closed places stay in the table (with `closed_at`) so a re-import can mark closures; nothing yet hides picks at a place that closed.
+
 ## Phase 8: launch
 
 - `KeyboardAvoider` (apps/mobile) adds `StatusBar.currentHeight` on Android to match `measureInWindow`. Verify it on real devices with cutouts, a hidden status bar and landscape; add an Android-platform unit test and an unmount listener-removal assertion.
@@ -35,3 +42,5 @@ Each item names the phase that closes it.
 - Work through the production configuration checklist in `docs/ops/supabase.md` ("Before the first production push").
 - Add the "City data © GeoNames (CC BY 4.0)" line to the About screen.
 - Run `pnpm db:import-cities` once against the production database (see "Cities" in `docs/ops/supabase.md`).
+- Show Foursquare attribution in the About screen (text in `docs/third-party/fsq-os-places-NOTICE.txt`).
+- Run the global places import in prod: `pnpm db:import-places -- --db-url <direct connection string> --all` (see "Places" in `docs/ops/supabase.md`).

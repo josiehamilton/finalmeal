@@ -18,6 +18,7 @@
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
     "db:import-cities": "node scripts/import-cities.mjs",
+    "db:import-places": "node scripts/import-places.mjs",
     "env:local": "node scripts/write-local-env.mjs",
     "brand:assets": "node scripts/generate-brand-assets.mjs"
   },
