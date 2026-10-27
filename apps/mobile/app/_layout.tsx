@@ -20,6 +20,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { colors } from '@finalmeal/ui-tokens';
+import { SessionProvider } from '../src/providers/SessionProvider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -49,9 +50,11 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar style="light" />
-      <Stack
-        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.night } }}
-      />
+      <SessionProvider>
+        <Stack
+          screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.night } }}
+        />
+      </SessionProvider>
     </>
   );
 }
