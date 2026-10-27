@@ -69,8 +69,13 @@ A cloud session (claude.ai/code) works on a fresh copy of this repository. This 
 
 1. **Network access:** choose "Trusted" (the default). Don't pick "None".
 2. **Web end-to-end tests (optional):** Playwright downloads its browser from hosts outside the Trusted list. To run `pnpm test:e2e` in the cloud, choose "Custom" (keep the Trusted list included if it offers that), then add these two under "Custom allowed domains": `cdn.playwright.dev` and `playwright.download.prss.microsoft.com`. In a session, run `pnpm --filter @finalmeal/web exec playwright install --with-deps chromium` once. If you'd rather skip this, leave web e2e to CI, which runs it on every push.
-3. **Setup script:** paste in the contents of `scripts/cloud-setup.sh`, or just the one line `bash scripts/cloud-setup.sh`. It installs everything (including the pinned Supabase CLI), then starts and stops Supabase once so the Docker images are cached. It takes under about 5 minutes and stops with an error if the install fails, so a broken setup is never cached (the result is cached for about 7 days).
+3. **Setup script:** leave it **empty**. Node 22, pnpm and Docker are already installed, and setup scripts run before the repository is in place, so project installs can't go there.
 4. **Secrets:** none needed for local-only work. Don't paste keys into the environment settings.
+
+**First steps in every cloud session** (before anything else):
+
+1. `pnpm install --frozen-lockfile`. It installs everything, including the pinned Supabase CLI, and takes a minute or two.
+2. When a task needs the database: `pnpm db:start`, then `pnpm env:local`. The first start in a session downloads the backend's Docker images and takes a few minutes.
 
 - **Who tests what:** a cloud session builds and tests code for web, Android and iOS (unit tests, API integration tests, web end-to-end). Looking at the app on the iPhone Simulator or an Android emulator happens on Josie's Mac. Expo cloud builds come in Phase 8.
 - The rules above (models, spec first, Supabase codified, no secrets in commits) apply in cloud sessions too.
