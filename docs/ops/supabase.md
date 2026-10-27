@@ -10,6 +10,21 @@ Final Meal keeps all of its data (people, dishes, places, picks, lists) in a Sup
 | `pnpm db:stop` | Stops it. |
 | `pnpm db:reset` | Wipes the local database and re-applies every migration, then `seed.sql` if present. |
 | `pnpm db:test` | Runs the database tests in `supabase/tests/database/` (pgTAP). |
+| `pnpm env:local` | With Supabase running, writes the gitignored env files below from `supabase status`. Re-run it after `db:start` if the keys change. Prints file names only, never keys. |
+
+### Local env files
+
+`pnpm env:local` (script: `scripts/write-local-env.mjs`) creates these, each holding the local API URL and the publishable key (the anon key on older CLIs). A committed `.env.example` sits beside each, with names only.
+
+| File | Variables |
+|---|---|
+| `apps/web/.env.local` | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_KEY` |
+| `apps/mobile/.env.local` | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY` |
+| `packages/api/.env.test.local` | `SUPABASE_URL`, `SUPABASE_KEY` (read by the `@finalmeal/api` integration tests) |
+
+Apps must only ever be given the publishable key. The service-role key is never written to a file.
+
+`@finalmeal/api` tests: `pnpm --filter @finalmeal/api test` (unit, no Supabase needed) and `pnpm --filter @finalmeal/api test:integration` (needs Supabase running, seeded, and `pnpm env:local` run). After a schema change, refresh `packages/api/src/database.types.ts` with `pnpm --filter @finalmeal/api gen:types`.
 
 ## Rules
 
