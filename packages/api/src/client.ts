@@ -17,7 +17,8 @@ export const DEFAULT_TIMEOUT_MS = 2500;
 
 const POSTGREST_PATH = '/rest/v1/';
 
-function requestUrl(input: Parameters<typeof fetch>[0]): string {
+/** The URL of a fetch input, whichever form it takes (kept structural so it type-checks against both Node and React Native fetch types). */
+function requestUrl(input: string | URL | { url: string }): string {
   if (typeof input === 'string') return input;
   if (input instanceof URL) return input.href;
   return input.url;
