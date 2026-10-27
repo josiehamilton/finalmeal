@@ -12,6 +12,8 @@ interface PrimaryButtonProps {
   /** `ghost` is the outlined button; `secondary` is the raised-ash button used beside a primary. */
   variant?: 'primary' | 'ghost' | 'secondary';
   icon?: ReactNode;
+  /** `compact` is the 40-point button used beside other content, such as Edit profile. */
+  size?: 'regular' | 'compact';
   testID?: string;
 }
 
@@ -22,6 +24,7 @@ export function PrimaryButton({
   busy = false,
   variant = 'primary',
   icon,
+  size = 'regular',
   testID,
 }: PrimaryButtonProps) {
   const inactive = disabled || busy;
@@ -36,6 +39,7 @@ export function PrimaryButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        size === 'compact' && styles.compact,
         variantStyle[variant],
         disabled && !busy && styles.disabled,
         pressed && styles.pressed,
@@ -46,7 +50,11 @@ export function PrimaryButton({
       ) : (
         <View style={styles.content}>
           {icon}
-          <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
+          <Text
+            style={[styles.label, size === 'compact' && styles.labelCompact, { color: labelColor }]}
+          >
+            {label}
+          </Text>
         </View>
       )}
     </Pressable>
@@ -60,6 +68,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  compact: { height: 40 },
   primary: { backgroundColor: colors.ember },
   ghost: { borderWidth: 1, borderColor: colors.lineStrong },
   secondary: { backgroundColor: colors.ashRaised },
@@ -71,6 +80,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     letterSpacing: 0.01 * 15,
   },
+  labelCompact: { fontSize: 14 },
 });
 
 const variantStyle = {

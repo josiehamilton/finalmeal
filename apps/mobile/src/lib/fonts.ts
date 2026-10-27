@@ -2,6 +2,8 @@
 export const fontFamily = {
   wordmark: 'InstrumentSerif_400Regular',
   display: 'Newsreader_300Light_Italic',
+  serif: 'Newsreader_400Regular',
+  serifItalic: 'Newsreader_400Regular_Italic',
   ui: 'Manrope_400Regular',
   uiMedium: 'Manrope_500Medium',
   uiSemiBold: 'Manrope_600SemiBold',

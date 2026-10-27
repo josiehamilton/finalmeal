@@ -1,5 +1,4 @@
 import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
 import { useRef, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
@@ -9,15 +8,11 @@ import { OnboardingScreen } from '../../src/components/OnboardingScreen';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { prepareAvatar } from '../../src/lib/avatar';
 import { fontFamily } from '../../src/lib/fonts';
+import { pickPhoto } from '../../src/lib/pick-photo';
+import type { PhotoSource } from '../../src/lib/pick-photo';
 import { getSupabase } from '../../src/lib/supabase';
 
 const DENIED = 'No problem. You can add a photo later from Edit profile.';
-const PICKER_OPTIONS = {
-  mediaTypes: ['images'],
-  allowsEditing: true,
-  aspect: [1, 1],
-  quality: 1,
-} satisfies ImagePicker.ImagePickerOptions;
 
 function CameraIcon({ size, color }: { size: number; color: string }) {
   return (
@@ -60,27 +55,12 @@ export default function PhotoStep() {
   // The photo that is already uploaded, so a retry after a later failure does not upload it again.
   const uploaded = useRef<string | null>(null);
 
-  async function pick(source: 'camera' | 'library') {
+  async function pick(source: PhotoSource) {
     setNotice(null);
     setError(null);
-    try {
-      if (source === 'camera') {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) {
-          setNotice(DENIED);
-          return;
-        }
-      }
-      const result =
-        source === 'camera'
-          ? await ImagePicker.launchCameraAsync(PICKER_OPTIONS)
-          : await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS);
-      const chosen = result.canceled ? undefined : result.assets[0]?.uri;
-      if (chosen) setUri(chosen);
-    } catch {
-      // The OS refused (no permission, no camera): the same gentle message as a "no".
-      setNotice(DENIED);
-    }
+    const result = await pickPhoto(source);
+    if (result.status === 'picked') setUri(result.uri);
+    else if (result.status === 'denied') setNotice(DENIED);
   }
 
   async function finish(withPhoto: boolean) {

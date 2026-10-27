@@ -13,6 +13,8 @@ interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   prefix?: string;
   /** Anything after the input, such as an "Available" indicator. */
   suffix?: ReactNode;
+  /** Small text under the field on the right, such as "25 / 100". */
+  counter?: string;
 }
 
 export function TextField({
@@ -20,6 +22,7 @@ export function TextField({
   error,
   prefix,
   suffix,
+  counter,
   onFocus,
   onBlur,
   ...input
@@ -28,7 +31,14 @@ export function TextField({
   return (
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>
-      <View style={[styles.box, focused && styles.boxFocused, error ? styles.boxError : null]}>
+      <View
+        style={[
+          styles.box,
+          input.multiline && styles.boxMultiline,
+          focused && styles.boxFocused,
+          error ? styles.boxError : null,
+        ]}
+      >
         {prefix ? <Text style={styles.prefix}>{prefix}</Text> : null}
         <TextInput
           accessibilityLabel={label}
@@ -43,10 +53,11 @@ export function TextField({
             setFocused(false);
             onBlur?.(e);
           }}
-          style={styles.input}
+          style={[styles.input, input.multiline && styles.inputMultiline]}
         />
         {suffix}
       </View>
+      {counter ? <Text style={styles.counter}>{counter}</Text> : null}
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
           {error}
@@ -76,6 +87,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.lineStrong,
   },
+  boxMultiline: { height: undefined, minHeight: 96, alignItems: 'flex-start', paddingVertical: 14 },
   boxFocused: { borderColor: colors.emberGlow },
   boxError: { borderColor: colors.danger },
   prefix: { fontFamily: fontFamily.uiMedium, fontSize: 17, color: colors.smoke },
@@ -88,6 +100,14 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: colors.bone,
   },
+  inputMultiline: {
+    height: undefined,
+    minHeight: 68,
+    textAlignVertical: 'top',
+    fontFamily: fontFamily.serifItalic,
+    lineHeight: 17 * 1.45,
+  },
+  counter: { alignSelf: 'flex-end', fontFamily: fontFamily.ui, fontSize: 12, color: colors.dim },
   error: {
     fontFamily: fontFamily.uiMedium,
     fontSize: 13,
