@@ -5,12 +5,10 @@ Things that are deliberately unfinished or must be revisited, with the phase tha
 ## Phase 2: Accounts and profile
 
 - Check that the seeded users can sign in with an email code (they have `@example.com` addresses; codes land in the local inbox at http://127.0.0.1:54324).
-- Raise the local `[auth.rate_limit] email_sent` in `supabase/config.toml` for development when Phase 2 starts. It is 2 per hour now, which will get in the way of repeated sign-in testing. Note only; not changed yet. Record any change in `docs/ops/supabase.md`.
-- Create profiles without letting people set `trust_level` or `is_business_affiliated` (the `profiles_insert_own` policy lets a user insert their own row with any values). Use a security-definer function or column grants.
 
 ## Phase 3 and Phase 7: privacy and safety
 
-- Column-level protection for `profiles.trust_level`, `profiles.is_business_affiliated` and `follows.status` (policies are row-level today).
+- Column-level protection for `follows.status` (policies are row-level today). `profiles.trust_level` and `profiles.is_business_affiliated` are already protected by column grants (Phase 2).
 - Revoke the default `TRUNCATE` grants that `anon` and `authenticated` hold on public tables (not reachable through PostgREST, but should not exist).
 - Narrow `notifications_update_own` so a user can only change `read_at`, not `activity_id`.
 - Enforce private profiles and blocks in the read policies.

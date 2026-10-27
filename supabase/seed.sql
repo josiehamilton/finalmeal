@@ -70,15 +70,15 @@ select
   'email', now(), now(), now()
 from seed_people;
 
--- Home city label: name, then region_code (US/CA/AU only, otherwise region_name), then country.
-insert into public.profiles (id, username, display_name, bio, home_city_id, home_place_text, home_location, trust_level)
+-- Home city label comes from public.city_label (name, then region_code for US/CA/AU or
+-- region_name, then country). Seeded people are already onboarded.
+insert into public.profiles (id, username, display_name, bio, home_city_id, home_place_text, home_location, trust_level, onboarded_at)
 select
   sp.id, sp.username, sp.display_name, sp.bio, c.id,
-  concat_ws(', ', c.name,
-    case when c.country in ('US', 'CA', 'AU') then c.region_code else c.region_name end,
-    c.country_name),
+  public.city_label(c),
   c.location,
-  sp.trust
+  sp.trust,
+  now()
 from seed_people sp
 join public.cities c on c.geoname_id = sp.home_geoname_id;
 

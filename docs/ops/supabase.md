@@ -62,8 +62,9 @@ Do these before the first `pnpm exec supabase db push` and `pnpm exec supabase c
   - `site_url` (and any extra redirect URLs) to the real web address, not `http://127.0.0.1:3000`
   - email confirmations on (`[auth.email] enable_confirmations = true`)
   - a sensible `minimum_password_length` (local is 6)
-  - email rate limits (`[auth.rate_limit] email_sent`; local is 2 per hour)
-  - SMTP (`[auth.email.smtp]`) with a real sender, since the built-in cloud mailer is heavily limited
+  - email rate limits: `[auth.rate_limit] email_sent` is 30 per hour locally; choose the production value (the built-in cloud mailer allows very few, so this only means something once SMTP is on)
+  - SMTP (`[auth.email.smtp]`) with a real sender (From address and name), since the built-in cloud mailer is heavily limited and the sign-in code emails depend on it
+  - the sign-in code email: confirm `otp_length = 6`, `otp_expiry = 600`, `max_frequency = "30s"` and the two templates (`supabase/templates/`) carry over with `config push`, then send a real code to a real inbox
 - [ ] **Database locale must match local.** `normalize_dish_name` uses the `[:space:]`, `[:punct:]` and `[:cntrl:]` character classes, whose meaning depends on the locale. Local uses ICU `en_US.UTF-8`; confirm the production database reports the same (`select datcollate, datctype, datlocprovider from pg_database where datname = 'postgres'`) before any dish data is written.
 - [ ] **`NEXT_PUBLIC_*` values are baked in at `next build`.** Build the production web app with production values; a build made with local values will point at the local database.
 - [ ] **The seed never runs in production.** `seed.sql` is sample data for local development only; `db push` does not run it, and it must never be run by hand against the cloud project.
@@ -75,6 +76,13 @@ Do these before the first `pnpm exec supabase db push` and `pnpm exec supabase c
 | Setting | Value | Why |
 |---|---|---|
 | `project_id` | `finalmeal` | Names the local Docker containers and volumes. |
+| `[auth.email] otp_length` | `6` | Sign-in is by emailed 6-digit code (same as the default; stated so it cannot drift). |
+| `[auth.email] otp_expiry` | `600` | Codes work for 10 minutes (default is 1 hour). The email template says "10 minutes". |
+| `[auth.email] max_frequency` | `"30s"` | A person can ask for a new code at most every 30 seconds (default 1s). |
+| `[auth.rate_limit] email_sent` | `30` | Emails per hour. Raised from 2 so repeated sign-in testing works locally. Production value: see "Before the first production push". |
+| `[auth.email.template.magic_link]` | subject `Your Final Meal code`, `./supabase/templates/magic_link.html` | The email an existing person gets when they ask for a code. Shows the 6-digit `{{ .Token }}`; no link. |
+| `[auth.email.template.confirmation]` | subject `Your Final Meal code`, `./supabase/templates/confirmation.html` | The email a brand-new person gets. Identical to the one above; both must be kept in sync. |
+| `[storage.buckets.avatars]` | public, `2MiB`, `image/jpeg` | Profile photos (see Storage buckets). |
 
 ### Extensions
 
@@ -113,6 +121,11 @@ All installed into the `extensions` schema by `20261026233813_extensions_and_typ
 | `public.search_cities(q, lim default 8)` | Stable, security invoker. City type-ahead: matches `name` and `ascii_name` by prefix or trigram similarity (accent- and case-insensitive via `unaccent`); orders prefix matches first (largest city first, then similarity), then typo-tolerant trigram matches by similarity, then population. Empty or blank `q` returns nothing; `lim` is capped at 50. |
 | `public.city_fold(text)` | Immutable. Lower-cases and removes accents ("Zürich" becomes "zurich"); used by `search_cities` and its trigram index, because `unaccent()` itself is not immutable. |
 | `public.nearest_city(lat, lng)` | Stable, security invoker. The single nearest city to a point (PostGIS `<->`). |
+| `public.city_label(public.cities)` | Immutable. The home-city label (see Cities): `Vancouver, BC, Canada`. Used by `set_my_home_city` and `seed.sql` so there is one definition. |
+| `public.is_username_available(p_username)` | Security definer, `authenticated` only. False if the name fails `^[A-Za-z0-9_]{3,30}$` or someone else has it (case-insensitive); true if it is free or already the caller's. |
+| `public.create_my_profile(p_display_name, p_username)` | Security definer, `authenticated` only. The only way to create a profile: inserts the caller's row with defaults (`visibility = 'public'`, `trust_level = 'new'`, not business-affiliated, not onboarded). Raises `P0001` with message `profile_exists`, `username_taken` or `invalid_username`; a display name outside 1-60 characters raises the `23514` check violation as is. |
+| `public.set_my_home_city(p_city_id)` | Security definer, `authenticated` only. Sets `home_city_id`, `home_location` (the city point) and `home_place_text` (label); a null id clears all three. Raises `city_not_found` or `profile_not_found`. |
+| `public.finish_onboarding()` | Security definer, `authenticated` only. Sets `onboarded_at = now()` if it is still null (idempotent). Raises `profile_not_found` when the caller has no profile. |
 | `pick_tags_check_owner` | Before insert/update on `pick_tags`: raises `personal_tag_not_owned` if a personal tag is put on someone else's pick. |
 
 ### Tables (schema `public`, row-level security on)
@@ -130,7 +143,7 @@ Migration: `20261027000454_rls_baseline.sql`; tests: `supabase/tests/database/rl
 | Table | Signed out (`anon`) | Signed in (`authenticated`) |
 |---|---|---|
 | `places`, `dishes`, `cities` | read | read; no direct writes |
-| `profiles` | read | read; insert and update own |
+| `profiles` | read | read; no direct insert (use `create_my_profile`); update own, limited to the columns listed under Profile writes below |
 | `picks` | read | read; insert, update, delete own |
 | `tags` | read global tags | read global tags and own personal tags; insert, update, delete own personal tags only |
 | `pick_tags` | read when the tag is visible | same; insert and delete when the pick is own |
@@ -144,10 +157,22 @@ Migration: `20261027000454_rls_baseline.sql`; tests: `supabase/tests/database/rl
 
 Known gaps (full carry-forward list with the phase that closes each: `docs/known-gaps.md`):
 
-- **Trust level and business flag.** Policies are row-level, not column-level. `profiles_insert_own` lets a user *insert or edit* their own profile, so they can create it with `trust_level = 'trusted'` (or `is_business_affiliated = true`). Phase 2 must create profiles through a security-definer function or column grants; Phase 3/7 adds column-level protection.
 - **Follow status.** A user can set their own follow `status`, for the same reason.
 - **Default TRUNCATE grants.** `anon` and `authenticated` hold the default `TRUNCATE` grant on public tables. It is not reachable through PostgREST (no HTTP verb maps to it), but a later migration should revoke it.
 - **`notifications_update_own` is row-level.** A user can rewrite `activity_id` on their own notifications (the policy only checks `user_id`). Tighten with a column grant limited to `read_at`.
+
+### Profile writes
+
+Migration: `20261027052232_profiles_onboarding.sql`; tests: `supabase/tests/database/profiles.test.sql`.
+
+- **New columns:** `onboarded_at timestamptz` (null until onboarding finishes) and `show_home_city boolean not null default true`.
+- **Grants:** `insert` and `update` on `public.profiles` are revoked from `anon` and `authenticated`; `authenticated` gets `update (display_name, username, bio, avatar_path, visibility, show_home_city)` only. So `trust_level`, `is_business_affiliated`, `affiliation_note`, `onboarded_at`, `home_*` and `id` cannot be written directly (error `42501`); the home fields change through `set_my_home_city`. The `profiles_insert_own` policy was dropped; `profiles_update_own` stays (row-level, owner only) alongside the column grants.
+- **Functions** (`is_username_available`, `create_my_profile`, `set_my_home_city`, `finish_onboarding`, `city_label`): see Functions and triggers. They are `security definer` with `search_path = ''`. Execute is granted to `authenticated` only and explicitly revoked from `anon` (Supabase grants new functions to `anon` by default). Error messages are the contract with `packages/api`: `profile_exists`, `username_taken`, `invalid_username`, `city_not_found`, `profile_not_found`.
+- Remaining `profiles` column protection (Phase 3/7): `follows.status`, see Known gaps above.
+
+### Sign-in emails
+
+Sign-in and sign-up are by emailed 6-digit code (no link, no password). Settings are in the `config.toml` table above. Both `supabase/templates/magic_link.html` (existing people) and `supabase/templates/confirmation.html` (new people) are the same minimal on-brand page: night background, bone text, wordmark as text, Manrope with a system-font fallback, the code shown large. The two colours in the templates are copied from `packages/ui-tokens` because email cannot import tokens. Locally the emails arrive in the inbox at http://127.0.0.1:54324. Auth settings only take effect after `pnpm db:stop && pnpm db:start`.
 
 ### Cities
 
@@ -162,7 +187,12 @@ Migration: `20261027050402_cities.sql`; tests: `supabase/tests/database/cities.t
 
 ### Storage buckets
 
-None yet.
+Migration (policies): `20261027052235_avatars_storage.sql`; tests: `supabase/tests/database/storage.test.sql`.
+
+- **`avatars`**: declared in `config.toml` as `[storage.buckets.avatars]` (public, `2MiB`, `image/jpeg` only). `supabase start`, `db reset` and `config push` create the bucket from that setting; the migration holds only the policies, so the bucket row is not duplicated in SQL. Public read comes from the bucket being public (no read policy for anonymous visitors).
+- **Object path:** `<uid>/avatar-<unix-ms>.jpg`, one folder per person.
+- **Policies on `storage.objects`** (`authenticated`): `avatars_insert_own`, `avatars_update_own` and `avatars_delete_own` allow the operation only where `bucket_id = 'avatars'` and the first folder of the path is the caller's id. `avatars_select_own` lets the caller see their own folder through the API; the Storage API cannot delete or replace a file without it. Nobody can list other people's files through the API.
+- Direct SQL deletes from `storage.objects` are blocked by Supabase itself (use the Storage API), so the tests check the delete policy exists instead of running a delete.
 
 ### Edge Functions
 
