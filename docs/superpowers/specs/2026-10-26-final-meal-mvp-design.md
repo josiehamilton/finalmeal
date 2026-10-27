@@ -123,10 +123,10 @@ All tables use UUID primary keys and `created_at`/`updated_at` timestamps. Row-l
 2. Email code.
 3. Name.
 4. Username, with a live availability check.
-5. Home city, chosen from the places data at city level.
+5. Home city, chosen from a world cities list (GeoNames, cities over 15,000 people, CC BY 4.0) or from the phone's current location.
 6. Photo (optional).
 
-Apple and Google sign-in skip steps 1–2 and land on Name. After step 6 comes the loading screen ("There can only be five."), then the first landing screen ("Your Final Meal has begun."). On mobile, the attestation check runs silently after sign-in.
+Apple and Google sign-in skip steps 1–2 and land on Name. Their buttons stay hidden until the developer accounts exist (Phase 8); until then sign-up is email code only. After step 6 comes the loading screen ("There can only be five."), then the first landing screen ("Your Final Meal has begun."); until adding dishes exists (Phase 3), the loading screen lands on the You tab instead. On mobile, the attestation check runs silently after sign-in.
 
 ### 5.2 Add a dish (one screen)
 
@@ -151,16 +151,20 @@ Apple and Google sign-in skip steps 1–2 and land on Name. After step 6 comes t
 - **Discover:** map pins come from a bounding-box query (`picks_in_view`) that returns places with their best tier (a skull pin if any Final Meal, otherwise a bone dot). Private members' picks appear without a name or profile link. Search covers dishes, places, people and active shared lists. Filters cover pick type, distance, food type and dietary.
 - **Profile:** Final Meal / Honorable / Map tabs come first, with a slim filter row under them (chips for cities, food types and tags) and "Share these" when a filter is active. The Final Meal tab lists the five individually; Honorable and the map group by restaurant.
 
-### 5.5 Privacy defaults
+### 5.5 Privacy
 
-These apply until Josie decides otherwise; each is a single setting to change.
+Decided by Josie on 2026-10-27.
 
+- **Everyone starts Public.** Private is a setting.
 - **Private accounts:**
-  - Their picks appear on Discover and in counts (if trusted) without name or profile link.
+  - Their name, @username and photo stay visible everywhere (search, followers lists, shared links), and anyone can open their profile.
+  - The profile shows only the header (photo, name, @username, follower counts) plus "This account is private". Their picks, lists, bio details and **home city** are visible only to followers they approve.
   - Follows of a private account need approval.
-  - Approved followers see their name and full profile.
+  - Their picks still count on Discover and in counts (if trusted), but those pins show without their name or a profile link.
   - Lists they share by link show their name to anyone with the link.
+- **Home city:** never shown for private accounts (except to approved followers). Public members can hide it with "Show my home city".
 - **Blocks hide everything both ways.**
+- **Timing:** the setting is stored from Phase 2; the read rules are enforced in Phase 7.
 
 ### 5.6 Errors and offline
 
@@ -250,7 +254,8 @@ Each phase gets its own implementation plan and ends with something Josie can tr
 
 Each has a default, so building isn't blocked.
 
-1. **Profile filter style.** Default: the chip row under the tabs, as on the canvas. Alternatives: a single Filter button, or the top 3 + More.
-2. **Private members and followers.** Default: approved followers see the name (5.5).
+1. **Profile filter style.** Decided (Claude's call, 2026-10-27; may change): the chip row under the tabs, as on the canvas, shown only once someone has picks.
+2. **Private members.** Decided 2026-10-27 (see 5.5).
 3. **Ads.** Frequency and sales channel; after the MVP.
-4. **Link domain.** Needed by phase 6.
+4. **Link domain.** Josie will buy one later. Until then share links use the placeholder `finalmeal.example` (a reserved, never-real domain), set in one config value.
+5. **App icon and splash.** A placeholder ember skull on night for now; Josie will design the real ones later.
