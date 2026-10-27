@@ -12,7 +12,7 @@ Things that are deliberately unfinished or must be revisited, with the phase tha
 
 ## Phase 8: launch
 
-- Branded app icon and splash image from Josie.
+- Replace the placeholder skull icon and splash with Josie's final designs (re-run `pnpm brand:assets` from new source art).
 - Use development builds instead of Expo Go.
 - Verify the splash background colour on real devices.
 - Work through the production configuration checklist in `docs/ops/supabase.md` ("Before the first production push").
