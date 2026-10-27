@@ -51,6 +51,8 @@ People can build their Final Meal. They search a real restaurant (or add their o
   - `invalid_dish_name`: `Give the dish a name (up to 80 characters).`
   - `invalid_place_name`: `Give the spot a name (up to 80 characters).`
   - `pick_not_found`: `That pick isn’t there any more.`
+  - `address_required`: `Add the street address, or mark it as a food truck or pop-up.`
+  - `invalid_tag_name`: `Tags can be up to 40 characters.`
   - `invalid_photo`: `That photo didn’t work. Try another.`
 - **Copy:** quote canvas copy exactly, with typographic punctuation. Where the canvas shows sample data (Pork Gyro, Marutama…), render real data instead.
 
@@ -59,7 +61,7 @@ People can build their Final Meal. They search a real restaurant (or add their o
 1. **The same dish typed differently** at the same place ("tonkotsu ramen", "Tonkotsu  Ramen!", "Tonkotsu Ramen (extra chashu)") ends up on one dish. The person's wording is kept in `original_dish_name`, and suggestions show the existing dish first. Pinned in Tasks 3 and 5.
 2. **Slot integrity under every path:** add, swap, promote (with and without a swap), demote and remove keep slots 1..n contiguous with no duplicates. A failure part-way changes nothing. Pinned in Task 3 (pgTAP) and Task 4 (integration).
 3. **Adding a dish you already have** (either tier) gives `That dish is already on your list.` and doesn't create a second pick. Promoting it instead is offered in the UI. Pinned in Tasks 3 and 6.
-4. **Restaurant not found** (a food truck, a pop-up, a friend's place, or a spot in a city you visited): "Can’t find it? Add it" creates a custom place from a name, an optional address and a city. No location permission is ever needed. Pinned in Tasks 2 and 5.
+4. **Restaurant not found** (a food truck, a pop-up, a new spot, or a spot in a city you visited): "Can’t find it? Add it" creates a custom place from a name, a street address (or "No fixed address" for food trucks and pop-ups) and a city. The UI makes it clear that spots must be places anyone can visit, never a home. No location permission is ever needed. Pinned in Tasks 2 and 5.
 5. **Slow or failed photo upload** while adding a dish: the pick still saves without the photo, and a friendly notice offers to add it later from the pick. No duplicate pick on retry. Pinned in Task 6.
 
 ---
@@ -109,7 +111,12 @@ People can build their Final Meal. They search a real restaurant (or add their o
   - with coordinates, ranks by text match then distance and only searches within 50 km first, widening to global when there are fewer than 5 hits
   - with no coordinates, ranks by text match then name
   - an empty `p_q` with coordinates returns the nearest 12 food places
-- **`public.create_custom_place(p_name text, p_city_id uuid, p_address text default null) returns public.places`:**
+- **Custom places are public businesses** (Josie, 2026-10-27): restaurants, cafés, food trucks and pop-ups anyone can visit, never a home. They're for discovery and appear on the map.
+  - Their address is public; `created_by` is visible only to the creator (column grants).
+  - `search_places` and `get_place(p_id)` never return `created_by`.
+  - New column `no_fixed_address boolean not null default false`.
+- **`public.create_custom_place(p_name text, p_city_id uuid, p_address text default null, p_no_fixed_address boolean default false) returns public.places`:**
+  - Raises `address_required` when there's no address and the flag is false, or when an address is given with the flag set.
   - security definer; `source = 'custom'`; `created_by = auth.uid()`
   - `address` = the trimmed `p_address` (at most 200 characters, otherwise `invalid_place_name`)
   - `location` = the city's point. Address geocoding is a known gap for when maps arrive (Phase 5).
@@ -131,7 +138,9 @@ People can build their Final Meal. They search a real restaurant (or add their o
     - `search_places('maru', 49.28, -123.12)` returns Marutama first
     - `search_places('sushi', 35.66, 139.70)` ranks Sushi Itto before Vancouver hits
     - a closed place and a merged place never appear
-    - `create_custom_place('Grandma’s Kitchen', <Vancouver id>, '123 Main St')` uses the Vancouver point and stores the address
+    - `create_custom_place('Taco Truck', <Vancouver id>, '123 Main St')` uses the Vancouver point and stores the address
+    - no address and no flag raises `address_required`; the flag with no address succeeds
+    - another user sees the address but never `created_by`
     - an empty name raises `invalid_place_name`
     - the 21st custom place in a day raises `rate_limited`
     - anon can't create
@@ -140,7 +149,7 @@ People can build their Final Meal. They search a real restaurant (or add their o
 - [ ] **Step 3: Implement.** Then, if `HF_TOKEN` is set, run `pnpm db:import-places --bbox vancouver`, commit the generated extract, and record the row count in the report.
 - [ ] **Step 4: Run the tests again.** Same commands. Expected: PASS.
 - Dev data note: the canvas places in `seed.sql` stay (picks reference them), so a real Foursquare "Marutama" may appear beside the seeded one in dev search. That's acceptable; merging custom places into Foursquare ones is already a known gap.
-- [ ] **Step 5: Update known-gaps and commit.** Add "Show Foursquare attribution in the About screen (Phase 8)", "Run the global places import in prod (Phase 8)" and "Geocode custom-spot addresses so they get real map pins (Phase 5)" to known-gaps. Commit `Add place search, custom places and the Foursquare import`.
+- [ ] **Step 5: Update known-gaps and commit.** Add "Show Foursquare attribution in the About screen (Phase 8)", "Run the global places import in prod (Phase 8)" and "Geocode custom-spot addresses so they get real map pins: custom spots must show on the map for discovery (Phase 5)" to known-gaps. Commit `Add place search, custom places and the Foursquare import`.
 
 ### Task 3: Dishes and picks: the write functions
 
@@ -215,7 +224,7 @@ People can build their Final Meal. They search a real restaurant (or add their o
   - `DishSuggestion = { id; name; pickCount }`
   - `Pick = { id; tier: 'final' | 'honorable'; slot: number | null; dish: { id; name }; originalDishName; place: Place; note: string | null; photoUrl: string | null; tags: Tag[]; createdAt }`
 - **Tags:** `searchTags(client, kind, q, limit?)`, `createPersonalTag(client, name)`
-- **Places:** `searchPlaces(client, q, inCity?: { lat; lng }, limit?)` (the city's point, used for ranking), `createCustomPlace(client, { name, cityId, address? })`
+- **Places:** `searchPlaces(client, q, inCity?: { lat; lng }, limit?)` (the city's point, used for ranking), `createCustomPlace(client, { name, cityId, address?, noFixedAddress? })`, `getPlace(client, id)`
 - **Dishes:** `suggestDishes(client, placeId, q)`
 - **Picks:**
   - `getMyPicks(client): Promise<Pick[]>`: finals by slot, then honorables newest first
@@ -277,9 +286,12 @@ People can build their Final Meal. They search a real restaurant (or add their o
   - **no location permission** anywhere in this flow
 - **Custom place** (`/add/custom-place`):
   - title `Add a spot`
-  - fields `Name` (prefilled), `Address (optional)` (placeholder `Street address`), `City` (CityPicker, prefilled from the search's city)
+  - intro text: `Restaurants, cafés, food trucks and pop-ups: anywhere the public can eat. Please don’t add someone’s home.`
+  - fields `Name` (prefilled), `Street address` (placeholder `123 Main St`), `City` (CityPicker, prefilled from the search's city)
+  - a checkbox `No fixed address (food truck or pop-up)`; ticking it clears and disables the address field
+  - a required checkbox `This spot is open to the public`, which must be ticked before `Add spot` enables
   - CTA `Add spot`, which calls `createCustomPlace` and returns to the form with that place
-  - helper `Food trucks, pop-ups, a friend’s place: if it served you a dish worth remembering, it counts.`
+  - errors show the friendly copy inline (e.g. `address_required`)
 - **Tag search** (`/add/tags-search`):
   - title `Add food type` or `Add dietary`, with a `Done` action
   - segmented `Food type | Dietary`
@@ -293,7 +305,7 @@ People can build their Final Meal. They search a real restaurant (or add their o
   - the CTA label and disabled rules, including the full-five label
   - `DishField` shows the `· 14 picks here` format and hides 0
   - `PlaceSearch` debounce and the city chip (defaults to the home city; changing it re-runs the search with the new point)
-  - the custom-place prefill of name and city, with the address passed through
+  - the custom-place prefill of name and city; `Add spot` stays disabled until there's an address (or No fixed address) and the public-spot box is ticked; the address is passed through
   - no location permission request is ever made in the add flow
   - tag search: the empty state shows Popular, and the footer creates a personal tag
   - the duplicate path offers promote
@@ -423,7 +435,7 @@ People can build their Final Meal. They search a real restaurant (or add their o
   2. Add Tonkotsu Ramen at Marutama as Final Meal (suggestion `· n picks here` shown), with tags and a photo. It becomes #5.
   3. Add another dish as Final Meal, which goes to Swap: replace #4. Confirm #4 is now Honorable and the new dish is #4.
   4. In pick detail: Move up, Directions, Edit the note, Remove (confirm).
-  5. Add at a custom spot ("Grandma’s Kitchen", `123 Main St`, Vancouver). Also add a dish in Tokyo by switching the city chip.
+  5. Add at a custom spot ("Taco Truck", No fixed address, Vancouver) and another ("Corner Café", `123 Main St`, Vancouver). Also add a dish in Tokyo by switching the city chip.
   6. Adding a duplicate shows the copy and the promote offer.
   7. Sign up a new user through onboarding: The hard part, then Your first pick, then Lock it in, then First landing (`4 seats left`).
 - [ ] **Step 2: Pixel_10 run.** Repeat 2, 3, 5 and 7, plus Review Focus #5: put the photo upload in airplane mode mid-save (`adb shell svc wifi disable` and `svc data disable`) and confirm the pick saves without a photo and the banner shows. Re-enable the network after.
