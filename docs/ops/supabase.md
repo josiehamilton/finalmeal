@@ -49,6 +49,20 @@ Production setup happens in Phase 8. These are the steps then.
 6. `supabase secrets set --env-file <file>`: sets function secrets from a local file kept outside git. Names are listed in the Secrets inventory below.
 7. Extensions are created by the migrations themselves, so nothing to enable in the dashboard.
 
+## Before the first production push
+
+Do these before the first `supabase db push` and `supabase config push` (Phase 8). The local defaults are fine for a laptop and wrong for production.
+
+- [ ] **Auth settings in `supabase/config.toml` are local defaults.** Set them for production before the first `supabase config push`:
+  - `site_url` (and any extra redirect URLs) to the real web address, not `http://127.0.0.1:3000`
+  - email confirmations on (`[auth.email] enable_confirmations = true`)
+  - a sensible `minimum_password_length` (local is 6)
+  - email rate limits (`[auth.rate_limit] email_sent`; local is 2 per hour)
+  - SMTP (`[auth.email.smtp]`) with a real sender, since the built-in cloud mailer is heavily limited
+- [ ] **Database locale must match local.** `normalize_dish_name` uses `[:alnum:]`, whose meaning depends on the locale. Local uses ICU `en_US.UTF-8`; confirm the production database reports the same (`select datcollate, datctype, datlocprovider from pg_database where datname = 'postgres'`) before any dish data is written.
+- [ ] **`NEXT_PUBLIC_*` values are baked in at `next build`.** Build the production web app with production values; a build made with local values will point at the local database.
+- [ ] **The seed never runs in production.** `seed.sql` is sample data for local development only; `db push` does not run it, and it must never be run by hand against the cloud project.
+
 ## Inventory
 
 ### `config.toml` settings changed from default

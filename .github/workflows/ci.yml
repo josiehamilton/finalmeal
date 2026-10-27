@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main, phase-1-foundations]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast checks that need no database: lint, types and unit tests.
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # reads the version from "packageManager"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  # Needs the local backend in Docker: database tests, API integration tests, web e2e.
+  # No secrets: Supabase runs with its default local keys, written by `pnpm env:local`.
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase start
+      - run: supabase test db
+      - run: pnpm env:local
+      - run: pnpm test:integration
+      - run: pnpm --filter @finalmeal/web exec playwright install --with-deps chromium
+      - run: pnpm test:e2e

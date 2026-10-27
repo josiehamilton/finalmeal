@@ -3,6 +3,8 @@
   "private": true,
   "packageManager": "pnpm@10.32.1",
   "scripts": {
+    "dev": "turbo run dev --filter=@finalmeal/web --filter=@finalmeal/mobile",
+    "bootstrap": "pnpm install && pnpm db:start && pnpm env:local",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",

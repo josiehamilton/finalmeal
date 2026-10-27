@@ -23,9 +23,11 @@ A social food app (iOS, Android, web). Each person picks the five dishes for the
 ## Current status
 
 - 2026-10-26: the MVP design spec is **approved**.
-- **Phase 1 (Foundations) plan:** `docs/superpowers/plans/2026-10-26-phase-1-foundations.md`, awaiting Josie's review, then build on branch `phase-1-foundations`.
+- **Phase 1 (Foundations) is complete** on branch `phase-1-foundations`, pending final review and merge: monorepo, brand tokens, local Supabase schema/RLS/seed, typed API client, web and mobile foundation screens, CI. Plan: `docs/superpowers/plans/2026-10-26-phase-1-foundations.md`.
+- **Next:** write the Phase 2 (Accounts & profile) plan.
+- **Dev:** `pnpm bootstrap` once, then `pnpm dev` (web at http://localhost:3000, Expo for the mobile app). See `README.md`.
 - **iOS testing:** Josie's iPhone 17 simulator (in the app sidebar), via the iOS Simulator tool.
-- No product code exists yet.
+- **Needed from Josie later:** a branded app icon and splash image, before Phase 8.
 
 ## Working rules
 
