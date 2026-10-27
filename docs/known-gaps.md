@@ -10,6 +10,14 @@ Things that are deliberately unfinished or must be revisited, with the phase tha
 - Enforce private profiles and blocks in the read policies.
 - Decide what happens to tag ownership when a personal tag is changed after it is attached to picks.
 
+## Phase 2 carry-forward
+
+- Device verification of Phase 2 on the iPhone 17 and Pixel 10 (plan Task 6 Step 4, Task 9 Steps 1–2) is pending on Josie's Mac. The checklist is in `README.md` ("Device checklist (pending Mac)").
+- The auth server answers a wrong code and an expired code the same way, so the "That code has expired…" copy never shows; people see "That code didn’t work…" either way. Revisit with the production auth server.
+- Auth calls (send code, verify code) have no client-side timeout, so a backend that accepts the connection but never answers leaves the spinner up. Add a timeout in `@finalmeal/api`.
+- The integration tests leave their sign-up people behind in the local database. Run `pnpm db:reset` afterwards (see `README.md`). A cleanup step in the test run would remove the need.
+- Avatar storage has no per-person quota beyond the one-name rule (`<id>/avatar-<unix-ms>.jpg`, 2 MiB each). The app removes the old photo when a new one is saved, but nothing stops a client from uploading many files; decide on a limit before launch.
+
 ## Phase 8: launch
 
 - Replace the placeholder skull icon and splash with Josie's final designs (re-run `pnpm brand:assets` from new source art).

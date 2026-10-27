@@ -111,6 +111,7 @@
   - stable, security invoker
   - matches `name`/`ascii_name` by prefix or trigram, accent-insensitive (`unaccent`)
   - ordered by prefix match first, then similarity, then population (descending)
+  - _Changed during the build (ruling R11): prefix matches order by population (largest first), then similarity; non-prefix matches order by similarity, then population._
   - an empty `q` returns nothing
 - **`public.nearest_city(lat double precision, lng double precision) returns public.cities`:** the single nearest city by `<->`.
 - **Profiles changes** live in this migration because they reference cities: `profiles.home_city_id uuid references public.cities on delete set null`.
