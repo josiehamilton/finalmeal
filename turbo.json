@@ -3,9 +3,10 @@
   "globalDependencies": ["tsconfig.base.json", "eslint.config.mjs", ".npmrc"],
   "tasks": {
     "dev": { "cache": false, "persistent": true },
+    "transit": { "dependsOn": ["^transit"] },
     "lint": {},
-    "typecheck": {},
-    "test": {},
+    "typecheck": { "dependsOn": ["transit"] },
+    "test": { "dependsOn": ["transit"] },
     "test:integration": { "cache": false },
     "test:e2e": { "cache": false }
   }
