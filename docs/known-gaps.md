@@ -7,9 +7,6 @@ Things that are deliberately unfinished or must be revisited, with the phase tha
 - Check that the seeded users can sign in with an email code (they have `@example.com` addresses; codes land in the local inbox at http://127.0.0.1:54324).
 - Raise the local `[auth.rate_limit] email_sent` in `supabase/config.toml` for development when Phase 2 starts. It is 2 per hour now, which will get in the way of repeated sign-in testing. Note only; not changed yet. Record any change in `docs/ops/supabase.md`.
 - Create profiles without letting people set `trust_level` or `is_business_affiliated` (the `profiles_insert_own` policy lets a user insert their own row with any values). Use a security-definer function or column grants.
-- Extend `createFinalMealClient` (`packages/api/src/client.ts`) with React Native auth storage so mobile sessions persist.
-- Narrow the request timeout in `createFinalMealClient` to the URL path (`new URL(url).pathname`) and to reads (GET/HEAD). Today it bounds every `/rest/v1/` request, so a timed-out write could still commit on the server.
-- Close the open socket left by the auth-timeout test in `packages/api/src/client.test.ts` (destroy connections in `afterEach`).
 
 ## Phase 3 and Phase 7: privacy and safety
 
