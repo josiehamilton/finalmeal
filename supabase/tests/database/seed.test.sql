@@ -1,13 +1,21 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(24);
+select plan(25);
 
 -- Counts
 select is((select count(*)::int from public.profiles), 6, '6 profiles');
 select is((select count(*)::int from public.places), 14, '14 places');
 select is((select count(*)::int from public.dishes), 17, '17 dishes');
 select is((select count(*)::int from public.picks), 28, '28 picks');
+
+-- Saves match the saved_pick activity
+select is(
+  (select count(*)::int from public.saves s join public.dishes d on d.id = s.dish_id
+    where s.user_id = '00000000-0000-4000-8000-000000000002' and d.name = 'Pork Gyro'),
+  1,
+  'mike has saved josie''s Pork Gyro dish, matching his saved_pick activity'
+);
 
 -- Josie's picks
 select is(

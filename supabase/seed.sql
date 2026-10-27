@@ -238,6 +238,12 @@ select '00000000-0000-4000-8000-000000000002', 'saved_pick', p.id
 from public.picks p join public.dishes d on d.id = p.dish_id
 where p.user_id = '00000000-0000-4000-8000-000000000001' and d.name = 'Pork Gyro';
 
+-- Mike's save behind that activity.
+insert into public.saves (user_id, dish_id)
+select '00000000-0000-4000-8000-000000000002', d.id
+from public.dishes d
+where d.name = 'Pork Gyro';
+
 insert into public.activities (actor_id, type, list_id)
 select '00000000-0000-4000-8000-000000000002', 'saved_from_list', id
 from public.shared_lists where slug = 'josies-vancouver';
