@@ -48,7 +48,9 @@ alter table public.profiles
 create index profiles_home_city_id_idx on public.profiles (home_city_id);
 
 -- Type-ahead search. Accent- and case-insensitive. Prefix matches (on the display name,
--- its accent-folded form, or GeoNames' transliterated ascii_name) come first, then trigram similarity (typos), then population.
+-- its accent-folded form, or GeoNames' transliterated ascii_name) come first, largest city
+-- first (then similarity); after them come trigram-only matches (typos) by similarity, then
+-- population.
 -- An empty or blank query returns nothing.
 create function public.search_cities(q text, lim int default 8)
 returns setof public.cities
@@ -86,6 +88,14 @@ as $$
       or c.name ilike pat.raw_like
       or public.city_fold(c.name) like pat.folded_like
     ) desc,
+    -- prefix matches: biggest city first; typo (trigram-only) matches fall through to similarity
+    case
+      when c.ascii_name ilike pat.folded_like
+        or c.name ilike pat.raw_like
+        or public.city_fold(c.name) like pat.folded_like
+      then c.population
+      else 0
+    end desc,
     greatest(
       extensions.similarity(c.ascii_name, pat.folded),
       extensions.similarity(public.city_fold(c.name), pat.folded)

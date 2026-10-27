@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(24);
+select plan(25);
 
 -- ---------------------------------------------------------------- structure
 select has_table('public', 'cities', 'cities table exists');
@@ -32,8 +32,14 @@ insert into public.cities (geoname_id, name, ascii_name, country, country_name, 
 values
   (-1, 'Zürich', 'Zuerich', 'CH', 'Switzerland', 341730, 'SRID=4326;POINT(8.55 47.37)'::extensions.geography),
   (-2, 'Köln', 'Koeln', 'DE', 'Germany', 963395, 'SRID=4326;POINT(6.95 50.94)'::extensions.geography),
+  (-4, 'Zuru', 'Zuru', 'NG', 'Nigeria', 50, 'SRID=4326;POINT(5.23 11.43)'::extensions.geography),
   (-3, 'Düsseldorf', 'Duesseldorf', 'DE', 'Germany', 573057, 'SRID=4326;POINT(6.78 51.22)'::extensions.geography);
 select is((select name from public.search_cities('zuri') limit 1), 'Zürich', 'search "zuri" finds Zürich first');
+select is(
+  (select name from public.search_cities('zur') limit 1),
+  'Zürich',
+  'prefix matches: the bigger city (Zürich) ranks above a tiny one with the same prefix (Zuru)'
+);
 select ok(
   exists (select 1 from public.search_cities('zur') where name = 'Zürich'),
   'search "zur" includes Zürich'
