@@ -111,6 +111,7 @@ All installed into the `extensions` schema by `20261026233813_extensions_and_typ
 | `public.normalize_dish_name(text)` | Immutable. Turns a dish name into its comparison key: accents removed, lower case, split into words on whitespace, punctuation, symbols and emoji (combining marks such as Thai tone marks stay inside their word), simple plurals folded. A name that normalises to empty is rejected by the `dishes.name_key <> ''` check. |
 | `dishes_set_name_key` | Before insert/update on `dishes`: fills `name_key`. |
 | `public.search_cities(q, lim default 8)` | Stable, security invoker. City type-ahead: matches `name` and `ascii_name` by prefix or trigram similarity (accent- and case-insensitive via `unaccent`); orders prefix matches first, then similarity, then population (largest first). Empty or blank `q` returns nothing; `lim` is capped at 50. |
+| `public.city_fold(text)` | Immutable. Lower-cases and removes accents ("Zürich" becomes "zurich"); used by `search_cities` and its trigram index, because `unaccent()` itself is not immutable. |
 | `public.nearest_city(lat, lng)` | Stable, security invoker. The single nearest city to a point (PostGIS `<->`). |
 | `pick_tags_check_owner` | Before insert/update on `pick_tags`: raises `personal_tag_not_owned` if a personal tag is put on someone else's pick. |
 
@@ -128,7 +129,7 @@ Migration: `20261027000454_rls_baseline.sql`; tests: `supabase/tests/database/rl
 
 | Table | Signed out (`anon`) | Signed in (`authenticated`) |
 |---|---|---|
-| `places`, `dishes` | read | read; no direct writes |
+| `places`, `dishes`, `cities` | read | read; no direct writes |
 | `profiles` | read | read; insert and update own |
 | `picks` | read | read; insert, update, delete own |
 | `tags` | read global tags | read global tags and own personal tags; insert, update, delete own personal tags only |
@@ -152,11 +153,11 @@ Known gaps (full carry-forward list with the phase that closes each: `docs/known
 
 Migration: `20261027050402_cities.sql`; tests: `supabase/tests/database/cities.test.sql`.
 
-- **`public.cities`**: one row per world city: `geoname_id` (unique), `name`, `ascii_name`, `region_code`, `region_name`, `country` (ISO code), `country_name`, `population`, `location` (`geography(Point, 4326)`). Indexes: GIN trigram on `name` and on `ascii_name` (search), GiST on `location` (nearest city). Row-level security is on and `anon` and `authenticated` can only `select`; there are no client writes (privileges are revoked, not just policies). Rows are written by the import script or the dev seed.
+- **`public.cities`**: one row per world city: `geoname_id` (unique), `name`, `ascii_name`, `region_code`, `region_name`, `country` (ISO code), `country_name`, `population`, `location` (`geography(Point, 4326)`). Indexes: GIN trigram on `name`, on `ascii_name` and on `city_fold(name)` (search), GiST on `location` (nearest city). Row-level security is on and `anon` and `authenticated` can only `select`; there are no client writes (privileges are revoked, not just policies). Rows are written by the import script or the dev seed.
 - **`profiles.home_city_id`** (`uuid`, references `cities`, `on delete set null`, indexed) is added by the same migration. The city label is stored in `profiles.home_place_text`.
 - **Label format**, used everywhere: `name`, then `region_code` if the country is `US`, `CA` or `AU` (otherwise `region_name`), then `country_name`. Examples: `Vancouver, BC, Canada`, `Paris, Île-de-France, France`. `region_code` is only filled for `US`, `CA` and `AU`.
 - **Dev seed**: 24 cities with real GeoNames ids, names and populations (so the full import upserts over them cleanly), and every seeded profile has a `home_city_id`.
-- **Full import**: `pnpm db:import-cities` (script: `scripts/import-cities.mjs`, uses the `postgres` package from the root devDependencies) downloads GeoNames `cities15000.zip`, `admin1CodesASCII.txt` and `countryInfo.txt` into the gitignored `.cache/geonames/` folder and upserts them by `geoname_id` in batches of 1,000, printing the counts. It skips neighbourhoods (feature code `PPLX`, such as "Downtown Vancouver") and historical places (`PPLH`), which leaves about 31,800 cities. Canadian provinces and Australian states are mapped from GeoNames numeric admin1 codes to their usual abbreviations inside the script. Re-running it is safe. Production: run it once against the cloud database in Phase 8 with `pnpm db:import-cities -- --db-url <direct connection string>` (the connection string is a secret; never commit it). After a full import, `pnpm db:reset` returns the local database to the 24-city dev seed.
+- **Full import**: `pnpm db:import-cities` (script: `scripts/import-cities.mjs`, uses the `postgres` package from the root devDependencies) downloads GeoNames `cities15000.zip`, `admin1CodesASCII.txt` and `countryInfo.txt` into the gitignored `.cache/geonames/` folder and upserts them by `geoname_id` in batches of 1,000, printing the counts. It skips neighbourhoods (feature code `PPLX`, such as "Downtown Vancouver") and historical places (`PPLH`), which leaves about 31,800 cities. Canadian provinces and Australian states are mapped from GeoNames numeric admin1 codes to their usual abbreviations inside the script. Re-running it is safe. Downloads are cached; delete `.cache/geonames` to fetch fresh GeoNames data. Production: run it once against the cloud database in Phase 8 with `pnpm db:import-cities -- --db-url <direct connection string>` (the connection string is a secret; never commit it). After a full import, `pnpm db:reset` returns the local database to the 24-city dev seed.
 - **Attribution**: City data © GeoNames (CC BY 4.0), https://www.geonames.org. The in-app About line comes in Phase 8 (listed in `docs/known-gaps.md`).
 
 ### Storage buckets

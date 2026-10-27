@@ -18,6 +18,21 @@ create table public.cities (
 
 create index cities_name_trgm on public.cities using gin (name extensions.gin_trgm_ops);
 create index cities_ascii_name_trgm on public.cities using gin (ascii_name extensions.gin_trgm_ops);
+
+-- unaccent() is not immutable, so indexes and searches go through this wrapper (the same
+-- pattern as normalize_dish_name). It folds case and accents: "Zürich" -> "zurich".
+-- GeoNames' own ascii_name transliterates instead ("Zuerich"), so search matches both.
+create function public.city_fold(input text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select lower(extensions.unaccent('extensions.unaccent'::regdictionary, input));
+$$;
+
+create index cities_folded_name_trgm on public.cities
+  using gin (public.city_fold(name) extensions.gin_trgm_ops);
 create index cities_location_gist on public.cities using gist (location);
 
 -- Read-only to clients. Writes happen through the import script (service role / direct connection).
@@ -32,8 +47,8 @@ alter table public.profiles
   add column home_city_id uuid references public.cities on delete set null;
 create index profiles_home_city_id_idx on public.profiles (home_city_id);
 
--- Type-ahead search. Accent- and case-insensitive. Prefix matches (on the display name
--- or the accent-free name) come first, then trigram similarity (typos), then population.
+-- Type-ahead search. Accent- and case-insensitive. Prefix matches (on the display name,
+-- its accent-folded form, or GeoNames' transliterated ascii_name) come first, then trigram similarity (typos), then population.
 -- An empty or blank query returns nothing.
 create function public.search_cities(q text, lim int default 8)
 returns setof public.cities
@@ -45,7 +60,7 @@ as $$
   with p as (
     select
       lower(btrim(coalesce(q, ''))) as raw,
-      lower(extensions.unaccent('extensions.unaccent'::regdictionary, btrim(coalesce(q, '')))) as folded
+      public.city_fold(btrim(coalesce(q, ''))) as folded
   ),
   pat as (
     select
@@ -61,14 +76,19 @@ as $$
     and (
       c.ascii_name ilike pat.folded_like
       or c.name ilike pat.raw_like
+      or public.city_fold(c.name) like pat.folded_like
       or c.ascii_name operator(extensions.%) pat.folded
-      or c.name operator(extensions.%) pat.raw
+      or public.city_fold(c.name) operator(extensions.%) pat.folded
     )
   order by
-    (c.ascii_name ilike pat.folded_like or c.name ilike pat.raw_like) desc,
+    (
+      c.ascii_name ilike pat.folded_like
+      or c.name ilike pat.raw_like
+      or public.city_fold(c.name) like pat.folded_like
+    ) desc,
     greatest(
       extensions.similarity(c.ascii_name, pat.folded),
-      extensions.similarity(c.name, pat.raw)
+      extensions.similarity(public.city_fold(c.name), pat.folded)
     ) desc,
     c.population desc,
     c.id

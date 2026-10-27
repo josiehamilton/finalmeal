@@ -19,6 +19,8 @@ const SKIPPED_FEATURE_CODES = new Set(['PPLX', 'PPLH']);
 
 // GeoNames gives Canadian provinces and Australian states numeric admin1 codes; the label
 // format wants the usual abbreviations. US admin1 codes already are the state abbreviations.
+// Keys are strings on purpose (they keep their leading zero); prettier would unquote 10-14.
+// prettier-ignore
 const REGION_CODES = {
   CA: {
     '01': 'AB',
@@ -29,11 +31,11 @@ const REGION_CODES = {
     '07': 'NS',
     '08': 'ON',
     '09': 'PE',
-    10: 'QC',
-    11: 'SK',
-    12: 'YT',
-    13: 'NT',
-    14: 'NU',
+    '10': 'QC',
+    '11': 'SK',
+    '12': 'YT',
+    '13': 'NT',
+    '14': 'NU',
   },
   AU: {
     '01': 'ACT',
