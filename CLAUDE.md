@@ -23,12 +23,26 @@ A social food app (iOS, Android, web). Each person picks the five dishes for the
 
 ## Current status
 
-- 2026-10-26: the MVP design spec is **approved**.
-- **Phase 1 (Foundations) is complete** on branch `phase-1-foundations`, pending final review and merge: monorepo, brand tokens, local Supabase schema/RLS/seed, typed API client, web and mobile foundation screens, CI. Plan: `docs/superpowers/plans/2026-10-26-phase-1-foundations.md`.
-- **Next:** write the Phase 2 (Accounts & profile) plan.
+- **Phase 1 (Foundations): done and merged to `main`** (2026-10-27). Monorepo, brand tokens, local Supabase schema/RLS/seed, typed API client, web and mobile foundation screens, CI.
+- **Phase 2 (Accounts & profile): plan approved by Josie, ready to build.** Plan: `docs/superpowers/plans/2026-10-27-phase-2-accounts-profile.md`. Build on branch `phase-2-accounts-profile` (create it from `main`); don't merge into `main` without Josie's OK.
+- **Leftovers and later work:** `docs/known-gaps.md`.
 - **Dev:** `pnpm bootstrap` once, then `pnpm dev` (web at http://localhost:3000, Expo for the mobile app). See `README.md`.
-- **iOS testing:** Josie's iPhone 17 simulator (in the app sidebar), via the iOS Simulator tool.
-- **Needed from Josie later:** a branded app icon and splash image, before Phase 8.
+- **Devices (Josie's Mac only):** iPhone 17 simulator and the `Pixel_10` Android emulator, both running the app in Expo Go.
+- **Placeholders until Josie decides:** link domain `finalmeal.example`; a generated ember-skull app icon and splash.
+
+## How we build (works with or without workflow plugins)
+
+1. **Spec, then plan, then build.** Josie approves the spec and each phase's plan before code. Plans live in `docs/superpowers/plans/` and list tasks with exact files, interfaces, copy and tests.
+2. **One task at a time, test first.** For each task, write the failing tests, see them fail, implement, see them pass, then commit with the co-author line.
+3. **Builder and reviewer are different agents.** A Sonnet 5.5 subagent builds each task from the plan's task text. An Opus 5.5 subagent reviews the diff against the task and the spec before the next task starts. Fixes go back to the builder, and the reviewer re-checks only the fix.
+4. **Keep a progress ledger** in `.superpowers/sdd/<plan-name>/progress.md` (gitignored): one line per task started, fixed and completed with commit ranges, plus every decision made on Josie's behalf (`Ruling: what — why — cost if wrong`). After a context reset, trust the ledger and `git log`.
+5. **Finish with one whole-branch review on Opus 5.5,** fix its findings in one round, push the branch, confirm CI is green, then ask Josie before merging into `main`. Report every ruling to her.
+6. **Decide, don't stall.** Make reasonable calls when the plan is unclear, and record them. Only stop for Josie on: anything destructive or irreversible, security-sensitive actions, merging/pushing to `main` or publishing, accounts or keys she must create, or a plan so broken every path is a guess.
+
+## Cloud session vs Josie's Mac (Phase 2)
+
+- **In a cloud session:** build and test Tasks 1–5, 7 and 8 fully (unit tests, pgTAP, API integration against local Supabase in Docker, web e2e if the Playwright domains are allowed). In Task 2, download.geonames.org is probably not on the cloud's allowed list. Skip the optional full city import (`pnpm db:import-cities`) and rely on the dev seed, or ask Josie to add the domain.
+- **Needs Josie's Mac:** the simulator checks in Task 6 Step 4 and Task 9 Steps 1–2 (iPhone 17 and Pixel 10). In a cloud session, do everything else in those tasks, mark the device steps "pending Mac" in the ledger and the final report, push the branch, and tell Josie to run them from a session on her Mac.
 
 ## Working rules
 
