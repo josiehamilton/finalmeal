@@ -1,7 +1,8 @@
 // Generates the placeholder app icon, adaptive icon, splash image and web favicons
-// from design/brand/icon-skull.svg. Usage: pnpm brand:assets
-// Replace with Josie's final art by pointing SKULL_SVG at new source art and re-running.
-import { mkdirSync, readFileSync } from 'node:fs';
+// from design/brand/icon-skull.svg. Usage: pnpm brand:assets [outputRoot]
+// outputRoot (or BRAND_ASSETS_OUT) defaults to the repo root; the tests use a temp folder.
+// For final art, change the SKULL_SVG constant; note every fill in the source is forced to ember.
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -9,6 +10,7 @@ import sharp from 'sharp';
 import { colors } from '../packages/ui-tokens/src/colors.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const outRoot = resolve(process.argv[2] ?? process.env.BRAND_ASSETS_OUT ?? root);
 const SKULL_SVG = resolve(root, 'design/brand/icon-skull.svg');
 
 // Recolour the source skull to the ember token so the art never carries its own hex.
@@ -31,9 +33,9 @@ async function render({ size, heightRatio, background }) {
 }
 
 const write = async (path, options) => {
-  const file = resolve(root, path);
+  const file = resolve(outRoot, path);
   mkdirSync(dirname(file), { recursive: true });
-  await sharp(await render(options)).toFile(file);
+  writeFileSync(file, await render(options));
   console.log(`brand:assets: wrote ${path}`);
 };
 

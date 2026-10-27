@@ -1,3 +1,4 @@
+// Keep this file import-free: apps/mobile/app.config.ts and scripts/generate-brand-assets.mjs import it directly in plain Node.
 /** Ember-only palette, verbatim from the design canvas. No other accent colours. */
 export const colors = Object.freeze({
   night: '#0B0A09',
