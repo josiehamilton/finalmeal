@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(38);
+select plan(39);
 
 -- Start from an empty database: the dev seed is deleted here and comes back
 -- when this transaction rolls back.
@@ -175,10 +175,18 @@ select is(
   (select count(*)::int from public.tags where id = '40000000-0000-0000-0000-00000000000b'),
   0, 'RLS hides user B''s personal tag from user A');
 
+-- Since Phase 3 a signed-in user can no longer insert into pick_tags directly (privileges are
+-- revoked), so this path is closed twice: update_pick refuses a tag id that is not a global tag
+-- (invalid_tag), and the pick_tags_check_owner trigger above stays as the backstop for any
+-- other writer (checked earlier in this file as the table owner).
 select throws_ok($$
-  insert into public.pick_tags (pick_id, tag_id)
-  values ('30000000-0000-0000-0000-00000000000a', '40000000-0000-0000-0000-00000000000b')
-$$, 'P0001', 'personal_tag_not_owned', 'owner check still fires for a signed-in user under RLS');
+  select public.update_pick('30000000-0000-0000-0000-00000000000a', null,
+    array['40000000-0000-0000-0000-00000000000b']::uuid[], '{}', null)
+$$, 'P0001', 'invalid_tag', 'a signed-in user cannot put user B''s personal tag on their own pick');
+select is(
+  (select count(*)::int from public.pick_tags where tag_id = '40000000-0000-0000-0000-00000000000b'
+     and pick_id = '30000000-0000-0000-0000-00000000000a'),
+  0, 'and nothing was attached');
 
 reset role;
 

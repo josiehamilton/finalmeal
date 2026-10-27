@@ -5,7 +5,7 @@ Things that are deliberately unfinished or must be revisited, with the phase tha
 ## Phase 3 and Phase 7: privacy and safety
 
 - Column-level protection for `follows.status` (policies are row-level today). `profiles.trust_level` and `profiles.is_business_affiliated` are already protected by column grants (Phase 2).
-- Revoke the default `TRUNCATE` grants that `anon` and `authenticated` hold on public tables (not reachable through PostgREST, but should not exist).
+- Revoke the default `TRUNCATE` grants that `anon` and `authenticated` hold on public tables (not reachable through PostgREST, but should not exist). Done for `picks` and `pick_tags` (Phase 3); the other tables remain.
 - Narrow `notifications_update_own` so a user can only change `read_at`, not `activity_id`.
 - Enforce private profiles and blocks in the read policies.
 - Decide what happens to tag ownership when a personal tag is changed after it is attached to picks.
@@ -30,6 +30,12 @@ Each item names the phase that closes it.
 - **Phase 5:** custom spots must get real map pins: geocode their street addresses when maps arrive. Today a custom place sits on its city's point and the address is only text, so every custom place in a city shares one pin. Spots flagged `no_fixed_address` (food trucks, pop-ups) have no address to geocode and need a different answer (a pin the creator drops, or no pin).
 - **Later:** merge custom places into Foursquare ones when the same restaurant exists in both (the dev canvas "Marutama" and a Foursquare "Marutama" appear side by side).
 - **Phase 8:** closed places stay in the table (with `closed_at`) so a re-import can mark closures; nothing yet hides picks at a place that closed.
+
+## Phase 3 carry-forward: dishes and picks
+
+- **Phase 7:** `dish_stats` is a plain view that counts picks on every read. Make it a materialised view (refreshed on a schedule or by trigger) before dish pages get busy.
+- **Phase 7:** pick-photo storage has no per-person quota beyond the one-name rule (`<id>/pick-<unix-ms>.jpg`, 4 MiB each), like avatars; decide on a limit with the other abuse controls. Nothing yet limits how many dishes a new account can create, or how many tags a pick can carry (`add_pick` / `update_pick` take any number of personal tag names).
+- **Later:** a merged dish (`dishes.merged_into_id`) is refused by `add_pick` with `place_not_found` rather than followed to its target; follow the merge when dish merging is built.
 
 ## Phase 8: launch
 

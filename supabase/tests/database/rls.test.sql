@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(85);
+select plan(86);
 
 -- Start from an empty database: the dev seed is deleted here and comes back
 -- when this transaction rolls back.
@@ -129,10 +129,12 @@ select is((select count(*)::int from public.device_attestations), 0, 'B cannot s
 select is((select count(*)::int from public.reports), 0, 'B cannot read reports');
 
 -- Writes against A's rows touch nothing (checked from A's side further down)
-select lives_ok($$update public.picks set note = 'hijacked' where id = '30000000-0000-0000-0000-00000000000a'$$,
-  'B''s update of A''s pick runs without error (and affects 0 rows)');
-select lives_ok($$delete from public.picks where id = '30000000-0000-0000-0000-00000000000a'$$,
-  'B''s delete of A''s pick runs without error (and affects 0 rows)');
+-- Phase 3 closed direct writes to picks and pick_tags (the pick functions are the only way in),
+-- so these are refused outright instead of quietly matching zero rows.
+select throws_ok($$update public.picks set note = 'hijacked' where id = '30000000-0000-0000-0000-00000000000a'$$,
+  '42501', null, 'B cannot update A''s pick (no direct picks writes)');
+select throws_ok($$delete from public.picks where id = '30000000-0000-0000-0000-00000000000a'$$,
+  '42501', null, 'B cannot delete A''s pick (no direct picks writes)');
 select lives_ok($$update public.shared_lists set title = 'hijacked' where id = '50000000-0000-0000-0000-000000000001'$$,
   'B''s update of A''s list runs without error (and affects 0 rows)');
 select lives_ok($$update public.profiles set display_name = 'hijacked' where id = '00000000-0000-0000-0000-00000000000a'$$,
@@ -254,17 +256,18 @@ select lives_ok($$update public.tags set is_featured = true where id = '40000000
   'A''s update of a global tag runs without error (and affects 0 rows)');
 
 -- pick_tags on own picks
-select lives_ok($$
+-- Tagging goes through add_pick / update_pick since Phase 3; a direct write is refused.
+select throws_ok($$
   insert into public.pick_tags (pick_id, tag_id)
   select '30000000-0000-0000-0000-00000000000a', id from public.tags where slug = 'date-night'
-$$, 'A can tag A''s own pick');
-select lives_ok($$
+$$, '42501', null, 'A cannot tag A''s own pick directly (use add_pick / update_pick)');
+select throws_ok($$
   delete from public.pick_tags where tag_id = '40000000-0000-0000-0000-00000000000a'
-$$, 'A can untag A''s own pick');
+$$, '42501', null, 'A cannot untag A''s own pick directly (use update_pick)');
 
 -- Own picks, lists, follows
-select lives_ok($$update public.picks set note = 'edited by A' where id = '30000000-0000-0000-0000-00000000000a'$$,
-  'A can edit A''s own pick');
+select throws_ok($$update public.picks set note = 'edited by A' where id = '30000000-0000-0000-0000-00000000000a'$$,
+  '42501', null, 'A cannot edit A''s own pick directly (use update_pick)');
 select lives_ok($$update public.shared_lists set title = 'Renamed' where id = '50000000-0000-0000-0000-000000000001'$$,
   'A can edit A''s own list');
 select lives_ok($$
@@ -282,7 +285,9 @@ $$, '42501', null, 'users cannot write their own attestations');
 reset role;
 
 select is((select note from public.picks where id = '30000000-0000-0000-0000-00000000000a'),
-  'edited by A', 'A''s edit of A''s pick landed');
+  'original note', 'A''s direct edit of A''s pick was refused, so the note is unchanged');
+select is((select count(*)::int from public.pick_tags where pick_id = '30000000-0000-0000-0000-00000000000a'),
+  2, 'A''s direct tag changes were refused, so the pick still has its two tags');
 select is((select title from public.shared_lists where id = '50000000-0000-0000-0000-000000000001'),
   'Renamed', 'A''s rename of A''s list landed');
 select is((select is_featured from public.tags where id = '40000000-0000-0000-0000-000000000001'),
