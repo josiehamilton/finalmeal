@@ -129,7 +129,7 @@ People can build their Final Meal. They search a real restaurant (or add their o
   - maps fields to `places`
   - modes:
     - `--bbox vancouver` (Metro Vancouver: lat 49.0–49.45, lng −123.35 to −122.5) writes `supabase/seed/places_vancouver.sql`, sorted and deterministic
-    - `--db-url <url> [--bbox …|--all]` upserts by `(source, source_id)` in batches and prints counts
+    - `DATABASE_URL=… --upsert [--bbox …|--all]` upserts by `(source, source_id)` in batches and prints counts (the URL comes only from the env var, never argv)
   - `--fixture <csv>` reads a local CSV instead, for tests and CI
 - **If `HF_TOKEN` is absent:** generating the real Vancouver extract is **pending Josie** (see the ledger). Everything else proceeds with the canvas places plus the fixture, and `places_vancouver.sql` is a valid empty file that says how to regenerate it.
 
