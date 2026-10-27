@@ -40,4 +40,20 @@ describe('createFinalMealClient request timeout', () => {
     await expect(getFoundationStats(client)).rejects.toBeInstanceOf(ApiError);
     expect(Date.now() - started).toBeLessThan(2000);
   });
+
+  it('only bounds PostgREST reads: an /auth/v1/ request is not aborted at the read timeout', async () => {
+    const url = await listenAndNeverRespond();
+    const client = createFinalMealClient({ url, key: 'unused', timeoutMs: 200 });
+    // Auth calls (for example signInWithOtp waiting on SMTP) can legitimately take longer.
+    const request = client.auth.signInWithOtp({ email: 'someone@example.com' });
+    const settledEarly = await Promise.race([
+      request.then(
+        () => true,
+        () => true,
+      ),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 800)),
+    ]);
+    // The test's own wait ended first, so the request was still pending well past 200 ms.
+    expect(settledEarly).toBe(false);
+  });
 });
