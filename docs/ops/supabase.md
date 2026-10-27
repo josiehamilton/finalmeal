@@ -8,7 +8,7 @@ Final Meal keeps all of its data (people, dishes, places, picks, lists) in a Sup
 |---|---|
 | `pnpm db:start` | Starts the local backend in Docker (first run downloads images). API `http://127.0.0.1:54321`, Studio `http://127.0.0.1:54323`, inbox `http://127.0.0.1:54324`. |
 | `pnpm db:stop` | Stops it. |
-| `pnpm db:reset` | Wipes the local database and re-applies every migration, then `seed.sql` if present. |
+| `pnpm db:reset` | Wipes the local database and re-applies every migration, then `seed.sql` if present. It does not reload `config.toml` or the email templates: after pulling changes to those, run `pnpm db:stop && pnpm db:start`. |
 | `pnpm db:test` | Runs the database tests in `supabase/tests/database/` (pgTAP). |
 | `pnpm db:import-cities` | Loads the full world city list (see Cities below) into the local database; safe to re-run. Add `-- --db-url <url>` to target another database. |
 | `pnpm env:local` | With Supabase running, writes the gitignored env files below from `supabase status`. Re-run it after `db:start` if the keys change. Prints file names only, never keys. |
@@ -174,7 +174,7 @@ Migration: `20261027052232_profiles_onboarding.sql`; tests: `supabase/tests/data
 
 ### Sign-in emails
 
-Sign-in and sign-up are by emailed 6-digit code (no link, no password). Settings are in the `config.toml` table above. Both `supabase/templates/magic_link.html` (existing people) and `supabase/templates/confirmation.html` (new people) are the same minimal on-brand page: night background, bone text, wordmark as text, Manrope with a system-font fallback, the code shown large. The two colours in the templates are copied from `packages/ui-tokens` because email cannot import tokens. Locally the emails arrive in the inbox at http://127.0.0.1:54324. Auth settings only take effect after `pnpm db:stop && pnpm db:start`.
+Sign-in and sign-up are by emailed 6-digit code (no link, no password). Settings are in the `config.toml` table above. Both `supabase/templates/magic_link.html` (existing people) and `supabase/templates/confirmation.html` (new people) are the same minimal on-brand page: night background, bone text, wordmark as text, Manrope with a system-font fallback, the code shown large. The two colours in the templates are copied from `packages/ui-tokens` because email cannot import tokens. Locally the emails arrive in the inbox at http://127.0.0.1:54324. Auth settings and email templates only take effect after `pnpm db:stop && pnpm db:start`. `pnpm db:reset` reloads the database but not the auth container's settings, so after pulling a change to `supabase/config.toml` or `supabase/templates/` always stop and start (a stack started before the templates existed sends the default "Your sign-in link" email with no code).
 
 ### Cities
 

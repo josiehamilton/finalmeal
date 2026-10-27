@@ -16,7 +16,6 @@ Each item names the phase that closes it.
 
 - **Closes before the Phase 2 merge:** device verification of Phase 2 on the iPhone 17 and Pixel 10 (plan Task 6 Step 4, Task 9 Steps 1–2) is pending on Josie's Mac. The checklist is in `README.md` ("Device checklist (pending Mac)").
 - **Phase 8:** the auth server answers a wrong code and an expired code the same way, so the "That code has expired…" copy never shows; people see "That code didn’t work…" either way. Revisit with the production auth server.
-- **Phase 8:** auth calls (send code, verify code) have no client-side timeout, so a backend that accepts the connection but never answers leaves the spinner up. Add a timeout in `@finalmeal/api`.
 - **Phase 3:** the integration tests leave their sign-up people behind in the local database. Run `pnpm db:reset` afterwards (see `README.md`). A cleanup step in the test run would remove the need; add it when Phase 3 adds more integration tests.
 - **Phase 7:** avatar storage has no per-person quota beyond the one-name rule (`<id>/avatar-<unix-ms>.jpg`, 2 MiB each). The app removes the old photo when a new one is saved, but nothing stops a client from uploading many files; decide on a limit with the other abuse controls.
 - **Phase 8:** the mobile sign-up end-to-end test with Maestro (spec section 10) was not built in Phase 2; it needs the development builds. Web end-to-end runs in Playwright already.
