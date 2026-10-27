@@ -2,7 +2,6 @@ name: CI
 
 on:
   push:
-    branches: [main, phase-1-foundations]
   pull_request:
     branches: [main]
 
