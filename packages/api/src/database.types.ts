@@ -702,7 +702,9 @@ export type Database = {
       };
       tags: {
         Row: {
+          aliases: string[];
           created_at: string;
+          display_order: number | null;
           id: string;
           is_featured: boolean;
           kind: Database['public']['Enums']['tag_kind'];
@@ -712,7 +714,9 @@ export type Database = {
         };
         ComputedFields: never;
         Insert: {
+          aliases?: string[];
           created_at?: string;
+          display_order?: number | null;
           id?: string;
           is_featured?: boolean;
           kind: Database['public']['Enums']['tag_kind'];
@@ -721,7 +725,9 @@ export type Database = {
           slug: string;
         };
         Update: {
+          aliases?: string[];
           created_at?: string;
+          display_order?: number | null;
           id?: string;
           is_featured?: boolean;
           kind?: Database['public']['Enums']['tag_kind'];
@@ -744,6 +750,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      apply_tag_vocabulary: { Args: Record<PropertyKey, never>; Returns: undefined };
       city_fold: { Args: { input: string }; Returns: string };
       city_label: {
         Args: {
@@ -777,6 +784,26 @@ export type Database = {
         SetofOptions: {
           from: '*';
           to: 'profiles';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      create_personal_tag: {
+        Args: { p_name: string };
+        Returns: {
+          aliases: string[];
+          created_at: string;
+          display_order: number | null;
+          id: string;
+          is_featured: boolean;
+          kind: Database['public']['Enums']['tag_kind'];
+          name: string;
+          owner_id: string | null;
+          slug: string;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'tags';
           isOneToOne: true;
           isSetofReturn: false;
         };
@@ -831,6 +858,26 @@ export type Database = {
         };
       };
       normalize_dish_name: { Args: { input: string }; Returns: string };
+      popular_tags: {
+        Args: { p_kind: Database['public']['Enums']['tag_kind'] };
+        Returns: {
+          aliases: string[];
+          created_at: string;
+          display_order: number | null;
+          id: string;
+          is_featured: boolean;
+          kind: Database['public']['Enums']['tag_kind'];
+          name: string;
+          owner_id: string | null;
+          slug: string;
+        }[];
+        SetofOptions: {
+          from: '*';
+          to: 'tags';
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
       search_cities: {
         Args: { lim?: number; q: string };
         Returns: {
@@ -848,6 +895,26 @@ export type Database = {
         SetofOptions: {
           from: '*';
           to: 'cities';
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
+      search_tags: {
+        Args: { p_kind: Database['public']['Enums']['tag_kind']; p_lim?: number; p_q: string };
+        Returns: {
+          aliases: string[];
+          created_at: string;
+          display_order: number | null;
+          id: string;
+          is_featured: boolean;
+          kind: Database['public']['Enums']['tag_kind'];
+          name: string;
+          owner_id: string | null;
+          slug: string;
+        }[];
+        SetofOptions: {
+          from: '*';
+          to: 'tags';
           isOneToOne: false;
           isSetofReturn: true;
         };
@@ -879,6 +946,7 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      tag_slug: { Args: { input: string }; Returns: string };
     };
     Enums: {
       activity_type:

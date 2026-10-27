@@ -38,7 +38,7 @@ The CLI is a pinned root devDependency (`supabase` in the root `package.json`, c
 - Schema, policies and functions change **only** through files in `supabase/migrations/`. Create one with `pnpm exec supabase migration new <name>`. If you explore in Studio, turn the result into a migration before committing.
 - Auth, storage and API settings live in `supabase/config.toml`.
 - Edge Functions live in `supabase/functions/`.
-- `supabase/seed.sql` is sample data for local development only. It never runs in production: `pnpm exec supabase db push` does not run it, so never run it against the cloud project. It mirrors the design canvas: 6 people (`@example.com` emails, fixed ids `00000000-0000-4000-8000-00000000000N`, josie is `...0001`), 14 places, 17 dishes, 28 picks, the global food-type and dietary tags, Josie's personal tags, follows, 2 shared lists, one save, and a few activities with notifications. `pnpm db:reset` loads it. The other database tests empty these tables inside their own rolled-back transaction, so they stay independent of the seed.
+- `supabase/seed.sql` is sample data for local development only. It never runs in production: `pnpm exec supabase db push` does not run it, so never run it against the cloud project. It mirrors the design canvas: 6 people (`@example.com` emails, fixed ids `00000000-0000-4000-8000-00000000000N`, josie is `...0001`), 14 places, 17 dishes, 28 picks, Josie's personal tags (the global food-type and dietary tags are no longer in the seed: they come from the `tag_vocabulary` migration, see Tags), follows, 2 shared lists, one save, and a few activities with notifications. `pnpm db:reset` loads it. The other database tests empty these tables inside their own rolled-back transaction, so they stay independent of the seed.
 - Every new setting, extension, bucket or secret gets a line in the inventory below.
 - Secrets are listed here by name only. Never commit `.env` or `.env.local` files.
 
@@ -65,7 +65,7 @@ Do these before the first `pnpm exec supabase db push` and `pnpm exec supabase c
   - email rate limits: `[auth.rate_limit] email_sent` is 30 per hour locally; choose the production value (the built-in cloud mailer allows very few, so this only means something once SMTP is on)
   - SMTP (`[auth.email.smtp]`) with a real sender (From address and name), since the built-in cloud mailer is heavily limited and the sign-in code emails depend on it
   - the sign-in code email: confirm `otp_length = 6`, `otp_expiry = 600`, `max_frequency = "30s"` and the two templates (`supabase/templates/`) carry over with `config push`, then send a real code to a real inbox
-- [ ] **Database locale must match local.** `normalize_dish_name` uses the `[:space:]`, `[:punct:]` and `[:cntrl:]` character classes, whose meaning depends on the locale. Local uses ICU `en_US.UTF-8`; confirm the production database reports the same (`select datcollate, datctype, datlocprovider from pg_database where datname = 'postgres'`) before any dish data is written.
+- [ ] **Database locale must match local.** `normalize_dish_name` and `tag_slug` use the `[:space:]`, `[:punct:]`, `[:cntrl:]` and `[:alnum:]` character classes, whose meaning depends on the locale. Local uses ICU `en_US.UTF-8`; confirm the production database reports the same (`select datcollate, datctype, datlocprovider from pg_database where datname = 'postgres'`) before the first `db push` (the tag migration writes slugs) and before any dish data is written.
 - [ ] **`NEXT_PUBLIC_*` values are baked in at `next build`.** Build the production web app with production values; a build made with local values will point at the local database.
 - [ ] **The seed never runs in production.** `seed.sql` is sample data for local development only; `db push` does not run it, and it must never be run by hand against the cloud project.
 
@@ -126,6 +126,11 @@ All installed into the `extensions` schema by `20261026233813_extensions_and_typ
 | `public.create_my_profile(p_display_name, p_username)` | Security definer, `authenticated` only. The only way to create a profile: inserts the caller's row with defaults (`visibility = 'public'`, `trust_level = 'new'`, not business-affiliated, not onboarded). Raises `P0001` with message `profile_exists`, `username_taken` or `invalid_username`; a display name outside 1-60 characters raises the `23514` check violation as is. |
 | `public.set_my_home_city(p_city_id)` | Security definer, `authenticated` only. Sets `home_city_id`, `home_location` (the city point) and `home_place_text` (label); a null id clears all three. Raises `city_not_found` or `profile_not_found`. |
 | `public.finish_onboarding()` | Security definer, `authenticated` only. Sets `onboarded_at = now()` if it is still null (idempotent). Raises `profile_not_found` when the caller has no profile. |
+| `public.tag_slug(text)` | Immutable. A tag's slug: accents removed, lower case, runs of non-letters/digits become one dash (`Korean BBQ` becomes `korean-bbq`; same result as the Phase 1 rule for every seeded name). Used by the vocabulary and `create_personal_tag`. |
+| `public.apply_tag_vocabulary()` | Upserts the global `food_type` and `dietary` tags by `(kind, slug)` (name, aliases, featured and display order are overwritten). Called once by the `tag_vocabulary` migration; safe to call again (tests do). Not executable by `anon` or `authenticated`. |
+| `public.popular_tags(p_kind)` | Stable, security invoker. The TagSearch "Popular" list: featured tags of the kind by `display_order` (nulls last, then name); for `personal`, the caller's own tags by name. |
+| `public.search_tags(p_kind, p_q, p_lim default 10)` | Stable, security invoker. Tag type-ahead over `name` and `aliases`, accent- and case-insensitive: name prefix first, then alias prefix (shorter names first), then trigram typo matches by similarity. An empty or blank query returns `popular_tags(p_kind)` in full (`p_lim` does not shorten it). `personal` searches only the caller's own tags. `p_lim` is capped at 50. Open to `anon` and `authenticated`. |
+| `public.create_personal_tag(p_name)` | Security definer, `authenticated` only. Trims and collapses whitespace, then creates the caller's personal tag, or returns the one with the same slug (idempotent; the first spelling is kept). Raises `P0001` with message `invalid_tag_name` outside 1-40 characters, or `profile_not_found`. |
 | `pick_tags_check_owner` | Before insert/update on `pick_tags`: raises `personal_tag_not_owned` if a personal tag is put on someone else's pick. |
 
 ### Tables (schema `public`, row-level security on)
@@ -133,7 +138,7 @@ All installed into the `extensions` schema by `20261026233813_extensions_and_typ
 Migrations: `20261026234036_core_tables.sql` and `20261026234037_social_tables.sql`. Policies are in `20261027000454_rls_baseline.sql` (see Row-level security below).
 
 - Core: `profiles`, `places`, `dishes`, `picks`, `tags`, `pick_tags`
-- Reference data: `cities` (see Cities below)
+- Reference data: `cities` (see Cities below) and the global rows of `tags` (see Tags below)
 - Social and operations: `follows`, `saves`, `blocks`, `shared_lists`, `activities`, `notifications`, `push_tokens`, `device_attestations`, `reports`
 
 ### Row-level security
@@ -186,6 +191,16 @@ Migration: `20261027050402_cities.sql`; tests: `supabase/tests/database/cities.t
 - **Dev seed**: 24 cities with real GeoNames ids, names and populations (so the full import upserts over them cleanly), and every seeded profile has a `home_city_id`.
 - **Full import**: `pnpm db:import-cities` (script: `scripts/import-cities.mjs`, uses the `postgres` package from the root devDependencies) downloads GeoNames `cities15000.zip`, `admin1CodesASCII.txt` and `countryInfo.txt` into the gitignored `.cache/geonames/` folder and upserts them by `geoname_id` in batches of 1,000, printing the counts. It skips neighbourhoods (feature code `PPLX`, such as "Downtown Vancouver") and historical places (`PPLH`), which leaves about 31,800 cities. Canadian provinces and Australian states are mapped from GeoNames numeric admin1 codes to their usual abbreviations inside the script. Re-running it is safe. Downloads are cached; delete `.cache/geonames` to fetch fresh GeoNames data. Production: run it once against the cloud database in Phase 8 with `pnpm db:import-cities -- --db-url <direct connection string>` (the connection string is a secret; never commit it). After a full import, `pnpm db:reset` returns the local database to the 24-city dev seed.
 - **Attribution**: City data © GeoNames (CC BY 4.0), https://www.geonames.org. The in-app About line comes in Phase 8 (listed in `docs/known-gaps.md`).
+
+### Tags
+
+Migration: `20261027172000_tag_vocabulary.sql`; tests: `supabase/tests/database/tags.test.sql`.
+
+- **The global vocabulary is reference data, so it is in the migration, not `seed.sql`.** `supabase db push` therefore gives production the same `food_type` (125) and `dietary` (12) tags as a local `db reset`. The migration calls `public.apply_tag_vocabulary()`, which upserts by `(kind, slug)`, so a database that already holds the Phase 1 seeded tags converges on the same rows (no duplicates), and the call is safe to repeat. To add or rename a tag later, write a new migration that upserts the changed rows (do not edit this one once it is on main).
+- **New columns on `tags`**: `aliases text[] not null default '{}'` (extra search words, e.g. Ramen: `ramen noodles`; Low-FODMAP: `fodmap`, `ibs`) and `display_order integer` (position in the "Popular" list, null for tags that are not in it).
+- **Featured / Popular**: food types Ramen, Noodles, Japanese, Soup, Pork, Sushi, Burgers, Tacos, Pizza, BBQ, Bakery, Seafood (in that order); dietary Vegan, Vegetarian, Gluten-free, Low-FODMAP, Dairy-free, Nut-free, Halal.
+- **Search and personal tags**: `search_tags`, `popular_tags` and `create_personal_tag` (see Functions and triggers). A personal tag is only ever created through `create_personal_tag`, which keeps one row per person and slug.
+- **Dev seed**: `seed.sql` no longer inserts global tags; it keeps Josie's four personal tags and the pick tags, which refer to the global ones by slug.
 
 ### Storage buckets
 

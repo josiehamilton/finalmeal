@@ -45,14 +45,16 @@ select is(
 );
 
 -- Tags
-select is((select count(*)::int from public.tags where kind = 'food_type' and owner_id is null),
-  27, '27 global food_type tags');
+-- The global vocabulary now comes from the tag_vocabulary migration (see tags.test.sql for
+-- its exact contents), not from seed.sql, so the counts are the migration's.
+select cmp_ok((select count(*)::int from public.tags where kind = 'food_type' and owner_id is null),
+  '>=', 100, 'the migration gives 100 or more global food_type tags');
 select is((select count(*)::int from public.tags where kind = 'dietary' and owner_id is null),
-  8, '8 global dietary tags');
+  12, '12 global dietary tags (from the migration)');
 select is((select count(*)::int from public.tags where kind = 'food_type' and is_featured),
   12, '12 featured food_type tags');
 select is((select count(*)::int from public.tags where kind = 'dietary' and is_featured),
-  7, '7 featured dietary tags (all but Kosher)');
+  7, '7 featured dietary tags');
 select is((select slug from public.tags where name = 'Korean BBQ'), 'korean-bbq',
   'slug is the lower-case name with dashes');
 select is(

@@ -130,23 +130,8 @@ from (values
 join public.places p on p.name = v.place;
 
 -- ---------------------------------------------------------------- tags
-insert into public.tags (kind, name, slug, is_featured)
-select 'food_type', name, replace(lower(name), ' ', '-'), featured
-from (values
-  ('Greek', false), ('Rice bowl', false), ('Indian', false), ('Seafood', true), ('Tacos', true),
-  ('Burgers', true), ('Sandwiches', false), ('Thai', false), ('Noodles', true), ('Ramen', true),
-  ('Sushi', true), ('Bakery', true), ('Dumplings', false), ('Pork', true), ('Japanese', true),
-  ('Soup', true), ('Pizza', true), ('BBQ', true), ('Dessert', false), ('Breakfast', false),
-  ('Korean', false), ('Korean BBQ', false), ('Dim sum', false), ('Pho', false), ('Curry', false),
-  ('Brunch', false), ('Ice cream', false)
-) as v(name, featured);
-
-insert into public.tags (kind, name, slug, is_featured)
-select 'dietary', name, replace(lower(name), ' ', '-'), name <> 'Kosher'
-from (values
-  ('Vegan'), ('Vegetarian'), ('Gluten-free'), ('Low-FODMAP'),
-  ('Dairy-free'), ('Nut-free'), ('Halal'), ('Kosher')
-) as v(name);
+-- The global food_type and dietary tags are reference data: they come from the
+-- tag_vocabulary migration, so a fresh `db reset` and production have the same ones.
 
 -- Josie's personal tags
 insert into public.tags (kind, name, slug, owner_id)
