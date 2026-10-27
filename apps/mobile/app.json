@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Final Meal",
+    "slug": "finalmeal",
+    "version": "0.1.0",
+    "scheme": "finalmeal",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0A09",
+    "ios": {
+      "supportsTablet": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B0A09"
+        }
+      ]
+    ]
+  }
+}
