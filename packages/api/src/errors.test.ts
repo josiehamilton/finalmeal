@@ -22,9 +22,70 @@ describe('throwIfError', () => {
     },
   );
 
-  it('keeps an empty code for other fetch failures', () => {
-    expect(() => throwIfError({ message: 'TypeError: fetch failed', code: '' })).toThrow(
+  it.each([
+    'TypeError: fetch failed',
+    'TypeError: Failed to fetch',
+    'TypeError: Network request failed',
+    'fetch failed',
+  ])('maps the fetch failure "%s" to code network', (message) => {
+    expect(() => throwIfError({ message, code: '' })).toThrow(
+      expect.objectContaining({ name: 'ApiError', code: 'network' }),
+    );
+  });
+
+  it('maps an auth-js retryable fetch error to network', () => {
+    expect(() =>
+      throwIfError({ name: 'AuthRetryableFetchError', message: 'oops', status: 0 }),
+    ).toThrow(expect.objectContaining({ code: 'network' }));
+  });
+
+  it('keeps an empty code for other unnamed failures', () => {
+    expect(() => throwIfError({ message: 'something odd', code: '' })).toThrow(
       expect.objectContaining({ code: '' }),
+    );
+  });
+
+  it('keeps the message and tolerates a missing code', () => {
+    expect(() => throwIfError({ message: 'boom' })).toThrow(
+      expect.objectContaining({ message: 'boom', code: '' }),
+    );
+  });
+
+  it.each([
+    [{ code: 'otp_expired', status: 403 }, 'code_expired'],
+    [{ code: 'invalid_credentials', status: 400 }, 'invalid_code'],
+    [{ code: 'otp_disabled', status: 400 }, 'invalid_code'],
+    [{ code: 'over_email_send_rate_limit', status: 429 }, 'rate_limited'],
+    [{ code: 'over_request_rate_limit', status: 429 }, 'rate_limited'],
+    [{ code: undefined, status: 429 }, 'rate_limited'],
+    [{ code: 'validation_failed', status: 400 }, 'validation_failed'],
+  ])('maps the auth error %j to %s', (fields, expected) => {
+    expect(() => throwIfError({ message: 'auth says no', ...fields })).toThrow(
+      expect.objectContaining({ code: expected }),
+    );
+  });
+
+  it.each([
+    'profile_exists',
+    'username_taken',
+    'invalid_username',
+    'city_not_found',
+    'profile_not_found',
+  ])('maps the P0001 message %s to the same-named code', (message) => {
+    expect(() => throwIfError({ message, code: 'P0001' })).toThrow(
+      expect.objectContaining({ code: message }),
+    );
+  });
+
+  it('keeps P0001 for any other message', () => {
+    expect(() => throwIfError({ message: 'something else', code: 'P0001' })).toThrow(
+      expect.objectContaining({ code: 'P0001' }),
+    );
+  });
+
+  it('does not treat a domain message as a code unless the code is P0001', () => {
+    expect(() => throwIfError({ message: 'username_taken', code: '42501' })).toThrow(
+      expect.objectContaining({ code: '42501' }),
     );
   });
 });

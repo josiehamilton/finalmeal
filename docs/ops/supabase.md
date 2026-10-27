@@ -27,7 +27,7 @@ Final Meal keeps all of its data (people, dishes, places, picks, lists) in a Sup
 
 Apps must only ever be given the publishable key. The service-role key is never written to a file.
 
-`@finalmeal/api` tests: `pnpm --filter @finalmeal/api test` (unit, no Supabase needed) and `pnpm --filter @finalmeal/api test:integration` (needs Supabase running, seeded, and `pnpm env:local` run). After a schema change, refresh `packages/api/src/database.types.ts` with `pnpm --filter @finalmeal/api gen:types`.
+`@finalmeal/api` tests: `pnpm --filter @finalmeal/api test` (unit, no Supabase needed) and `pnpm --filter @finalmeal/api test:integration` (needs Supabase running, seeded, and `pnpm env:local` run). The sign-up tests create real people through the email-code flow (fresh `@example.com` addresses; local Supabase allows one email per address every 30 s and 30 per hour), so they leave new rows behind: run `pnpm db:reset` to return to the seed before `pnpm db:test` or the web e2e tests, which expect exactly the seeded people (CI runs them in an order that keeps this true, with a reset before the e2e tests). After a schema change, refresh `packages/api/src/database.types.ts` with `pnpm --filter @finalmeal/api gen:types`.
 
 ## Supabase CLI version
 

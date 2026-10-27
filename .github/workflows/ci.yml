@@ -44,5 +44,7 @@ jobs:
       - run: pnpm db:test
       - run: pnpm env:local
       - run: pnpm test:integration
+      # The sign-up tests leave new people behind; the web e2e test expects the seed's 6.
+      - run: pnpm db:reset
       - run: pnpm --filter @finalmeal/web exec playwright install --with-deps chromium
       - run: pnpm test:e2e

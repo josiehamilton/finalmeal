@@ -2,10 +2,6 @@
 
 Things that are deliberately unfinished or must be revisited, with the phase that has to close each. Phases are those in the design spec (`docs/superpowers/specs/2026-10-26-final-meal-mvp-design.md`). Remove an item here when it is done. Row-level security details are in `docs/ops/supabase.md`.
 
-## Phase 2: Accounts and profile
-
-- Check that the seeded users can sign in with an email code (they have `@example.com` addresses; codes land in the local inbox at http://127.0.0.1:54324).
-
 ## Phase 3 and Phase 7: privacy and safety
 
 - Column-level protection for `follows.status` (policies are row-level today). `profiles.trust_level` and `profiles.is_business_affiliated` are already protected by column grants (Phase 2).

@@ -1,6 +1,43 @@
 /**
- * An error from the backend. `code` is the Postgres or PostgREST error code (e.g. '42501'),
- * or 'timeout' when the request timed out or was aborted.
+ * The set of failures the apps know how to talk about. Every `ApiError` code is either one of
+ * these or a raw backend code (for example '42501'), which the apps treat as `unknown`.
+ */
+export type FriendlyCode =
+  | 'invalid_email'
+  | 'invalid_code'
+  | 'code_expired'
+  | 'rate_limited'
+  | 'username_taken'
+  | 'invalid_username'
+  | 'profile_exists'
+  | 'city_not_found'
+  | 'profile_not_found'
+  | 'timeout'
+  | 'network'
+  | 'unknown';
+
+const FRIENDLY_CODES: ReadonlySet<string> = new Set<FriendlyCode>([
+  'invalid_email',
+  'invalid_code',
+  'code_expired',
+  'rate_limited',
+  'username_taken',
+  'invalid_username',
+  'profile_exists',
+  'city_not_found',
+  'profile_not_found',
+  'timeout',
+  'network',
+  'unknown',
+]);
+
+export function isFriendlyCode(code: string): code is FriendlyCode {
+  return FRIENDLY_CODES.has(code);
+}
+
+/**
+ * An error from the backend. `code` is a `FriendlyCode` when the failure is one the apps
+ * explain, otherwise the Postgres, PostgREST or Auth code (e.g. '42501'), or '' when there is none.
  */
 export class ApiError extends Error {
   readonly code: string;
@@ -12,10 +49,51 @@ export class ApiError extends Error {
   }
 }
 
+/** The fields of a Postgrest, Auth or Storage error that `throwIfError` reads. */
+export interface ErrorLike {
+  message: string;
+  code?: string | null;
+  status?: number | null;
+  name?: string;
+}
+
+/** Messages the onboarding functions raise (SQLSTATE P0001); each is also a `FriendlyCode`. */
+const DOMAIN_MESSAGES: ReadonlySet<string> = new Set([
+  'profile_exists',
+  'username_taken',
+  'invalid_username',
+  'city_not_found',
+  'profile_not_found',
+]);
+
+const RATE_LIMIT_CODES: ReadonlySet<string> = new Set([
+  'over_email_send_rate_limit',
+  'over_request_rate_limit',
+  'over_sms_send_rate_limit',
+]);
+
+/** What fetch rejects with when the network is down (Node, browsers, React Native). */
+const FETCH_FAILURE =
+  /^(TypeError: )?(fetch failed|Failed to fetch|Network request failed|Load failed)/i;
+
+function codeFor(error: ErrorLike): string {
+  const code = error.code ?? '';
+  if (code === '') {
+    // postgrest-js reports a timed-out or aborted fetch with an empty code and the DOMException name.
+    if (/^(TimeoutError|AbortError)\b/.test(error.message)) return 'timeout';
+    if (FETCH_FAILURE.test(error.message)) return 'network';
+  }
+  // auth-js wraps a failed fetch (status 0) in this error.
+  if (error.name === 'AuthRetryableFetchError') return 'network';
+  if (code === 'otp_expired') return 'code_expired';
+  if (code === 'invalid_credentials' || code === 'otp_disabled') return 'invalid_code';
+  if (RATE_LIMIT_CODES.has(code) || error.status === 429) return 'rate_limited';
+  if (code === 'P0001' && DOMAIN_MESSAGES.has(error.message)) return error.message;
+  return code;
+}
+
 /** Throws an `ApiError` when a Supabase response carries an error; does nothing otherwise. */
-export function throwIfError(error: { message: string; code: string } | null): void {
+export function throwIfError(error: ErrorLike | null): void {
   if (!error) return;
-  // postgrest-js reports a timed-out or aborted fetch with an empty code and the DOMException name.
-  const timedOut = error.code === '' && /^(TimeoutError|AbortError)\b/.test(error.message);
-  throw new ApiError(error.message, timedOut ? 'timeout' : error.code);
+  throw new ApiError(error.message, codeFor(error));
 }

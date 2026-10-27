@@ -16,6 +16,7 @@
     "gen:types": "supabase gen types typescript --local > src/database.types.ts"
   },
   "dependencies": {
+    "@finalmeal/core": "workspace:*",
     "@supabase/supabase-js": "^2.118.0"
   },
   "devDependencies": {

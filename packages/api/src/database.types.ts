@@ -93,6 +93,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"cities": {
+                  Row: {
+                    "ascii_name": string,"country": string,"country_name": string,"geoname_id": number,"id": string,"location": unknown,"name": string,"population": number,"region_code": string | null,"region_name": string | null,"city_label": string | null
+                  }
+                  ComputedFields: "city_label"
+                  Insert: {
+                    "ascii_name": string,"country": string,"country_name": string,"geoname_id": number,"id"?: string,"location": unknown,"name": string,"population"?: number,"region_code"?: string | null,"region_name"?: string | null
+                  }
+                  Update: {
+                    "ascii_name"?: string,"country"?: string,"country_name"?: string,"geoname_id"?: number,"id"?: string,"location"?: unknown,"name"?: string,"population"?: number,"region_code"?: string | null,"region_name"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"device_attestations": {
                   Row: {
                     "checked_at": string,"created_at": string,"id": string,"platform": string,"result": string | null,"user_id": string
@@ -271,17 +285,23 @@ isOneToOne: false
                   ]
                 },"profiles": {
                   Row: {
-                    "affiliation_note": string | null,"avatar_path": string | null,"bio": string | null,"created_at": string,"display_name": string,"home_location": unknown,"home_place_text": string | null,"id": string,"is_business_affiliated": boolean,"trust_level": Database["public"]['Enums']["trust_level"],"updated_at": string,"username": string,"visibility": Database["public"]['Enums']["profile_visibility"]
+                    "affiliation_note": string | null,"avatar_path": string | null,"bio": string | null,"created_at": string,"display_name": string,"home_city_id": string | null,"home_location": unknown,"home_place_text": string | null,"id": string,"is_business_affiliated": boolean,"onboarded_at": string | null,"show_home_city": boolean,"trust_level": Database["public"]['Enums']["trust_level"],"updated_at": string,"username": string,"visibility": Database["public"]['Enums']["profile_visibility"]
                   }
                   ComputedFields: never
                   Insert: {
-                    "affiliation_note"?: string | null,"avatar_path"?: string | null,"bio"?: string | null,"created_at"?: string,"display_name": string,"home_location"?: unknown,"home_place_text"?: string | null,"id": string,"is_business_affiliated"?: boolean,"trust_level"?: Database["public"]['Enums']["trust_level"],"updated_at"?: string,"username": string,"visibility"?: Database["public"]['Enums']["profile_visibility"]
+                    "affiliation_note"?: string | null,"avatar_path"?: string | null,"bio"?: string | null,"created_at"?: string,"display_name": string,"home_city_id"?: string | null,"home_location"?: unknown,"home_place_text"?: string | null,"id": string,"is_business_affiliated"?: boolean,"onboarded_at"?: string | null,"show_home_city"?: boolean,"trust_level"?: Database["public"]['Enums']["trust_level"],"updated_at"?: string,"username": string,"visibility"?: Database["public"]['Enums']["profile_visibility"]
                   }
                   Update: {
-                    "affiliation_note"?: string | null,"avatar_path"?: string | null,"bio"?: string | null,"created_at"?: string,"display_name"?: string,"home_location"?: unknown,"home_place_text"?: string | null,"id"?: string,"is_business_affiliated"?: boolean,"trust_level"?: Database["public"]['Enums']["trust_level"],"updated_at"?: string,"username"?: string,"visibility"?: Database["public"]['Enums']["profile_visibility"]
+                    "affiliation_note"?: string | null,"avatar_path"?: string | null,"bio"?: string | null,"created_at"?: string,"display_name"?: string,"home_city_id"?: string | null,"home_location"?: unknown,"home_place_text"?: string | null,"id"?: string,"is_business_affiliated"?: boolean,"onboarded_at"?: string | null,"show_home_city"?: boolean,"trust_level"?: Database["public"]['Enums']["trust_level"],"updated_at"?: string,"username"?: string,"visibility"?: Database["public"]['Enums']["profile_visibility"]
                   }
                   Relationships: [
-                    
+                    {
+      foreignKeyName: "profiles_home_city_id_fkey"
+      columns: ["home_city_id"]
+isOneToOne: false
+      referencedRelation: "cities"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"push_tokens": {
                   Row: {
@@ -395,9 +415,131 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "normalize_dish_name":
+            "city_fold":
 { Args: { "input": string }; Returns: string
-                           }
+                           },
+"city_label":
+{ Args: { "c": Omit<Database["public"]['Tables']["cities"]['Row'], Database["public"]['Tables']["cities"]['ComputedFields']> }; Returns: string
+                           },
+"create_my_profile":
+{ Args: { "p_display_name": string,"p_username": string }; Returns: {
+              "affiliation_note": string | null,
+"avatar_path": string | null,
+"bio": string | null,
+"created_at": string,
+"display_name": string,
+"home_city_id": string | null,
+"home_location": unknown,
+"home_place_text": string | null,
+"id": string,
+"is_business_affiliated": boolean,
+"onboarded_at": string | null,
+"show_home_city": boolean,
+"trust_level": Database["public"]['Enums']["trust_level"],
+"updated_at": string,
+"username": string,
+"visibility": Database["public"]['Enums']["profile_visibility"]
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "profiles"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"finish_onboarding":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "affiliation_note": string | null,
+"avatar_path": string | null,
+"bio": string | null,
+"created_at": string,
+"display_name": string,
+"home_city_id": string | null,
+"home_location": unknown,
+"home_place_text": string | null,
+"id": string,
+"is_business_affiliated": boolean,
+"onboarded_at": string | null,
+"show_home_city": boolean,
+"trust_level": Database["public"]['Enums']["trust_level"],
+"updated_at": string,
+"username": string,
+"visibility": Database["public"]['Enums']["profile_visibility"]
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "profiles"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"is_username_available":
+{ Args: { "p_username": string }; Returns: boolean
+                           },
+"nearest_city":
+{ Args: { "lat": number,"lng": number }; Returns: {
+              "ascii_name": string,
+"country": string,
+"country_name": string,
+"geoname_id": number,
+"id": string,
+"location": unknown,
+"name": string,
+"population": number,
+"region_code": string | null,
+"region_name": string | null
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "cities"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"normalize_dish_name":
+{ Args: { "input": string }; Returns: string
+                           },
+"search_cities":
+{ Args: { "lim"?: number,"q": string }; Returns: {
+              "ascii_name": string,
+"country": string,
+"country_name": string,
+"geoname_id": number,
+"id": string,
+"location": unknown,
+"name": string,
+"population": number,
+"region_code": string | null,
+"region_name": string | null
+            }[]
+                          SetofOptions: {
+        from: "*"
+        to: "cities"
+        isOneToOne: false
+        isSetofReturn: true
+      } },
+"set_my_home_city":
+{ Args: { "p_city_id": string }; Returns: {
+              "affiliation_note": string | null,
+"avatar_path": string | null,
+"bio": string | null,
+"created_at": string,
+"display_name": string,
+"home_city_id": string | null,
+"home_location": unknown,
+"home_place_text": string | null,
+"id": string,
+"is_business_affiliated": boolean,
+"onboarded_at": string | null,
+"show_home_city": boolean,
+"trust_level": Database["public"]['Enums']["trust_level"],
+"updated_at": string,
+"username": string,
+"visibility": Database["public"]['Enums']["profile_visibility"]
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "profiles"
+        isOneToOne: true
+        isSetofReturn: false
+      } }
           }
           Enums: {
             "activity_type": "added_final"|"added_honorable"|"dethroned"|"promoted"|"followed"|"saved_pick"|"saved_from_list","follow_status": "active"|"requested","pick_tier": "final"|"honorable","place_source": "fsq"|"custom","profile_visibility": "public"|"private","report_status": "open"|"actioned"|"dismissed","report_target": "pick"|"profile"|"list"|"place","tag_kind": "food_type"|"dietary"|"personal","trust_level": "new"|"trusted"|"flagged"
