@@ -22,7 +22,7 @@ after(() => rmSync(tmp, { recursive: true, force: true }));
 function run(args, env = {}) {
   const result = spawnSync(process.execPath, [script, ...args], {
     encoding: 'utf8',
-    env: { ...process.env, HF_TOKEN: '', ...env },
+    env: { ...process.env, HF_TOKEN: '', DATABASE_URL: '', ...env },
   });
   return { ...result, all: `${result.stdout}\n${result.stderr}` };
 }
@@ -44,6 +44,14 @@ describe('fixture import to a seed file', () => {
     assert.match(sql, /-- Rows: 11$/m);
     assert.match(sql, /Apache License 2\.0/);
     assert.match(sql, /fsq-os-places-NOTICE\.txt/);
+  });
+
+  test('says what was changed from the Foursquare data (Apache 2.0 section 4)', () => {
+    assert.match(
+      sql,
+      /^-- Changes: filtered to Dining and Drinking categories; fields mapped to Final Meal's places table\.$/m,
+    );
+    assert.match(sql, /fsq-os-places-LICENSE\.txt/);
   });
 
   test('upserts by (source, source_id)', () => {
@@ -197,16 +205,64 @@ describe('arguments', () => {
     assert.match(r.stderr, /--bbox/);
   });
 
-  test('--db-url needs --bbox or --all', () => {
-    const r = run(['--fixture', fixture, '--db-url', 'postgresql://x@127.0.0.1:1/x', ...noEnvFile]);
+  test('--upsert needs DATABASE_URL', () => {
+    const r = run(['--fixture', fixture, '--upsert', '--all', ...noEnvFile]);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /DATABASE_URL/);
+  });
+
+  test('--upsert needs --bbox or --all', () => {
+    const r = run(['--fixture', fixture, '--upsert', ...noEnvFile], {
+      DATABASE_URL: 'postgresql://x@127.0.0.1:1/x',
+    });
     assert.notEqual(r.status, 0);
     assert.match(r.stderr, /--bbox.*--all|--all.*--bbox/);
   });
 
-  test('unknown arguments are refused', () => {
-    const r = run(['--nope']);
+  test('the database password is never logged when the connection fails', () => {
+    const r = run(['--fixture', fixture, '--upsert', '--all', ...noEnvFile], {
+      DATABASE_URL: 'postgresql://postgres:DBSECRETPW123@127.0.0.1:1/postgres',
+    });
+    assert.notEqual(r.status, 0);
+    assert.ok(!r.all.includes('DBSECRETPW123'), r.all);
+  });
+
+  test('--db-url is gone, and the refusal does not echo its value', () => {
+    const r = run([
+      '--fixture',
+      fixture,
+      '--db-url',
+      'postgresql://u:URLSECRET@h/db',
+      ...noEnvFile,
+    ]);
     assert.notEqual(r.status, 0);
     assert.match(r.stderr, /unknown argument/);
+    assert.ok(!r.all.includes('URLSECRET'));
+    assert.ok(!r.all.includes('--db-url'));
+  });
+
+  test('unknown arguments are refused', () => {
+    const r = run(['--nope=hunter2', 'hunter3']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /unknown argument/);
+    assert.ok(!r.all.includes('hunter'));
+  });
+});
+
+describe('the committed third-party files', () => {
+  test('the full Apache License 2.0 text is there', () => {
+    const text = readFileSync(join(root, 'docs/third-party/fsq-os-places-LICENSE.txt'), 'utf8');
+    assert.match(text, /Apache License\s+Version 2\.0, January 2004/);
+    assert.match(text, /END OF TERMS AND CONDITIONS/);
+    assert.match(text, /APPENDIX: How to apply the Apache License/);
+  });
+
+  test('the script header says what was changed', () => {
+    const head = readFileSync(script, 'utf8').split('import {')[0];
+    assert.match(
+      head,
+      /Changes: filtered to Dining and Drinking categories; fields mapped to Final Meal's places table/,
+    );
   });
 });
 
@@ -241,5 +297,6 @@ describe('helpers', () => {
   test('redact removes the token from any text', () => {
     assert.equal(mod.redact(`boom ${SECRET} and ${SECRET}`, SECRET), 'boom *** and ***');
     assert.equal(mod.redact('nothing here', ''), 'nothing here');
+    assert.equal(mod.redact('a b c', ['a', '', 'c']), '*** b ***');
   });
 });

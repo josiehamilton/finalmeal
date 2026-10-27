@@ -27,7 +27,7 @@ Each item names the phase that closes it.
 ## Phase 3 carry-forward: places
 
 - **Pending Josie:** generate the real Metro Vancouver extract. It needs her Hugging Face token (`HF_TOKEN` in the root `.env.local`) and the `duckdb` program: `pnpm db:import-places -- --bbox vancouver`, then commit `supabase/seed/places_vancouver.sql`. Until then that file is an empty placeholder and dev search shows only the 14 canvas places. The DuckDB path has never run against the live dataset (no token yet); check its first run (release folder, categories file, column names).
-- **Phase 5:** geocode custom-spot addresses so they get real map pins. Today a custom place sits on its city's point and the address is only text.
+- **Phase 5:** custom spots must get real map pins: geocode their street addresses when maps arrive. Today a custom place sits on its city's point and the address is only text, so every custom place in a city shares one pin. Spots flagged `no_fixed_address` (food trucks, pop-ups) have no address to geocode and need a different answer (a pin the creator drops, or no pin).
 - **Later:** merge custom places into Foursquare ones when the same restaurant exists in both (the dev canvas "Marutama" and a Foursquare "Marutama" appear side by side).
 - **Phase 8:** closed places stay in the table (with `closed_at`) so a re-import can mark closures; nothing yet hides picks at a place that closed.
 
@@ -43,4 +43,4 @@ Each item names the phase that closes it.
 - Add the "City data © GeoNames (CC BY 4.0)" line to the About screen.
 - Run `pnpm db:import-cities` once against the production database (see "Cities" in `docs/ops/supabase.md`).
 - Show Foursquare attribution in the About screen (text in `docs/third-party/fsq-os-places-NOTICE.txt`).
-- Run the global places import in prod: `pnpm db:import-places -- --db-url <direct connection string> --all` (see "Places" in `docs/ops/supabase.md`).
+- Run the global places import in prod: `DATABASE_URL=<direct connection string> pnpm db:import-places -- --upsert --all` (see "Places" in `docs/ops/supabase.md`).

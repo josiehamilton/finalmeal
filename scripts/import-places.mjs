@@ -2,8 +2,12 @@
 //
 // Usage:
 //   node scripts/import-places.mjs --bbox vancouver              write supabase/seed/places_vancouver.sql
-//   node scripts/import-places.mjs --db-url <url> --bbox vancouver   upsert Metro Vancouver
-//   node scripts/import-places.mjs --db-url <url> --all              upsert every place (production)
+//   DATABASE_URL=<url> node scripts/import-places.mjs --upsert --bbox vancouver   upsert Metro Vancouver
+//   DATABASE_URL=<url> node scripts/import-places.mjs --upsert --all              upsert every place (production)
+//   The target database comes from the DATABASE_URL environment variable only (there is no
+//   command-line flag for it, so a connection string with a password never ends up in shell
+//   history or the process list). For the local database:
+//   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
 //   add --fixture <csv> to read a local CSV instead of Hugging Face (tests and CI; no token)
 //   other flags: --out <file> (the seed file to write), --secrets-file <file> (default .env.local),
 //                --release dt=YYYY-MM-DD (default: the newest release folder)
@@ -28,12 +32,16 @@
 // Restaurant") -> category_labels; date_closed -> closed_at. Rows with no id, name, city, a
 // two-letter country or usable coordinates are skipped and counted.
 //
+// Changes: filtered to Dining and Drinking categories; fields mapped to Final Meal's places table.
+// (This is the notice of changes the Apache License 2.0, section 4(b), asks for. The same line
+// is written into the header of every generated seed file.)
+//
 // The seed file is sorted by fsq_place_id and has no timestamps, so regenerating from the same
 // release gives the same bytes. Re-running a database import is safe (upsert by source and
 // source_id).
 //
 // FSQ OS Places: © Foursquare Labs, Inc., Apache License 2.0. See
-// docs/third-party/fsq-os-places-NOTICE.txt.
+// docs/third-party/fsq-os-places-NOTICE.txt and docs/third-party/fsq-os-places-LICENSE.txt.
 import { spawnSync } from 'node:child_process';
 import {
   createReadStream,
@@ -64,15 +72,23 @@ const SEED_BATCH_SIZE = 500;
 const DB_BATCH_SIZE = 1000;
 
 // ---------------------------------------------------------------- errors and the token
-let secret = '';
+// Everything secret this run has seen (the Hugging Face token, the database URL and its
+// password). Anything printed goes through redact() first.
+const secrets = [];
+const addSecret = (s) => {
+  if (s) secrets.push(s);
+};
 
-export function redact(text, token) {
-  const s = String(text);
-  return token ? s.split(token).join('***') : s;
+export function redact(text, hidden) {
+  let s = String(text);
+  for (const h of [hidden].flat()) {
+    if (h) s = s.split(h).join('***');
+  }
+  return s;
 }
 
 function fail(message) {
-  console.error(`db:import-places: ${redact(message, secret)}`);
+  console.error(`db:import-places: ${redact(message, secrets)}`);
   process.exit(1);
 }
 
@@ -82,7 +98,7 @@ function parseArgs(argv) {
     fixture: null,
     bbox: null,
     all: false,
-    dbUrl: null,
+    upsert: false,
     out: DEFAULT_OUT,
     envFile: DEFAULT_ENV_FILE,
     release: null,
@@ -94,21 +110,38 @@ function parseArgs(argv) {
     else if (arg === '--fixture') opts.fixture = resolve(value(i++, arg));
     else if (arg === '--bbox') opts.bbox = value(i++, arg);
     else if (arg === '--all') opts.all = true;
-    else if (arg === '--db-url') opts.dbUrl = value(i++, arg);
+    else if (arg === '--upsert') opts.upsert = true;
     else if (arg === '--out') opts.out = resolve(value(i++, arg));
     else if (arg === '--secrets-file') opts.envFile = resolve(value(i++, arg));
     else if (arg === '--release') opts.release = value(i++, arg);
-    else fail(`unknown argument ${arg}`);
+    else fail('unknown argument (see the usage at the top of scripts/import-places.mjs)');
   }
   if (opts.bbox !== null && !BBOXES[opts.bbox]) {
-    fail(`unknown --bbox ${opts.bbox} (known: ${Object.keys(BBOXES).join(', ')})`);
+    fail(`unknown --bbox (known: ${Object.keys(BBOXES).join(', ')})`);
   }
   if (opts.bbox !== null && opts.all) fail('use --bbox or --all, not both');
-  if (opts.dbUrl !== null && opts.bbox === null && !opts.all) {
-    fail('--db-url needs --bbox vancouver or --all (to say how much to import)');
+  if (opts.upsert && opts.bbox === null && !opts.all) {
+    fail('--upsert needs --bbox vancouver or --all (to say how much to import)');
   }
-  if (opts.dbUrl === null && opts.bbox === null) {
-    fail('give --bbox vancouver to write the seed file, or --db-url <url> with --bbox/--all');
+  if (!opts.upsert && opts.bbox === null) {
+    fail('give --bbox vancouver to write the seed file, or --upsert with --bbox/--all');
+  }
+  if (opts.upsert) {
+    const dbUrl = (process.env.DATABASE_URL ?? '').trim();
+    if (!dbUrl) {
+      fail(
+        'DATABASE_URL is not set. Set it to the target database, e.g. for the local one ' +
+          'DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+      );
+    }
+    addSecret(dbUrl);
+    try {
+      addSecret(decodeURIComponent(new URL(dbUrl).password));
+      addSecret(new URL(dbUrl).password);
+    } catch {
+      fail('DATABASE_URL is not a valid connection string');
+    }
+    opts.dbUrl = dbUrl;
   }
   if (opts.release !== null && !/^dt=\d{4}-\d{2}-\d{2}$/.test(opts.release)) {
     fail('--release looks like dt=2026-01-01');
@@ -334,6 +367,7 @@ export function renderSeedSql(rows, { description, boxName }) {
   const out = [
     `-- Foursquare Open Source Places: ${boxName ? `the ${boxName} box, ` : ''}${FOOD_TOP_CATEGORY} categories only.`,
     '-- Generated by scripts/import-places.mjs; do not edit by hand.',
+    "-- Changes: filtered to Dining and Drinking categories; fields mapped to Final Meal's places table.",
     `-- Source: ${description}`,
     `-- Rows: ${sorted.length}`,
     '--',
@@ -342,7 +376,7 @@ export function renderSeedSql(rows, { description, boxName }) {
     '--',
     '-- Loaded by supabase/config.toml after seed.sql, which holds the canvas places.',
     '-- FSQ OS Places © Foursquare Labs, Inc., Apache License 2.0; see',
-    '-- docs/third-party/fsq-os-places-NOTICE.txt.',
+    '-- docs/third-party/fsq-os-places-NOTICE.txt and docs/third-party/fsq-os-places-LICENSE.txt.',
     '',
   ];
   for (let i = 0; i < sorted.length; i += SEED_BATCH_SIZE) {
@@ -505,7 +539,7 @@ async function latestRelease(token) {
 // Extracts the Dining and Drinking places (inside the box, if any) to a CSV and returns its path.
 async function extractFromHuggingFace(opts, box, workDir) {
   const token = readToken(opts.envFile);
-  secret = token;
+  addSecret(token);
   if (!token) {
     fail(
       'HF_TOKEN is not set. Add HF_TOKEN=<your Hugging Face token> to the root .env.local ' +
@@ -551,7 +585,7 @@ async function main() {
     }
     const stream = places(readCsvRecords(csvPath), box, counts);
 
-    if (opts.dbUrl) {
+    if (opts.upsert) {
       await upsertPlaces(stream, opts.dbUrl);
     } else {
       const byId = new Map();
