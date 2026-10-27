@@ -39,11 +39,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: supabase/setup-cli@v1
-        with:
-          version: 2.121.0
-      - run: supabase start
-      - run: supabase test db
+      # The Supabase CLI comes from the pinned root devDependency (installed above).
+      - run: pnpm db:start
+      - run: pnpm db:test
       - run: pnpm env:local
       - run: pnpm test:integration
       - run: pnpm --filter @finalmeal/web exec playwright install --with-deps chromium
