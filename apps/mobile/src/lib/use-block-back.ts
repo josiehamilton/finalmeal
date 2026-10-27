@@ -1,0 +1,17 @@
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
+import { BackHandler } from 'react-native';
+
+/**
+ * While this screen is focused, swallows the Android hardware back button. Used on screens
+ * you must not go back from (step 5 once the profile exists, and the loading screen).
+ * iOS swipe-back is switched off for the same screens in the onboarding layout.
+ */
+export function useBlockBack(): void {
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+      return () => subscription.remove();
+    }, []),
+  );
+}

@@ -3,6 +3,10 @@ import type { ExpoConfig } from 'expo/config';
 // extensionless TypeScript re-exports, so import the colours file directly (it has no imports).
 import { colors } from '../../packages/ui-tokens/src/colors.ts';
 
+const CAMERA_USAGE = 'Final Meal uses your camera for your profile photo.';
+const PHOTOS_USAGE = 'Final Meal uses your photos for your profile photo.';
+const LOCATION_USAGE = 'Final Meal uses your location to find your home city.';
+
 const config: ExpoConfig = {
   name: 'Final Meal',
   slug: 'finalmeal',
@@ -15,9 +19,9 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: false,
     infoPlist: {
-      NSCameraUsageDescription: 'Final Meal uses your camera for your profile photo.',
-      NSPhotoLibraryUsageDescription: 'Final Meal uses your photos for your profile photo.',
-      NSLocationWhenInUseUsageDescription: 'Final Meal uses your location to find your home city.',
+      NSCameraUsageDescription: CAMERA_USAGE,
+      NSPhotoLibraryUsageDescription: PHOTOS_USAGE,
+      NSLocationWhenInUseUsageDescription: LOCATION_USAGE,
     },
   },
   android: {
@@ -30,6 +34,15 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-font',
     'expo-secure-store',
+    [
+      'expo-image-picker',
+      {
+        cameraPermission: CAMERA_USAGE,
+        photosPermission: PHOTOS_USAGE,
+        microphonePermission: false,
+      },
+    ],
+    ['expo-location', { locationWhenInUsePermission: LOCATION_USAGE }],
     [
       'expo-splash-screen',
       {

@@ -9,8 +9,8 @@ interface PrimaryButtonProps {
   disabled?: boolean;
   /** Shows a spinner in place of the label and ignores presses. */
   busy?: boolean;
-  /** `ghost` is the outlined secondary button. */
-  variant?: 'primary' | 'ghost';
+  /** `ghost` is the outlined button; `secondary` is the raised-ash button used beside a primary. */
+  variant?: 'primary' | 'ghost' | 'secondary';
   icon?: ReactNode;
   testID?: string;
 }
@@ -25,7 +25,7 @@ export function PrimaryButton({
   testID,
 }: PrimaryButtonProps) {
   const inactive = disabled || busy;
-  const ghost = variant === 'ghost';
+  const labelColor = variant === 'primary' ? colors.white : colors.bone;
   return (
     <Pressable
       testID={testID}
@@ -36,17 +36,17 @@ export function PrimaryButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        ghost ? styles.ghost : styles.primary,
+        variantStyle[variant],
         disabled && !busy && styles.disabled,
         pressed && styles.pressed,
       ]}
     >
       {busy ? (
-        <ActivityIndicator testID="cta-busy" color={ghost ? colors.bone : colors.white} />
+        <ActivityIndicator testID="cta-busy" color={labelColor} />
       ) : (
         <View style={styles.content}>
           {icon}
-          <Text style={[styles.label, { color: ghost ? colors.bone : colors.white }]}>{label}</Text>
+          <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
         </View>
       )}
     </Pressable>
@@ -62,6 +62,7 @@ const styles = StyleSheet.create({
   },
   primary: { backgroundColor: colors.ember },
   ghost: { borderWidth: 1, borderColor: colors.lineStrong },
+  secondary: { backgroundColor: colors.ashRaised },
   disabled: { opacity: 0.4 },
   pressed: { opacity: 0.85 },
   content: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -71,3 +72,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.01 * 15,
   },
 });
+
+const variantStyle = {
+  primary: styles.primary,
+  ghost: styles.ghost,
+  secondary: styles.secondary,
+} as const;
