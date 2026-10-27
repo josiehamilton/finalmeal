@@ -69,7 +69,35 @@ A cloud session (claude.ai/code) works on a fresh copy of this repository. This 
 
 1. **Network access:** choose "Trusted" (the default). Don't pick "None".
 2. **Web end-to-end tests (optional):** Playwright downloads its browser from hosts outside the Trusted list. To run `pnpm test:e2e` in the cloud, choose "Custom" (keep the Trusted list included if it offers that), then add these two under "Custom allowed domains": `cdn.playwright.dev` and `playwright.download.prss.microsoft.com`. In a session, run `pnpm --filter @finalmeal/web exec playwright install --with-deps chromium` once. If you'd rather skip this, leave web e2e to CI, which runs it on every push.
-3. **Setup script:** leave it **empty**. Node 22, pnpm and Docker are already installed, and setup scripts run before the repository is in place, so project installs can't go there.
+3. **Setup script:** setup scripts run **before the repository is cloned**, so they must not reference project files. Node 22, pnpm and Docker are already installed. Paste the script below. It only pre-pulls the Supabase Docker images so they're cached with the environment, and it always exits 0. **When the pinned Supabase CLI version changes, update this image list** (`docker ps --filter name=supabase_ --format '{{.Image}}'` while the local stack runs).
+
+   ```bash
+   #!/bin/bash
+   # Final Meal cloud setup. Runs before the repo is cloned; pre-pulls Supabase images for CLI 2.121.0.
+   if ! docker info >/dev/null 2>&1; then
+     (dockerd >/tmp/dockerd.log 2>&1 &)
+     for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 1; done
+   fi
+   for img in \
+     public.ecr.aws/supabase/postgres:17.11.0.004 \
+     public.ecr.aws/supabase/gotrue:v2.197.0 \
+     public.ecr.aws/supabase/postgrest:v16.4 \
+     public.ecr.aws/supabase/storage-api:v1.82.1 \
+     public.ecr.aws/supabase/realtime:v2.143.4 \
+     public.ecr.aws/supabase/kong:2.8.1 \
+     public.ecr.aws/supabase/mailpit:v1.31.3 \
+     public.ecr.aws/supabase/postgres-meta:v0.100.0 \
+     public.ecr.aws/supabase/studio:2026.10.12-sha-3699278 \
+     public.ecr.aws/supabase/edge-runtime:v1.77.4 \
+     public.ecr.aws/supabase/logflare:1.53.0 \
+     public.ecr.aws/supabase/vector:0.58.0-alpine
+   do
+     docker pull -q "$img" >/dev/null 2>&1 &
+   done
+   wait
+   echo "Final Meal setup done."
+   exit 0
+   ```
 4. **Secrets:** none needed for local-only work. Don't paste keys into the environment settings.
 
 **First steps in every cloud session** (before anything else):
