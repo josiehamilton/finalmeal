@@ -52,7 +52,12 @@ describe('createFinalMealClient request timeout', () => {
 
   it('bounds /auth/v1/ requests at authTimeoutMs: signInWithOtp rejects as "timeout"', async () => {
     const url = await listenAndNeverRespond();
-    const client = createFinalMealClient({ url, key: 'unused', timeoutMs: 5000, authTimeoutMs: 300 });
+    const client = createFinalMealClient({
+      url,
+      key: 'unused',
+      timeoutMs: 5000,
+      authTimeoutMs: 300,
+    });
     const started = Date.now();
     const attempt = sendEmailCode(client, 'someone@example.com');
     await expect(attempt).rejects.toBeInstanceOf(ApiError);
@@ -62,7 +67,12 @@ describe('createFinalMealClient request timeout', () => {
 
   it('bounds verifying a code at authTimeoutMs too', async () => {
     const url = await listenAndNeverRespond();
-    const client = createFinalMealClient({ url, key: 'unused', timeoutMs: 5000, authTimeoutMs: 300 });
+    const client = createFinalMealClient({
+      url,
+      key: 'unused',
+      timeoutMs: 5000,
+      authTimeoutMs: 300,
+    });
     await expect(verifyEmailCode(client, 'someone@example.com', '123456')).rejects.toMatchObject({
       code: 'timeout',
     });
@@ -70,7 +80,12 @@ describe('createFinalMealClient request timeout', () => {
 
   it('keeps the auth bound separate from the read bound: auth waits past timeoutMs', async () => {
     const url = await listenAndNeverRespond();
-    const client = createFinalMealClient({ url, key: 'unused', timeoutMs: 200, authTimeoutMs: 5000 });
+    const client = createFinalMealClient({
+      url,
+      key: 'unused',
+      timeoutMs: 200,
+      authTimeoutMs: 5000,
+    });
     const request = client.auth.signInWithOtp({ email: 'someone@example.com' });
     expect(await settlesWithin(request, 800)).toBe(false);
   });
@@ -81,7 +96,12 @@ describe('createFinalMealClient request timeout', () => {
 
   it('does not bound Storage requests', async () => {
     const url = await listenAndNeverRespond();
-    const client = createFinalMealClient({ url, key: 'unused', timeoutMs: 200, authTimeoutMs: 200 });
+    const client = createFinalMealClient({
+      url,
+      key: 'unused',
+      timeoutMs: 200,
+      authTimeoutMs: 200,
+    });
     const request = client.storage.from('avatars').upload('x.jpg', new ArrayBuffer(4));
     expect(await settlesWithin(request, 800)).toBe(false);
   });
