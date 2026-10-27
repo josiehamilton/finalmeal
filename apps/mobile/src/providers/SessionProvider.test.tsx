@@ -26,13 +26,23 @@ const PROFILE: MyProfile = {
 
 type Listener = (event: string, session: unknown) => void;
 
-function fakeClient(initial: unknown) {
+const VALID_USER = { data: { user: { id: 'u1' } }, error: null };
+
+function fakeClient(initial: unknown, getUserResult: unknown = VALID_USER) {
   let listener: Listener = () => {};
   let current = initial;
   const unsubscribe = jest.fn();
+  const getUser = jest.fn().mockResolvedValue(getUserResult);
+  const signOut = jest.fn(async () => {
+    current = null;
+    listener('SIGNED_OUT', null);
+    return { error: null };
+  });
   const client = {
     auth: {
       getSession: async () => ({ data: { session: current }, error: null }),
+      getUser,
+      signOut,
       onAuthStateChange: (cb: Listener) => {
         listener = cb;
         cb('INITIAL_SESSION', initial);
@@ -47,6 +57,8 @@ function fakeClient(initial: unknown) {
       listener(event, s);
     },
     unsubscribe,
+    getUser,
+    signOut,
   };
 }
 
@@ -197,5 +209,63 @@ describe('SessionProvider', () => {
     expect(state().error).toBe('Can’t reach the kitchen right now.');
     // The last good profile is kept.
     expect(state().profile).toBe('josie');
+  });
+
+  describe('a stored session is checked with the server at launch', () => {
+    it('signs out on this device, without loading a profile, when the account is gone', async () => {
+      const gone = {
+        data: { user: null },
+        error: {
+          name: 'AuthApiError',
+          message: 'User from sub claim in JWT does not exist',
+          status: 403,
+        },
+      };
+      const { client, getUser, signOut } = fakeClient(SESSION, gone);
+      await render(
+        <SessionProvider client={client}>
+          <Probe />
+        </SessionProvider>,
+      );
+      await waitFor(() => expect(signOut).toHaveBeenCalledWith({ scope: 'local' }));
+      await waitFor(() => expect(state().loading).toBe(false));
+      expect(getUser).toHaveBeenCalledTimes(1);
+      expect(state()).toEqual({ session: false, profile: null, loading: false, error: null });
+      expect(mockGetMyProfile).not.toHaveBeenCalled();
+    });
+
+    it('keeps the session and shows the friendly error when the server cannot be reached', async () => {
+      const offline = {
+        data: { user: null },
+        error: { name: 'AuthRetryableFetchError', message: 'fetch failed', status: 0 },
+      };
+      mockGetMyProfile.mockRejectedValue(new TypeError('fetch failed'));
+      const { client, signOut } = fakeClient(SESSION, offline);
+      await render(
+        <SessionProvider client={client}>
+          <Probe />
+        </SessionProvider>,
+      );
+      await waitFor(() => expect(state().loading).toBe(false));
+      expect(signOut).not.toHaveBeenCalled();
+      expect(state().session).toBe(true);
+      expect(state().error).toBe('Can’t reach the kitchen right now.');
+    });
+
+    it('stays loading until the check finishes, then loads the profile', async () => {
+      mockGetMyProfile.mockResolvedValue(PROFILE);
+      const { client, getUser } = fakeClient(SESSION);
+      let release: (value: unknown) => void = () => {};
+      getUser.mockReturnValue(new Promise((resolve) => (release = resolve)));
+      await render(
+        <SessionProvider client={client}>
+          <Probe />
+        </SessionProvider>,
+      );
+      expect(state().loading).toBe(true);
+      expect(mockGetMyProfile).not.toHaveBeenCalled();
+      await act(async () => release(VALID_USER));
+      await waitFor(() => expect(state().profile).toBe('josie'));
+    });
   });
 });

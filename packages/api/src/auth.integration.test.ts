@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { finishOnboarding, getMyProfile, sendEmailCode, signOut, verifyEmailCode } from './index';
+import {
+  checkSession,
+  finishOnboarding,
+  getMyProfile,
+  sendEmailCode,
+  signOut,
+  verifyEmailCode,
+} from './index';
 import { newTestClient, randomSuffix } from './test-support/env';
 import { readLatestCode } from './test-support/mailpit';
 
@@ -24,6 +31,8 @@ describe('email code sign-in (local Supabase)', () => {
 
     await verifyEmailCode(client, email, code);
     expect((await client.auth.getSession()).data.session).not.toBeNull();
+
+    expect(await checkSession(client)).toBe('valid');
 
     // Signed in but no profile yet.
     expect(await getMyProfile(client)).toBeNull();

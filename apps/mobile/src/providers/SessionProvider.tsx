@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
-import { friendlyMessage, getMyProfile, throwIfError } from '@finalmeal/api';
+import { checkSession, friendlyMessage, getMyProfile, signOut, throwIfError } from '@finalmeal/api';
 import type { FinalMealClient, MyProfile } from '@finalmeal/api';
 import { getSupabase } from '../lib/supabase';
 
@@ -53,6 +53,8 @@ export function SessionProvider({ client, children }: SessionProviderProps) {
   const [setupError, setSetupError] = useState<string | null>(null);
   const clientRef = useRef<FinalMealClient | null>(null);
   const requestRef = useRef(0);
+  // The person whose stored sign-in the server has already vouched for (or could not be asked).
+  const checkedRef = useRef<string | null>(null);
 
   /** Loads and stores the profile. On failure it stores the friendly error, then rethrows. */
   const loadProfile = useCallback(async (userId: string): Promise<MyProfile | null> => {
@@ -100,8 +102,32 @@ export function SessionProvider({ client, children }: SessionProviderProps) {
       setResult(null);
       return;
     }
-    // A failure is already stored as `error` by loadProfile.
-    loadProfile(userId).catch(() => {});
+    let cancelled = false;
+    (async () => {
+      const active = clientRef.current;
+      // A stored session says nothing about whether the account still exists (for example after
+      // the backend was reset). Ask the server once; only a clear "gone" signs the person out,
+      // a network failure keeps the session and the profile load below reports it.
+      if (active && checkedRef.current !== userId) {
+        const verdict = await checkSession(active);
+        if (cancelled) return;
+        checkedRef.current = userId;
+        if (verdict === 'gone') {
+          try {
+            await signOut(active, 'local');
+            return;
+          } catch (e) {
+            // Could not sign out; fall through so the person sees the profile error, not a blank.
+            console.warn(e);
+          }
+        }
+      }
+      // A failure is already stored as `error` by loadProfile.
+      loadProfile(userId).catch(() => {});
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [userId, loadProfile]);
 
   const refreshProfile = useCallback(async () => {

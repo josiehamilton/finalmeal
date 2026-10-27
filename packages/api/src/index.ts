@@ -4,7 +4,7 @@ export type { FinalMealClient, FinalMealClientOptions } from './client';
 export { ApiError, throwIfError } from './errors';
 export type { FriendlyCode } from './errors';
 export { friendlyCode, friendlyMessage } from './friendly';
-export { sendEmailCode, signOut, verifyEmailCode } from './auth';
+export { checkSession, sendEmailCode, signOut, verifyEmailCode } from './auth';
 export {
   createMyProfile,
   finishOnboarding,

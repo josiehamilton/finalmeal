@@ -32,7 +32,30 @@ export async function verifyEmailCode(
   throwIfError(error);
 }
 
-export async function signOut(client: FinalMealClient): Promise<void> {
-  const { error } = await client.auth.signOut();
+/** Signs out everywhere by default, or on this device only (works without the network). */
+export async function signOut(
+  client: FinalMealClient,
+  scope: 'global' | 'local' = 'global',
+): Promise<void> {
+  const { error } = await client.auth.signOut({ scope });
   throwIfError(error);
+}
+
+/**
+ * Asks the server whether the stored sign-in still belongs to a real account. 'gone' only when the
+ * server says so (the user was deleted, or the token was revoked or is invalid), never for a network
+ * failure, a timeout or a server error: those return 'unknown' so the session is kept.
+ */
+export async function checkSession(client: FinalMealClient): Promise<'valid' | 'gone' | 'unknown'> {
+  try {
+    const { data, error } = await client.auth.getUser();
+    if (!error) return data.user ? 'valid' : 'gone';
+    if (error.name === 'AuthSessionMissingError') return 'gone';
+    const status = error.status ?? 0;
+    return status === 400 || status === 401 || status === 403 || status === 404
+      ? 'gone'
+      : 'unknown';
+  } catch {
+    return 'unknown';
+  }
 }

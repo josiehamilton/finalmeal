@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { ApiError, sendEmailCode } from '@finalmeal/api';
 import Email from '../../app/(onboarding)/email';
 
@@ -86,5 +86,18 @@ describe('Email step', () => {
     await render(<Email />);
     await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(mockRouter.back).toHaveBeenCalled();
+  });
+
+  it('sends one code when return is pressed twice quickly', async () => {
+    let finish: () => void = () => {};
+    mockSend.mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
+    await render(<Email />);
+    await typeEmail('you@example.com');
+    // Both returns land before the first send settles (do not await the pending first one).
+    void fireEvent(screen.getByLabelText('Email'), 'submitEditing');
+    void fireEvent(screen.getByLabelText('Email'), 'submitEditing');
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    await act(async () => finish());
+    expect(mockRouter.push).toHaveBeenCalledTimes(1);
   });
 });

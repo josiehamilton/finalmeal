@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { ApiError, friendlyMessage, sendEmailCode } from '@finalmeal/api';
 import { isPlausibleEmail, normalizeEmail } from '@finalmeal/core';
@@ -15,13 +15,17 @@ export default function EmailStep() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // State is stale within one tick, so a double "return" needs a ref to be caught.
+  const sending = useRef(false);
 
   async function send() {
+    if (sending.current) return;
     const normalised = normalizeEmail(email);
     if (!isPlausibleEmail(normalised)) {
       setError(friendlyMessage(new ApiError('Invalid email address', 'invalid_email')));
       return;
     }
+    sending.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -30,6 +34,7 @@ export default function EmailStep() {
     } catch (e) {
       setError(friendlyMessage(e));
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   }

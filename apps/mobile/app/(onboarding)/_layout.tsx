@@ -11,6 +11,8 @@ export default function OnboardingLayout() {
         contentStyle: { backgroundColor: colors.night },
       }}
     >
+      {/* Back from Name signs out and starts over, so it goes through the screen's own Back. */}
+      <Stack.Screen name="name" options={{ gestureEnabled: false }} />
       {/* The profile exists from step 5 on, and the loading screen is a hand-over: no swiping back. */}
       <Stack.Screen name="city" options={{ gestureEnabled: false }} />
       <Stack.Screen name="loading" options={{ gestureEnabled: false, animation: 'fade' }} />

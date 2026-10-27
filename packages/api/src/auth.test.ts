@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { sendEmailCode, verifyEmailCode } from './auth';
+import { checkSession, sendEmailCode, signOut, verifyEmailCode } from './auth';
 import { ApiError } from './errors';
 import type { FinalMealClient } from './client';
 
@@ -97,12 +97,10 @@ describe('verifyEmailCode', () => {
         this.name = 'AuthApiError';
       }
     }
-    const verifyOtp = vi
-      .fn()
-      .mockResolvedValue({
-        data: {},
-        error: new FakeAuthApiError('Token has expired or is invalid'),
-      });
+    const verifyOtp = vi.fn().mockResolvedValue({
+      data: {},
+      error: new FakeAuthApiError('Token has expired or is invalid'),
+    });
     const rejection = await verifyEmailCode(
       fakeClient({ verifyOtp }),
       'a@example.com',
@@ -125,5 +123,59 @@ describe('verifyEmailCode', () => {
     ).rejects.toMatchObject({
       code: 'rate_limited',
     });
+  });
+});
+
+describe('signOut', () => {
+  it('signs out everywhere by default', async () => {
+    const out = vi.fn().mockResolvedValue({ error: null });
+    await signOut(fakeClient({ signOut: out }));
+    expect(out).toHaveBeenCalledWith({ scope: 'global' });
+  });
+
+  it('can sign out of this device only', async () => {
+    const out = vi.fn().mockResolvedValue({ error: null });
+    await signOut(fakeClient({ signOut: out }), 'local');
+    expect(out).toHaveBeenCalledWith({ scope: 'local' });
+  });
+});
+
+describe('checkSession', () => {
+  const user = (result: unknown) => fakeClient({ getUser: vi.fn().mockResolvedValue(result) });
+
+  it('says valid when the server knows the person', async () => {
+    await expect(checkSession(user({ data: { user: { id: 'u1' } }, error: null }))).resolves.toBe(
+      'valid',
+    );
+  });
+
+  it.each([
+    [403, 'user_not_found'],
+    [401, 'bad_jwt'],
+    [404, 'user_not_found'],
+    [400, 'refresh_token_not_found'],
+  ])('says gone for a %s (%s) from the server', async (status, code) => {
+    const error = { name: 'AuthApiError', message: 'x', status, code };
+    await expect(checkSession(user({ data: { user: null }, error }))).resolves.toBe('gone');
+  });
+
+  it('says gone when there is no session to check', async () => {
+    const error = { name: 'AuthSessionMissingError', message: 'x', status: 400 };
+    await expect(checkSession(user({ data: { user: null }, error }))).resolves.toBe('gone');
+  });
+
+  it.each([
+    [{ name: 'AuthRetryableFetchError', message: 'fetch failed', status: 0 }],
+    [{ name: 'AuthApiError', message: 'boom', status: 500, code: 'unexpected_failure' }],
+    [{ name: 'AuthApiError', message: 'slow down', status: 429, code: 'over_request_rate_limit' }],
+  ])('says unknown, and so keeps the session, for %j', async (error) => {
+    await expect(checkSession(user({ data: { user: null }, error }))).resolves.toBe('unknown');
+  });
+
+  it('says unknown when the call throws', async () => {
+    const throws = fakeClient({
+      getUser: vi.fn().mockRejectedValue(new TypeError('fetch failed')),
+    });
+    await expect(checkSession(throws)).resolves.toBe('unknown');
   });
 });

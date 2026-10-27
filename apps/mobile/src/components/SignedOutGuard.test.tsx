@@ -21,6 +21,7 @@ function fakeClient(initial: unknown) {
   const client = {
     auth: {
       getSession: async () => ({ data: { session: initial }, error: null }),
+      getUser: async () => ({ data: { user: { id: 'u1' } }, error: null }),
       onAuthStateChange: (cb: Listener) => {
         listener = cb;
         cb('INITIAL_SESSION', initial);

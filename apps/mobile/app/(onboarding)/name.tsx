@@ -1,8 +1,11 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import { BackHandler } from 'react-native';
+import { signOut } from '@finalmeal/api';
 import { DISPLAY_NAME_MAX } from '@finalmeal/core';
 import { OnboardingScreen } from '../../src/components/OnboardingScreen';
 import { TextField } from '../../src/components/TextField';
+import { getSupabase } from '../../src/lib/supabase';
 
 /** Step 3. The name travels to step 4 in the route; the profile is created there. */
 export default function NameStep() {
@@ -10,17 +13,52 @@ export default function NameStep() {
   const [first, setFirst] = useState('');
   const [last, setLast] = useState('');
 
+  // A double "return" must not push the next step twice. Cleared when this screen is shown again.
+  const leaving = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      leaving.current = false;
+    }, []),
+  );
+
   function next() {
-    const displayName = `${first.trim()} ${last.trim()}`.trim().slice(0, DISPLAY_NAME_MAX).trim();
+    if (leaving.current) return;
+    leaving.current = true;
+    // Cap by characters, not UTF-16 units, so an emoji is never cut in half (the database counts characters too).
+    const displayName = Array.from(`${first.trim()} ${last.trim()}`.trim())
+      .slice(0, DISPLAY_NAME_MAX)
+      .join('')
+      .trim();
     router.push(`/username?name=${encodeURIComponent(displayName)}`);
   }
+
+  // The account exists from the code step on, but the profile does not yet. Going back means
+  // starting over, so end this device's sign-in (it also works offline) and begin at Email.
+  const goBack = useCallback(async () => {
+    router.replace('/email');
+    try {
+      await signOut(getSupabase(), 'local');
+    } catch (e) {
+      console.warn(e);
+    }
+  }, [router]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        void goBack();
+        return true;
+      });
+      return () => subscription.remove();
+    }, [goBack]),
+  );
 
   return (
     <OnboardingScreen
       step={3}
       title="What should we call you?"
       subtitle="This shows on your profile and on every pick."
-      onBack={() => router.back()}
+      onBack={goBack}
       cta={{ label: 'Continue', onPress: next, disabled: first.trim() === '' }}
     >
       <TextField
