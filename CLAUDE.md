@@ -43,14 +43,20 @@ A social food app (iOS, Android, web). Each person picks the five dishes for the
   5. Before publishing, check whether the canvas has a newer version (Josie may hand-edit). If it does, read the changed boards and merge first.
 - **Commits:** small, descriptive, and ending with the co-author line. Never commit `.env` files or secrets.
 - **Supabase is codified:** schema and policy changes go only through `supabase/migrations/`, settings through `supabase/config.toml`, and functions through `supabase/functions/`; record each one in `docs/ops/supabase.md` (the local→prod runbook). `seed.sql` is dev-only. No hand edits in Studio. This keeps local and prod in sync.
-- **Local first:** the backend runs in Docker via `supabase start`; cloud setup happens in Phase 8.
+- **Local first:** the backend runs in Docker via `pnpm db:start`; cloud setup happens in Phase 8.
 
 ## Working in a cloud session
 
 A cloud session (claude.ai/code) works on a fresh copy of this repository. This file, the spec, the plans and the design snapshot come along; personal notes and plugins from Josie's Mac do not.
 
-- **Already there:** Node 22, pnpm, `gh` and Docker (`docker compose` works). The default "Trusted" network access allows npm, GitHub and the Docker registries (Docker Hub, ghcr, public.ecr.aws), so the local Supabase backend runs in a cloud session just like on the Mac.
-- **Environment setup script:** paste the contents of `scripts/cloud-setup.sh` into the cloud environment's settings. It runs `pnpm install` (which installs the pinned Supabase CLI) and starts then stops Supabase once so the Docker images are downloaded. It should finish in under about 5 minutes, and the result is cached for about 7 days.
-- **Web end-to-end tests need one extra setting.** Playwright downloads its browser from hosts that are not in the default Trusted list. To run `pnpm test:e2e` in the cloud, add these under "Custom allowed domains" in the environment's network settings: `cdn.playwright.dev` and `playwright.download.prss.microsoft.com` (the fallback host). Then run `pnpm --filter @finalmeal/web exec playwright install --with-deps chromium` once per session. The `--with-deps` part also installs system packages through apt; if the network blocks that, leave web e2e to CI, which runs it on every push.
+- **Already there:** Node 22, pnpm, `gh` and Docker (`docker compose` works). With the default "Trusted" network access, npm, GitHub and the Docker registries are reachable, so the local Supabase backend runs in a cloud session just like on the Mac.
+
+**Setting up the cloud environment** (claude.ai/code, environment settings):
+
+1. **Network access:** choose "Trusted" (the default). Don't pick "None".
+2. **Web end-to-end tests (optional):** Playwright downloads its browser from hosts outside the Trusted list. To run `pnpm test:e2e` in the cloud, choose "Custom" (keep the Trusted list included if it offers that), then add these two under "Custom allowed domains": `cdn.playwright.dev` and `playwright.download.prss.microsoft.com`. In a session, run `pnpm --filter @finalmeal/web exec playwright install --with-deps chromium` once. If you'd rather skip this, leave web e2e to CI, which runs it on every push.
+3. **Setup script:** paste in the contents of `scripts/cloud-setup.sh`, or just the one line `bash scripts/cloud-setup.sh`. It installs everything (including the pinned Supabase CLI), then starts and stops Supabase once so the Docker images are cached. It takes under about 5 minutes and stops with an error if the install fails, so a broken setup is never cached (the result is cached for about 7 days).
+4. **Secrets:** none needed for local-only work. Don't paste keys into the environment settings.
+
 - **Who tests what:** a cloud session builds and tests code for web, Android and iOS (unit tests, API integration tests, web end-to-end). Looking at the app on the iPhone Simulator or an Android emulator happens on Josie's Mac. Expo cloud builds come in Phase 8.
 - The rules above (models, spec first, Supabase codified, no secrets in commits) apply in cloud sessions too.

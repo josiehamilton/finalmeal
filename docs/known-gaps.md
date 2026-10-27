@@ -11,11 +11,6 @@ Things that are deliberately unfinished or must be revisited, with the phase tha
 - Narrow the request timeout in `createFinalMealClient` to the URL path (`new URL(url).pathname`) and to reads (GET/HEAD). Today it bounds every `/rest/v1/` request, so a timed-out write could still commit on the server.
 - Close the open socket left by the auth-timeout test in `packages/api/src/client.test.ts` (destroy connections in `afterEach`).
 
-## Before the first cloud session
-
-- Make `scripts/cloud-setup.sh` stop on errors (`set -eu`, keeping `|| true` only on the Supabase steps), so a failed install can't be cached for about 7 days.
-- Change the remaining bare `supabase …` commands in `docs/ops/supabase.md` and `CLAUDE.md` to `pnpm exec supabase …`.
-
 ## Phase 3 and Phase 7: privacy and safety
 
 - Column-level protection for `profiles.trust_level`, `profiles.is_business_affiliated` and `follows.status` (policies are row-level today).

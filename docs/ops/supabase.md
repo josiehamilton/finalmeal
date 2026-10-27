@@ -34,10 +34,10 @@ The CLI is a pinned root devDependency (`supabase` in the root `package.json`, c
 
 ## Rules
 
-- Schema, policies and functions change **only** through files in `supabase/migrations/`. Create one with `supabase migration new <name>`. If you explore in Studio, turn the result into a migration before committing.
+- Schema, policies and functions change **only** through files in `supabase/migrations/`. Create one with `pnpm exec supabase migration new <name>`. If you explore in Studio, turn the result into a migration before committing.
 - Auth, storage and API settings live in `supabase/config.toml`.
 - Edge Functions live in `supabase/functions/`.
-- `supabase/seed.sql` is sample data for local development only. It never runs in production: `supabase db push` does not run it, so never run it against the cloud project. It mirrors the design canvas: 6 people (`@example.com` emails, fixed ids `00000000-0000-4000-8000-00000000000N`, josie is `...0001`), 14 places, 17 dishes, 28 picks, the global food-type and dietary tags, Josie's personal tags, follows, 2 shared lists, one save, and a few activities with notifications. `pnpm db:reset` loads it. The other database tests empty these tables inside their own rolled-back transaction, so they stay independent of the seed.
+- `supabase/seed.sql` is sample data for local development only. It never runs in production: `pnpm exec supabase db push` does not run it, so never run it against the cloud project. It mirrors the design canvas: 6 people (`@example.com` emails, fixed ids `00000000-0000-4000-8000-00000000000N`, josie is `...0001`), 14 places, 17 dishes, 28 picks, the global food-type and dietary tags, Josie's personal tags, follows, 2 shared lists, one save, and a few activities with notifications. `pnpm db:reset` loads it. The other database tests empty these tables inside their own rolled-back transaction, so they stay independent of the seed.
 - Every new setting, extension, bucket or secret gets a line in the inventory below.
 - Secrets are listed here by name only. Never commit `.env` or `.env.local` files.
 
@@ -45,19 +45,19 @@ The CLI is a pinned root devDependency (`supabase` in the root `package.json`, c
 
 Production setup happens in Phase 8. These are the steps then.
 
-1. `supabase login`
-2. `supabase link --project-ref <project-ref>`: ties this folder to the cloud project.
-3. `supabase db push`: applies any migrations the cloud project has not seen. Never run `seed.sql` against production.
-4. `supabase config push`: applies the settings in `config.toml` (auth, storage, API) to the cloud project.
-5. `supabase functions deploy`: deploys everything in `supabase/functions/`.
-6. `supabase secrets set --env-file <file>`: sets function secrets from a local file kept outside git. Names are listed in the Secrets inventory below.
+1. `pnpm exec supabase login`
+2. `pnpm exec supabase link --project-ref <project-ref>`: ties this folder to the cloud project.
+3. `pnpm exec supabase db push`: applies any migrations the cloud project has not seen. Never run `seed.sql` against production.
+4. `pnpm exec supabase config push`: applies the settings in `config.toml` (auth, storage, API) to the cloud project.
+5. `pnpm exec supabase functions deploy`: deploys everything in `supabase/functions/`.
+6. `pnpm exec supabase secrets set --env-file <file>`: sets function secrets from a local file kept outside git. Names are listed in the Secrets inventory below.
 7. Extensions are created by the migrations themselves, so nothing to enable in the dashboard.
 
 ## Before the first production push
 
-Do these before the first `supabase db push` and `supabase config push` (Phase 8). The local defaults are fine for a laptop and wrong for production.
+Do these before the first `pnpm exec supabase db push` and `pnpm exec supabase config push` (Phase 8). The local defaults are fine for a laptop and wrong for production.
 
-- [ ] **Auth settings in `supabase/config.toml` are local defaults.** Set them for production before the first `supabase config push`:
+- [ ] **Auth settings in `supabase/config.toml` are local defaults.** Set them for production before the first `pnpm exec supabase config push`:
   - `site_url` (and any extra redirect URLs) to the real web address, not `http://127.0.0.1:3000`
   - email confirmations on (`[auth.email] enable_confirmations = true`)
   - a sensible `minimum_password_length` (local is 6)
