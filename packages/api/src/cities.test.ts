@@ -36,8 +36,22 @@ describe('formatCityLabel', () => {
         country: 'JP',
         countryName: 'Japan',
       }),
-    ).toBe('Tokyo, Tokyo, Japan');
+    ).toBe('Tokyo, Japan');
   });
+
+  it.each([
+    ['Seoul', 'Seoul', 'KR', 'South Korea', 'Seoul, South Korea'],
+    ['Mexico City', 'Mexico City', 'MX', 'Mexico', 'Mexico City, Mexico'],
+    ['Ho Chi Minh City', 'Ho Chi Minh City (HCMC)', 'VN', 'Vietnam', 'Ho Chi Minh City, Vietnam'],
+    ['Osaka', 'OSAKA', 'JP', 'Japan', 'Osaka, Japan'],
+  ])(
+    'leaves out a region that repeats the city (%s, %s)',
+    (name, regionName, country, countryName, label) => {
+      expect(formatCityLabel({ name, regionCode: null, regionName, country, countryName })).toBe(
+        label,
+      );
+    },
+  );
 
   it('skips empty parts', () => {
     expect(

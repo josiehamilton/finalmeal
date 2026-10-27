@@ -19,12 +19,16 @@ export type CityRow = Pick<
   'id' | 'name' | 'region_code' | 'region_name' | 'country' | 'country_name'
 >;
 
-/** Same rule as SQL `public.city_label`: name, region code (US, CA, AU) or region name, country. */
+/**
+ * Same rule as SQL `public.city_label`: name, region code (US, CA, AU) or region name, country.
+ * A region that equals the city name or starts with it (any case) is left out: "Tokyo, Japan".
+ */
 export function formatCityLabel(
   c: Pick<City, 'name' | 'regionCode' | 'regionName' | 'country' | 'countryName'>,
 ): string {
   const region = ['US', 'CA', 'AU'].includes(c.country) ? c.regionCode : c.regionName;
-  return [c.name, region, c.countryName].filter((part) => part).join(', ');
+  const repeated = !!region && region.toLowerCase().startsWith(c.name.toLowerCase());
+  return [c.name, repeated ? null : region, c.countryName].filter((part) => part).join(', ');
 }
 
 export function toCity(row: CityRow): City {
