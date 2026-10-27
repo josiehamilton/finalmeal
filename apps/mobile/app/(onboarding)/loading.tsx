@@ -19,6 +19,11 @@ export default function LoadingStep() {
 
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Start loading the profile now and wait for the slower of that and the minimum time, so the
+    // wait is not the minimum plus the request. A failed load is not fatal here: the You tab
+    // shows the error with a Try again button.
+    const loaded = refreshProfile().catch(() => null);
     const bar = Animated.timing(progress, {
       toValue: 1,
       duration: MIN_VISIBLE_MS,
@@ -26,14 +31,12 @@ export default function LoadingStep() {
       useNativeDriver: false,
     });
     bar.start();
-    const timer = setTimeout(async () => {
-      try {
-        await refreshProfile();
-      } catch {
-        // The app loads the profile again on its own; the person should not be stuck here.
-      }
+    const minimum = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, MIN_VISIBLE_MS);
+    });
+    Promise.all([loaded, minimum]).then(() => {
       if (!cancelled) router.replace('/(app)/you');
-    }, MIN_VISIBLE_MS);
+    });
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -46,6 +49,19 @@ export default function LoadingStep() {
       <View style={styles.center}>
         <SkullMark size={72} color={colors.ember} />
         <Text style={styles.line}>There can only be five.</Text>
+        <View
+          style={styles.dots}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
+          {[0, 1, 2, 3, 4].map((i) => (
+            <View
+              key={i}
+              testID={`loading-dot-${i}`}
+              style={[styles.dot, i === 0 && styles.dotOn]}
+            />
+          ))}
+        </View>
         <View style={styles.status} accessibilityRole="progressbar" accessibilityLabel="Loading">
           <View style={styles.track}>
             <Animated.View
@@ -80,6 +96,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.bone,
   },
+  dots: { flexDirection: 'row', gap: 10 },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.lineStrong },
+  dotOn: { backgroundColor: colors.emberGlow },
   status: { marginTop: 40, alignItems: 'center', gap: 12 },
   track: {
     width: 160,

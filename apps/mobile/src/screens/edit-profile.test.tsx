@@ -153,6 +153,16 @@ describe('Edit profile', () => {
     expect(mockRouter.back).toHaveBeenCalledTimes(1);
   });
 
+  it('still goes back when only the reload after a successful save fails', async () => {
+    mockRefresh.mockRejectedValue(new TypeError('Network request failed'));
+    await render(<EditProfile />);
+    await typeInto('Name', 'Josie H');
+    await fireEvent.press(save());
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Can’t reach the kitchen right now.')).toBeNull();
+  });
+
   it('saves a new username', async () => {
     await render(<EditProfile />);
     await typeInto('Username', 'josie_h');

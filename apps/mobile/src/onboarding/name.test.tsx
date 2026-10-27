@@ -107,7 +107,7 @@ describe('Name step', () => {
   });
 
   it('treats the Android back button like Back', async () => {
-    let handler: () => boolean | null | undefined = () => false;
+    let handler: (...args: never[]) => boolean | null | undefined = () => false;
     const add = jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, cb) => {
       handler = cb;
       return { remove: jest.fn() };

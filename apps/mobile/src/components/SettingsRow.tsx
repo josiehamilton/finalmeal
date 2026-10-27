@@ -21,7 +21,11 @@ export function SettingsRow({ icon, label, value, onPress, danger = false }: Set
     <>
       <Icon name={icon} size={20} color={tint} />
       <Text style={[styles.label, danger && { color: colors.danger }]}>{label}</Text>
-      {value ? <Text style={styles.value}>{value}</Text> : null}
+      {value ? (
+        <Text style={styles.value} numberOfLines={1}>
+          {value}
+        </Text>
+      ) : null}
       {onPress && !danger ? <Icon name="chev" size={18} color={colors.dim} /> : null}
     </>
   );
@@ -43,6 +47,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
   },
-  label: { flex: 1, fontFamily: fontFamily.uiSemiBold, fontSize: 15, color: colors.bone },
-  value: { fontFamily: fontFamily.ui, fontSize: 14, color: colors.smoke },
+  label: {
+    flexGrow: 1,
+    flexShrink: 0,
+    fontFamily: fontFamily.uiSemiBold,
+    fontSize: 15,
+    color: colors.bone,
+  },
+  value: { flexShrink: 1, fontFamily: fontFamily.ui, fontSize: 14, color: colors.smoke },
 });

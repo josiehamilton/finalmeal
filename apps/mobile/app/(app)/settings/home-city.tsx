@@ -23,7 +23,11 @@ export default function HomeCity() {
     setError(null);
     try {
       await setMyHomeCity(getSupabase(), id);
-      await refreshProfile();
+      try {
+        await refreshProfile();
+      } catch {
+        // The change is saved. Only the shared copy is stale; the You tab shows the reason and a retry.
+      }
       router.back();
     } catch (e) {
       setError(friendlyMessage(e));

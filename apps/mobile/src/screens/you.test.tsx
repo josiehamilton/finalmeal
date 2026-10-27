@@ -1,17 +1,19 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import You from '../../app/(app)/(tabs)/you';
 import { makeProfile } from '../test-support/profile';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter }));
 const mockRefresh = jest.fn();
-let mockProfile = makeProfile();
+let mockProfile: ReturnType<typeof makeProfile> | null = makeProfile();
+let mockSessionError: string | null = null;
+let mockLoading = false;
 jest.mock('../providers/SessionProvider', () => ({
   useSession: () => ({
     session: {},
     profile: mockProfile,
-    loading: false,
-    error: null,
+    loading: mockLoading,
+    error: mockSessionError,
     refreshProfile: mockRefresh,
   }),
 }));
@@ -21,6 +23,8 @@ describe('You tab', () => {
     jest.clearAllMocks();
     mockRefresh.mockResolvedValue(null);
     mockProfile = makeProfile();
+    mockSessionError = null;
+    mockLoading = false;
   });
 
   it('shows the profile: name, handle, bio, city and stats', async () => {
@@ -103,5 +107,49 @@ describe('You tab', () => {
     await render(<You />);
     await screen.getByTestId('you-scroll').props.refreshControl.props.onRefresh();
     expect(await screen.findByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+  });
+
+  describe('without a profile', () => {
+    beforeEach(() => {
+      mockProfile = null;
+    });
+
+    it('shows the session error with a Try again button instead of a blank screen', async () => {
+      mockSessionError = 'Can’t reach the kitchen right now.';
+      await render(<You />);
+      expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+    });
+
+    it('falls back to the generic copy when there is no error to show', async () => {
+      await render(<You />);
+      expect(screen.getByText('Something went wrong. Try again.')).toBeOnTheScreen();
+    });
+
+    it('reloads the profile on Try again, showing a spinner meanwhile', async () => {
+      let finish: (value: null) => void = () => {};
+      mockRefresh.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+      await render(<You />);
+      void fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+      expect(mockRefresh).toHaveBeenCalledTimes(1);
+      expect(await screen.findByTestId('you-loading')).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+      await act(async () => finish(null));
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+    });
+
+    it('shows the new friendly copy when Try again fails', async () => {
+      mockRefresh.mockRejectedValue(new TypeError('Network request failed'));
+      await render(<You />);
+      await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+      expect(await screen.findByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+    });
+
+    it('shows a spinner while the session is still loading', async () => {
+      mockLoading = true;
+      await render(<You />);
+      expect(screen.getByTestId('you-loading')).toBeOnTheScreen();
+    });
   });
 });

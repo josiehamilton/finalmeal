@@ -59,6 +59,16 @@ describe('Home city', () => {
     expect(mockRouter.back).toHaveBeenCalledTimes(1);
   });
 
+  it('still goes back when only the reload after a successful save fails', async () => {
+    mockRefresh.mockRejectedValue(new TypeError('Network request failed'));
+    await render(<HomeCity />);
+    await fireEvent.press(screen.getByText('pick Tokyo'));
+    await fireEvent.press(save());
+    expect(mockSetCity).toHaveBeenCalledTimes(1);
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Can’t reach the kitchen right now.')).toBeNull();
+  });
+
   it('clears the home city', async () => {
     await render(<HomeCity />);
     await fireEvent.press(screen.getByRole('button', { name: 'Clear home city' }));

@@ -1,11 +1,20 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { friendlyMessage } from '@finalmeal/api';
 import { colors } from '@finalmeal/ui-tokens';
 import { EmptySeats } from '../../../src/components/EmptySeats';
 import { Icon } from '../../../src/components/Icon';
+import { PrimaryButton } from '../../../src/components/PrimaryButton';
 import { ProfileHeader } from '../../../src/components/ProfileHeader';
 import { fontFamily } from '../../../src/lib/fonts';
 import { useSession } from '../../../src/providers/SessionProvider';
@@ -20,7 +29,7 @@ const TABS: { key: ProfileTab; label: string }[] = [
 
 export default function You() {
   const router = useRouter();
-  const { profile, refreshProfile } = useSession();
+  const { profile, loading, error: sessionError, refreshProfile } = useSession();
   const [tab, setTab] = useState<ProfileTab>('final');
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +46,25 @@ export default function You() {
     }
   }
 
-  if (!profile) return <View style={styles.screen} />;
+  if (!profile) {
+    // No profile to show: never a blank screen. Say why and offer a retry.
+    return (
+      <SafeAreaView edges={['top']} style={styles.screen}>
+        <View style={styles.center}>
+          {refreshing || loading ? (
+            <ActivityIndicator testID="you-loading" color={colors.emberGlow} />
+          ) : (
+            <>
+              <Text style={styles.problem} accessibilityRole="alert">
+                {error ?? sessionError ?? friendlyMessage(null)}
+              </Text>
+              <PrimaryButton label="Try again" onPress={refresh} />
+            </>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
@@ -108,6 +135,19 @@ export default function You() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.night },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+    paddingHorizontal: 32,
+  },
+  problem: {
+    fontFamily: fontFamily.uiMedium,
+    fontSize: 15,
+    color: colors.bone,
+    textAlign: 'center',
+  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -101,7 +101,11 @@ function EditProfileForm({ profile }: { profile: MyProfile }) {
       if (changed.username) patch.username = username;
       if (changed.bio) patch.bio = trimmedBio === '' ? null : trimmedBio;
       if (Object.keys(patch).length > 0) await updateMyProfile(client, patch);
-      await refreshProfile();
+      try {
+        await refreshProfile();
+      } catch {
+        // The change is saved. Only the shared copy is stale; the You tab shows the reason and a retry.
+      }
       router.back();
     } catch (e) {
       const code = friendlyCode(e);
