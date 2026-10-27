@@ -29,7 +29,7 @@ create table public.blocks (
 create table public.shared_lists (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references public.profiles on delete cascade,
-  slug extensions.citext unique not null check (slug ~ '^[a-z0-9-]{3,60}$'),
+  slug extensions.citext unique not null check (slug::text ~ '^[a-z0-9-]{3,60}$'),
   title text not null check (char_length(title) between 1 and 80),
   note text check (char_length(note) <= 280),
   filter jsonb not null default '{"scope":"everything"}',

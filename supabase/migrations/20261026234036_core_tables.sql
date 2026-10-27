@@ -111,9 +111,11 @@ create table public.pick_tags (
   primary key (pick_id, tag_id)
 );
 
+-- security definer so the check sees every tag and pick regardless of the caller's RLS
 create function public.pick_tags_check_owner()
 returns trigger
 language plpgsql
+security definer
 set search_path = ''
 as $$
 begin
