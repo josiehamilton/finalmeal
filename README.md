@@ -20,11 +20,11 @@ pnpm dev         # starts the website and the mobile app
 
 - The website is at http://localhost:3000.
 - The phone app's Expo server starts too. With the iPhone Simulator open, run `xcrun simctl openurl booted exp://127.0.0.1:8081` in a second terminal to load the app in Expo Go. (Keyboard shortcuts such as `i` don't work inside `pnpm dev`.)
-- Both show the Final Meal foundation screen with live counts from the local database.
+- The website shows the Final Meal foundation screen with live counts from the local database. The phone app opens on Welcome (sign up or log in with an email code).
 
 ## Try the app
 
-Start the database and the apps first (`pnpm bootstrap` once, then `pnpm dev`). For a clean start, run `pnpm db:reset && pnpm env:local` before you begin.
+Start the database and the apps first (`pnpm bootstrap` once, then `pnpm dev`). For a clean start, run `pnpm db:reset && pnpm env:local` before you begin. If you reset the database while the app is already signed in, the app notices that the account is gone and returns to Welcome by itself.
 
 **On the iPhone 17 Simulator**
 
@@ -36,7 +36,7 @@ Start the database and the apps first (`pnpm bootstrap` once, then `pnpm dev`). 
 
 **On the Pixel 10 emulator**
 
-1. Start the `Pixel_10` emulator from Android Studio, then run `pnpm --filter @finalmeal/mobile android` (or press `a` in a standalone `npx expo start`).
+1. Start the `Pixel_10` emulator from Android Studio. `pnpm dev` holds the Expo port (8081), so stop it first (Ctrl+C in its terminal), then run `pnpm --filter @finalmeal/mobile android`: it starts Expo and opens the app in the emulator. (To keep `pnpm dev` running instead, load the app into its Expo server with `adb shell am start -a android.intent.action.VIEW -d exp://10.0.2.2:8081`. Never start a second Expo server beside `pnpm dev`.)
 2. Follow steps 2 to 5 above with another address, such as `josie.test+android@example.com`.
 3. The Android emulator reaches your computer at `10.0.2.2` instead of `127.0.0.1`. The app swaps the address automatically, so nothing needs changing.
 
@@ -44,12 +44,12 @@ Sign-in codes expire after 10 minutes, and you can ask for a new one every 30 se
 
 ### Device checklist (pending Mac)
 
-Phase 2 was built and tested in a cloud session, which has no simulators. These checks still need to be run on Josie's Mac (from a session there, or by hand). Start each with `pnpm db:reset && pnpm env:local`. Take a screenshot of every step.
+Phase 2 was built and tested in a cloud session, which has no simulators. These checks still need to be run on Josie's Mac (from a session there, or by hand). Run `pnpm db:reset && pnpm env:local` once per device run: before check 1 for the iPhone checks (1 to 3), and before check 4 for the Pixel checks (4 and 5). Do not reset in between: checks 2 and 5 rely on the account made earlier in the same run. Take a screenshot of every step. If the database is reset while the app is still signed in, the app signs itself out and returns to Welcome, so no reinstall is needed.
 
 1. **iPhone 17, full flow.** Start Expo for iOS. Go Welcome, then email `josie.test+ios@example.com`, then read the code in the local inbox (http://127.0.0.1:54324), then Name `Josie` `Tester`, then username `josie_ios`, then city `vanc` and choose Vancouver, BC, Canada, then photo "Choose from library" (use a simulator stock photo), then the loading screen, then the You tab.
 2. **iPhone 17, staying signed in.** Kill and relaunch Expo Go: the You tab opens signed in. Edit the bio and tap Save. Set Privacy to Private. Log out and confirm Welcome. Log back in with the same email and confirm the You tab.
 3. **iPhone 17, resuming sign-up.** Sign up a second email and stop after the code step (kill the app). Relaunch and confirm it lands on the Name step.
-4. **Pixel 10, full flow.** Start the `Pixel_10` emulator, then `npx expo start --android`. Repeat checks 1 and 2 with `josie.test+android@example.com` and username `josie_android`.
+4. **Pixel 10, full flow.** Start the `Pixel_10` emulator and open the app as in the Pixel steps above (stop `pnpm dev` first, or load the app into its running Expo server; never start a second server). Reset the database once, then repeat checks 1 and 2 with `josie.test+android@example.com` and username `josie_android`.
 5. **Pixel 10, backend unreachable.** Run `pnpm db:stop`. On the email step, tap Send code and confirm it shows `Can’t reach the kitchen right now.` and the button works again afterwards. Then run `pnpm db:start`.
 6. **Task 6 Step 4** of the Phase 2 plan (the simulator checks listed there) is also still to be run on the Mac.
 
