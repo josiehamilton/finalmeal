@@ -1,6 +1,5 @@
 import { isPlausibleEmail, normalizeEmail } from '@finalmeal/core';
 import { ApiError, throwIfError } from './errors';
-import type { ErrorLike } from './errors';
 import type { FinalMealClient } from './client';
 
 /** Sends a 6-digit sign-in code to `email`, creating the account on first use. */
@@ -26,15 +25,11 @@ export async function verifyEmailCode(
     token: code.trim(),
     type: 'email',
   });
-  throwIfError(error && forVerify(error));
-}
-
-/**
- * The auth server answers a wrong code and an expired one identically (403 otp_expired,
- * "Token has expired or is invalid"), so a 403 here is always shown as "that code didn't work".
- */
-function forVerify(error: ErrorLike): ErrorLike {
-  return error.status === 403 ? { ...error, code: 'invalid_credentials' } : error;
+  // The auth server answers a wrong code and an expired one identically (403 otp_expired,
+  // "Token has expired or is invalid"), so a 403 here is always shown as "that code didn't work".
+  // A new ApiError, not a spread: an AuthApiError's message is not an own enumerable property.
+  if (error?.status === 403) throw new ApiError(error.message, 'invalid_code');
+  throwIfError(error);
 }
 
 export async function signOut(client: FinalMealClient): Promise<void> {

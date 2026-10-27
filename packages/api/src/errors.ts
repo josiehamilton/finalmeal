@@ -76,6 +76,11 @@ const RATE_LIMIT_CODES: ReadonlySet<string> = new Set([
 const FETCH_FAILURE =
   /^(TypeError: )?(fetch failed|Failed to fetch|Network request failed|Load failed)/i;
 
+/** True when a message is what fetch rejects with on a network failure. */
+export function isFetchFailure(message: string): boolean {
+  return FETCH_FAILURE.test(message);
+}
+
 function codeFor(error: ErrorLike): string {
   const code = error.code ?? '';
   if (code === '') {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { sendEmailCode, verifyEmailCode } from './auth';
+import { ApiError } from './errors';
 import type { FinalMealClient } from './client';
 
 function fakeClient(auth: Record<string, unknown>): FinalMealClient {
@@ -83,6 +84,34 @@ describe('verifyEmailCode', () => {
       verifyEmailCode(fakeClient({ verifyOtp }), 'a@example.com', '000000'),
     ).rejects.toMatchObject({
       code: 'invalid_code',
+    });
+  });
+
+  it('keeps the original message when it re-maps a real AuthApiError instance', async () => {
+    // auth-js errors are Error subclasses: their message is not an own enumerable property.
+    class FakeAuthApiError extends Error {
+      status = 403;
+      code = 'otp_expired';
+      constructor(message: string) {
+        super(message);
+        this.name = 'AuthApiError';
+      }
+    }
+    const verifyOtp = vi
+      .fn()
+      .mockResolvedValue({
+        data: {},
+        error: new FakeAuthApiError('Token has expired or is invalid'),
+      });
+    const rejection = await verifyEmailCode(
+      fakeClient({ verifyOtp }),
+      'a@example.com',
+      '000000',
+    ).catch((e: unknown) => e);
+    expect(rejection).toBeInstanceOf(ApiError);
+    expect(rejection).toMatchObject({
+      code: 'invalid_code',
+      message: 'Token has expired or is invalid',
     });
   });
 

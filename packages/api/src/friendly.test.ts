@@ -35,6 +35,22 @@ describe('friendlyMessage', () => {
     );
   });
 
+  it.each(['Network request failed', 'Failed to fetch', 'Load failed', 'fetch failed'])(
+    'treats a fetch TypeError (%s) as a network failure',
+    (message) => {
+      expect(friendlyMessage(new TypeError(message))).toBe('Can’t reach the kitchen right now.');
+    },
+  );
+
+  it('does not hide a programming TypeError as a network failure', () => {
+    expect(friendlyMessage(new TypeError('undefined is not a function'))).toBe(
+      'Something went wrong. Try again.',
+    );
+    expect(
+      friendlyMessage(new TypeError("Cannot read properties of undefined (reading 'x')")),
+    ).toBe('Something went wrong. Try again.');
+  });
+
   it('treats a raw timeout as a timeout', () => {
     expect(friendlyMessage(new DOMException('timed out', 'TimeoutError'))).toBe(
       'Can’t reach the kitchen right now.',

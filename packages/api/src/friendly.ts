@@ -1,4 +1,4 @@
-import { ApiError, isFriendlyCode } from './errors';
+import { ApiError, isFetchFailure, isFriendlyCode } from './errors';
 import type { FriendlyCode } from './errors';
 
 /** Spec 5.6 copy. Apps show these and never a raw error. */
@@ -16,8 +16,8 @@ const COPY = {
 /** The friendly code for anything thrown; anything unrecognised is `unknown`. */
 export function friendlyCode(e: unknown): FriendlyCode {
   if (e instanceof ApiError) return isFriendlyCode(e.code) ? e.code : 'unknown';
-  // A fetch that rejected before reaching our wrappers.
-  if (e instanceof TypeError) return 'network';
+  // A fetch that rejected before reaching our wrappers. Other TypeErrors are bugs, not outages.
+  if (e instanceof TypeError) return isFetchFailure(e.message) ? 'network' : 'unknown';
   if (e instanceof Error && /^(TimeoutError|AbortError)$/.test(e.name)) return 'timeout';
   return 'unknown';
 }
