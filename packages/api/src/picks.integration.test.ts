@@ -521,9 +521,11 @@ async function clearPicks(client: FinalMealClient): Promise<void> {
 describe('one person acting twice at once (local Supabase)', () => {
   let client: FinalMealClient;
   let place: Place;
+  let other: Awaited<ReturnType<typeof newPerson>>;
 
   beforeAll(async () => {
     ({ client, place } = await newPerson());
+    other = await newPerson();
   });
 
   it('gives exactly one pick and one duplicate_pick for the same dish added concurrently', async () => {
@@ -578,7 +580,6 @@ describe('one person acting twice at once (local Supabase)', () => {
 
   it('cannot be changed by another person', async () => {
     await clearPicks(client);
-    const other = await newPerson();
     const { pick } = await addPick(client, { placeId: place.id, dishName: 'Mine', tier: 'final' });
 
     // Anyone can read a pick; only its owner can change it.

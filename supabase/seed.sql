@@ -139,39 +139,44 @@ select 'personal', name, replace(lower(name), ' ', '-'), '00000000-0000-4000-800
 from (values ('Late night'), ('Spicy'), ('Splurge'), ('Rainy day')) as v(name);
 
 -- ---------------------------------------------------------------- picks
--- tier/slot per person; original_dish_name is the dish name.
-insert into public.picks (user_id, dish_id, tier, slot, note, original_dish_name)
-select pe.id, d.id, v.tier::public.pick_tier, v.slot::smallint, v.note, d.name
+-- tier/slot per person; original_dish_name is the dish name. `mins` is how many minutes ago the
+-- pick was made: each person's picks get distinct times so lists that sort by newest first are
+-- the same after every reset. Josie's honorables run newest to oldest in the order the ProfileHM
+-- board groups them: Marutama (Tonkotsu Ramen, Pork Gyoza), Kin Kao (Khao Soi, Crispy Rice
+-- Salad), Miku, Lotus Noodle Bar, Hearth Bakery, then the rest.
+insert into public.picks (user_id, dish_id, tier, slot, note, original_dish_name, created_at)
+select pe.id, d.id, v.tier::public.pick_tier, v.slot::smallint, v.note, d.name,
+       now() - v.mins * interval '1 minute'
 from (values
-  ('josiehamilton', 'Pork Gyro',             'final',     1,    'Delicious. I’d fly back for it.'),
-  ('josiehamilton', 'Wagyu Beef Don',        'final',     2,    null),
-  ('josiehamilton', 'Plain Biryani',         'final',     3,    null),
-  ('josiehamilton', 'Lobster Roll',          'final',     4,    null),
-  ('josiehamilton', 'Smash Burger',          'honorable', null, null),
-  ('josiehamilton', 'Tacos Al Pastor',       'honorable', null, null),
-  ('josiehamilton', 'Banh Mi',               'honorable', null, null),
-  ('josiehamilton', 'Tonkotsu Ramen',        'honorable', null, null),
-  ('josiehamilton', 'Khao Soi',              'honorable', null, null),
-  ('josiehamilton', 'Aburi Salmon Oshi',     'honorable', null, null),
-  ('josiehamilton', 'Vegan Dan Dan Noodles', 'honorable', null, null),
-  ('josiehamilton', 'Cardamom Bun',          'honorable', null, null),
-  ('josiehamilton', 'Omakase',               'honorable', null, null),
-  ('josiehamilton', 'Nigiri Set',            'honorable', null, null),
-  ('josiehamilton', 'Toro Hand Roll',        'honorable', null, null),
-  ('josiehamilton', 'Pork Gyoza',            'honorable', null, null),
-  ('josiehamilton', 'Crispy Rice Salad',     'honorable', null, null),
-  ('mikebrennan',   'Smash Burger',          'final',     1,    null),
-  ('mikebrennan',   'Wagyu Beef Don',        'final',     2,    'God tier. I still dream about it.'),
-  ('arimitchell',   'Pork Gyro',             'final',     1,    'Delicious. I’d fly back for it.'),
-  ('arimitchell',   'Smash Burger',          'final',     2,    null),
-  ('arimitchell',   'Tacos Al Pastor',       'honorable', null, null),
-  ('allimercer',    'Plain Biryani',         'final',     1,    'The spice level was absolutely perfect.'),
-  ('allimercer',    'Khao Soi',              'final',     2,    null),
-  ('allimercer',    'Tacos Al Pastor',       'final',     3,    null),
-  ('devpatel',      'Tonkotsu Ramen',        'final',     1,    'The broth is a religious experience.'),
-  ('devpatel',      'Khao Soi',              'honorable', null, 'Not quite top five, but I’d cross town for it.'),
-  ('samokafor',     'Omakase',               'honorable', null, null)
-) as v(username, dish, tier, slot, note)
+  ('josiehamilton', 'Pork Gyro',             'final',     1,    'Delicious. I’d fly back for it.', 101),
+  ('josiehamilton', 'Wagyu Beef Don',        'final',     2,    null, 102),
+  ('josiehamilton', 'Plain Biryani',         'final',     3,    null, 103),
+  ('josiehamilton', 'Lobster Roll',          'final',     4,    null, 104),
+  ('josiehamilton', 'Smash Burger',          'honorable', null, null, 11),
+  ('josiehamilton', 'Tacos Al Pastor',       'honorable', null, null, 12),
+  ('josiehamilton', 'Banh Mi',               'honorable', null, null, 13),
+  ('josiehamilton', 'Tonkotsu Ramen',        'honorable', null, null, 1),
+  ('josiehamilton', 'Khao Soi',              'honorable', null, null, 3),
+  ('josiehamilton', 'Aburi Salmon Oshi',     'honorable', null, null, 5),
+  ('josiehamilton', 'Vegan Dan Dan Noodles', 'honorable', null, null, 6),
+  ('josiehamilton', 'Cardamom Bun',          'honorable', null, null, 7),
+  ('josiehamilton', 'Omakase',               'honorable', null, null, 8),
+  ('josiehamilton', 'Nigiri Set',            'honorable', null, null, 9),
+  ('josiehamilton', 'Toro Hand Roll',        'honorable', null, null, 10),
+  ('josiehamilton', 'Pork Gyoza',            'honorable', null, null, 2),
+  ('josiehamilton', 'Crispy Rice Salad',     'honorable', null, null, 4),
+  ('mikebrennan',   'Smash Burger',          'final',     1,    null, 105),
+  ('mikebrennan',   'Wagyu Beef Don',        'final',     2,    'God tier. I still dream about it.', 106),
+  ('arimitchell',   'Pork Gyro',             'final',     1,    'Delicious. I’d fly back for it.', 107),
+  ('arimitchell',   'Smash Burger',          'final',     2,    null, 108),
+  ('arimitchell',   'Tacos Al Pastor',       'honorable', null, null, 109),
+  ('allimercer',    'Plain Biryani',         'final',     1,    'The spice level was absolutely perfect.', 110),
+  ('allimercer',    'Khao Soi',              'final',     2,    null, 111),
+  ('allimercer',    'Tacos Al Pastor',       'final',     3,    null, 112),
+  ('devpatel',      'Tonkotsu Ramen',        'final',     1,    'The broth is a religious experience.', 113),
+  ('devpatel',      'Khao Soi',              'honorable', null, 'Not quite top five, but I’d cross town for it.', 114),
+  ('samokafor',     'Omakase',               'honorable', null, null, 115)
+) as v(username, dish, tier, slot, note, mins)
 join seed_people pe on pe.username = v.username
 join public.dishes d on d.name = v.dish;
 

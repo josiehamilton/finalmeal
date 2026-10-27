@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FinalMealClient } from './client';
+import { ApiError } from './errors';
 import { addPick, sortPicks, toPick, updatePick } from './picks';
 import type { Pick } from './picks';
 
@@ -88,6 +89,129 @@ describe('addPick when the photo upload never finishes', () => {
     expect(args.p_photo_path).toBeUndefined();
     expect(args.p_dish_name).toBe('Tonkotsu Ramen');
     expect(result.pick.id).toBe('pick-1');
+  });
+});
+
+/** A signed-in client whose photo upload, rpc and pick read are the given stubs. */
+function stubClient(opts: {
+  upload: ReturnType<typeof vi.fn>;
+  rpc: ReturnType<typeof vi.fn>;
+  remove?: ReturnType<typeof vi.fn>;
+}) {
+  const remove = opts.remove ?? vi.fn().mockResolvedValue({ data: [], error: null });
+  const client = {
+    auth: {
+      getSession: vi
+        .fn()
+        .mockResolvedValue({ data: { session: { user: { id: 'u1' } } }, error: null }),
+    },
+    storage: {
+      from: () => ({
+        upload: opts.upload,
+        remove,
+        getPublicUrl: () => ({ data: { publicUrl: 'x' } }),
+      }),
+    },
+    rpc: opts.rpc,
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: () => ({
+            retry: vi.fn().mockResolvedValue({ data: PICK_ROW, error: null }),
+          }),
+        }),
+      }),
+    }),
+  } as unknown as FinalMealClient;
+  return { client, remove };
+}
+
+const UPLOADED = vi.fn().mockResolvedValue({ data: { path: 'p' }, error: null });
+
+describe('the photo file after a failed add or update', () => {
+  const LOST_RESPONSE = { message: 'TypeError: fetch failed', code: '' };
+  const TIMED_OUT = { message: 'TimeoutError: The operation timed out', code: '' };
+  const REFUSED = { message: 'duplicate_pick', code: 'P0001' };
+  const RAW_REFUSAL = { message: 'permission denied', code: '42501' };
+
+  it.each([
+    ['a lost response', LOST_RESPONSE],
+    ['a timeout', TIMED_OUT],
+    ['an error with no code', { message: 'something odd', code: '' }],
+  ])(
+    'keeps the uploaded photo when addPick fails with %s (the pick may have been saved)',
+    async (_n, error) => {
+      const rpc = vi.fn().mockResolvedValue({ data: null, error });
+      const { client, remove } = stubClient({ upload: UPLOADED, rpc });
+      await expect(addPick(client, { ...INPUT, photo: jpeg(100) })).rejects.toBeInstanceOf(
+        ApiError,
+      );
+      expect(remove).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['a duplicate', REFUSED],
+    ['a raw database refusal', RAW_REFUSAL],
+  ])('deletes the uploaded photo when addPick is refused with %s', async (_n, error) => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error });
+    const { client, remove } = stubClient({ upload: UPLOADED, rpc });
+    await expect(addPick(client, { ...INPUT, photo: jpeg(100) })).rejects.toBeInstanceOf(ApiError);
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove.mock.calls[0]?.[0]).toEqual([expect.stringMatching(/^u1\/pick-\d+\.jpg$/)]);
+  });
+
+  it.each([
+    ['a lost response', LOST_RESPONSE],
+    ['a timeout', TIMED_OUT],
+  ])(
+    'keeps the new photo when updatePick fails with %s (the update may have been saved)',
+    async (_n, error) => {
+      const rpc = vi.fn().mockResolvedValue({ data: null, error });
+      const { client, remove } = stubClient({ upload: UPLOADED, rpc });
+      await expect(updatePick(client, 'pick-1', { photo: jpeg(100) })).rejects.toBeInstanceOf(
+        ApiError,
+      );
+      expect(remove).not.toHaveBeenCalled();
+    },
+  );
+
+  it('deletes the new photo when updatePick is definitely refused', async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: null, error: { message: 'invalid_tag', code: 'P0001' } });
+    const { client, remove } = stubClient({ upload: UPLOADED, rpc });
+    await expect(updatePick(client, 'pick-1', { photo: jpeg(100) })).rejects.toMatchObject({
+      code: 'invalid_tag',
+    });
+    expect(remove).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('an upload that finishes after the timeout', () => {
+  it('is deleted again, so no orphan is left behind', async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    const upload = vi.fn().mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const rpc = vi.fn().mockResolvedValue({ data: { id: 'pick-1' }, error: null });
+    const { client, remove } = stubClient({ upload, rpc });
+    const result = await addPick(client, { ...INPUT, photo: jpeg(100), photoTimeoutMs: 10 });
+    expect(result.photoFailed).toBe(true);
+    expect(remove).not.toHaveBeenCalled();
+
+    finish({ data: { path: 'p' }, error: null }); // the upload lands after we gave up
+    await vi.waitFor(() => expect(remove).toHaveBeenCalledTimes(1));
+    expect(remove.mock.calls[0]?.[0]).toEqual([expect.stringMatching(/^u1\/pick-\d+\.jpg$/)]);
+  });
+
+  it('leaves nothing to delete when it fails after the timeout', async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    const upload = vi.fn().mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const rpc = vi.fn().mockResolvedValue({ data: { id: 'pick-1' }, error: null });
+    const { client, remove } = stubClient({ upload, rpc });
+    await addPick(client, { ...INPUT, photo: jpeg(100), photoTimeoutMs: 10 });
+    finish({ data: null, error: { message: 'too big', statusCode: '413' } });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(remove).not.toHaveBeenCalled();
   });
 });
 

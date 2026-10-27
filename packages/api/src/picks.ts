@@ -89,6 +89,20 @@ function throwPickError(error: ErrorLike | null): void {
   throwIfError(error);
 }
 
+/**
+ * True when the server definitely refused a write (it answered with an error code that is not a
+ * lost connection or a timeout). Writes are not bounded or retried, so a dropped connection or a
+ * timeout is ambiguous: the write may have been saved and its response lost.
+ */
+function isDefiniteRefusal(error: ErrorLike): boolean {
+  try {
+    throwIfError(error);
+  } catch (e) {
+    return e instanceof ApiError && e.code !== '' && e.code !== 'network' && e.code !== 'timeout';
+  }
+  return false;
+}
+
 function requireJpeg(bytes: ArrayBuffer): void {
   if (!looksLikeJpeg(bytes)) throw new ApiError('Not a JPEG image', 'invalid_photo');
 }
@@ -204,7 +218,8 @@ export interface AddPickInput {
  * Adds a pick. A photo is uploaded first; if that fails or takes too long the pick is still
  * added, without a photo, and `photoFailed` is true (the person can add it later from the pick).
  * A photo that is not a JPEG is rejected (`invalid_photo`) before any request. If the pick
- * itself is refused (a duplicate, a full five), the uploaded photo is deleted again.
+ * itself is definitely refused (a duplicate, a full five), the uploaded photo is deleted again;
+ * after a lost connection or a timeout it is kept, because the pick may have been saved.
  */
 export async function addPick(
   client: FinalMealClient,
@@ -238,7 +253,8 @@ export async function addPick(
     p_replace_slot: input.replaceSlot,
   });
   if (error) {
-    if (photoPath) await removePhoto(client, photoPath);
+    // Only a definite refusal leaves the photo unused; after a lost response the pick may point at it.
+    if (photoPath && isDefiniteRefusal(error)) await removePhoto(client, photoPath);
     throwPickError(error);
   }
   return { pick: await requirePick(client, (data as { id: string }).id), photoFailed };
@@ -335,7 +351,8 @@ export async function updatePick(
     p_photo_path: photoPath as string,
   });
   if (error) {
-    if (uploaded) await removePhoto(client, uploaded);
+    // As in addPick: after an ambiguous failure the update may have been saved, so keep the file.
+    if (uploaded && isDefiniteRefusal(error)) await removePhoto(client, uploaded);
     throwPickError(error);
   }
   if (current.photo_path && current.photo_path !== photoPath) {

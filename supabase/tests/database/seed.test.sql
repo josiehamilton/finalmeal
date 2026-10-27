@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(25);
+select plan(27);
 
 -- Counts
 select is((select count(*)::int from public.profiles), 6, '6 profiles');
@@ -42,6 +42,26 @@ select is(
     where p.user_id = '00000000-0000-4000-8000-000000000001' and p.slot = 1),
   'Pork Gyro',
   'josie''s number one is Pork Gyro'
+);
+
+-- Newest first is stable: every person's picks have distinct times, and Josie's honorables
+-- run in the order the ProfileHM board groups them.
+select is(
+  (select count(*)::int from (
+    select user_id from public.picks group by user_id having count(distinct created_at) <> count(*)
+  ) dup),
+  0,
+  'each person''s picks have distinct created_at times'
+);
+select is(
+  (select array_agg(d.name order by p.created_at desc) from (
+    select * from public.picks
+    where user_id = '00000000-0000-4000-8000-000000000001' and tier = 'honorable'
+    order by created_at desc limit 7) p
+    join public.dishes d on d.id = p.dish_id),
+  array['Tonkotsu Ramen', 'Pork Gyoza', 'Khao Soi', 'Crispy Rice Salad', 'Aburi Salmon Oshi',
+        'Vegan Dan Dan Noodles', 'Cardamom Bun'],
+  'josie''s newest honorables are Marutama, Kin Kao, Miku, Lotus Noodle Bar, Hearth Bakery'
 );
 
 -- Tags

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chipOptions, filterPicks, groupPicksByPlace, summarizeGroups } from './group';
+import { chipOptions, cityKey, filterPicks, groupPicksByPlace, summarizeGroups } from './group';
 import type { PickLike } from './group';
 
 type TagKind = 'food_type' | 'dietary' | 'personal';
@@ -10,16 +10,23 @@ function tag(kind: TagKind, name: string) {
 
 interface TestPick extends PickLike {
   id: string;
-  place: { id: string; name: string; city: string };
+  place: { id: string; name: string; city: string; region: string | null; country: string };
 }
+
+const WHERE: Record<string, { region: string | null; country: string }> = {
+  Vancouver: { region: 'BC', country: 'CA' },
+  Tokyo: { region: null, country: 'JP' },
+  Portland: { region: 'ME', country: 'US' },
+};
 
 function pick(
   id: string,
   placeName: string,
   city: string,
   tags: Array<ReturnType<typeof tag>> = [],
+  where: { region: string | null; country: string } = WHERE[city]!,
 ): TestPick {
-  return { id, place: { id: `place-${placeName}`, name: placeName, city }, tags };
+  return { id, place: { id: `place-${placeName}`, name: placeName, city, ...where }, tags };
 }
 
 const VAN = 'Vancouver';
@@ -89,7 +96,9 @@ describe('filterPicks', () => {
   });
 
   it('filters by city', () => {
-    expect(filterPicks(picks, { city: 'Tokyo' }).map((p) => p.id)).toEqual(['omakase']);
+    expect(filterPicks(picks, { city: cityKey(picks[7]!.place) }).map((p) => p.id)).toEqual([
+      'omakase',
+    ]);
   });
 
   it('filters by a global tag slug (food type or dietary)', () => {
@@ -107,8 +116,10 @@ describe('filterPicks', () => {
   });
 
   it('combines filters with AND', () => {
-    expect(filterPicks(picks, { city: VAN, tagSlug: 'sushi' }).map((p) => p.id)).toEqual(['aburi']);
-    expect(filterPicks(picks, { city: 'Tokyo', tagSlug: 'ramen' })).toEqual([]);
+    expect(
+      filterPicks(picks, { city: cityKey(picks[0]!.place), tagSlug: 'sushi' }).map((p) => p.id),
+    ).toEqual(['aburi']);
+    expect(filterPicks(picks, { city: cityKey(picks[7]!.place), tagSlug: 'ramen' })).toEqual([]);
   });
 });
 
@@ -140,9 +151,13 @@ describe('chipOptions', () => {
     ]);
   });
 
-  it('carries the filter value: the city name or the tag slug, with the tag kind', () => {
+  it('carries the filter value: the city key or the tag slug, with the tag kind', () => {
     const chips = chipOptions(picks);
-    expect(chips[0]).toMatchObject({ kind: 'city', value: 'Vancouver' });
+    expect(chips[0]).toMatchObject({
+      kind: 'city',
+      label: 'Vancouver',
+      value: cityKey(picks[0]!.place),
+    });
     expect(chips.find((c) => c.label === 'Rainy day')).toMatchObject({
       kind: 'tag',
       value: 'rainy-day',
@@ -163,5 +178,49 @@ describe('chipOptions', () => {
 
   it('is empty for no picks', () => {
     expect(chipOptions([])).toEqual([]);
+  });
+});
+
+describe('cities with the same name', () => {
+  const VAN_BC = WHERE.Vancouver!;
+  const VAN_WA = { region: 'WA', country: 'US' };
+  const picks = [
+    pick('bc1', 'Marutama', 'Vancouver', [], VAN_BC),
+    pick('bc2', 'Kin Kao', 'Vancouver', [], VAN_BC),
+    pick('wa1', 'Some Diner', 'Vancouver', [], VAN_WA),
+    pick('me1', 'Luke’s', 'Portland'),
+  ];
+
+  it('keys a city by name, region and country', () => {
+    expect(cityKey(picks[0]!.place)).toBe(cityKey(picks[1]!.place));
+    expect(cityKey(picks[0]!.place)).not.toBe(cityKey(picks[2]!.place));
+  });
+
+  it('does not merge Vancouver, BC and Vancouver, WA in the filter', () => {
+    expect(filterPicks(picks, { city: cityKey(picks[0]!.place) }).map((p) => p.id)).toEqual([
+      'bc1',
+      'bc2',
+    ]);
+    expect(filterPicks(picks, { city: cityKey(picks[2]!.place) }).map((p) => p.id)).toEqual([
+      'wa1',
+    ]);
+  });
+
+  it('makes two chips and tells them apart by region only where the label would repeat', () => {
+    const chips = chipOptions(picks).filter((c) => c.kind === 'city');
+    expect(chips.map((c) => [c.label, c.count])).toEqual([
+      ['Vancouver, BC', 2],
+      ['Portland', 1], // equal counts sort by label
+      ['Vancouver, WA', 1],
+    ]);
+    expect(new Set(chips.map((c) => c.value)).size).toBe(3);
+  });
+
+  it('falls back to the country when there is no region', () => {
+    const chips = chipOptions([
+      pick('a', 'X', 'Vancouver', [], VAN_BC),
+      pick('b', 'Y', 'Vancouver', [], { region: null, country: 'XX' }),
+    ]).filter((c) => c.kind === 'city');
+    expect(chips.map((c) => c.label).sort()).toEqual(['Vancouver, BC', 'Vancouver, XX']);
   });
 });
