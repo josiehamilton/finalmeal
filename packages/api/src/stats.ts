@@ -12,7 +12,10 @@ async function countRows(
   client: FinalMealClient,
   table: 'profiles' | 'places' | 'dishes' | 'picks',
 ): Promise<number> {
-  const { count, error } = await client.from(table).select('*', { count: 'exact', head: true });
+  const { count, error } = await client
+    .from(table)
+    .select('*', { count: 'exact', head: true })
+    .retry(false);
   throwIfError(error);
   return count ?? 0;
 }

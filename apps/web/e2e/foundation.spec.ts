@@ -38,10 +38,13 @@ test.describe('foundation page with the local database', () => {
 
 test.describe('foundation page when the API is unreachable', () => {
   test('keeps the page and says the kitchen is unreachable', async ({ page }) => {
+    const started = Date.now();
     const response = await page.goto(`${BROKEN_API_URL}/`);
     expect(response?.status()).toBe(200);
     await expect(page.getByRole('heading', { level: 1, name: 'Final Meal' })).toBeVisible();
     await expect(page.getByText('Can’t reach the kitchen right now.')).toBeVisible();
+    // The visitor must not stare at a blank tab while the backend is down.
+    expect(Date.now() - started).toBeLessThan(3000);
     await expect(page.getByText(/people/)).toHaveCount(0);
   });
 });

@@ -9,8 +9,20 @@ export interface FinalMealClientOptions {
   url: string;
   /** Publishable key (or legacy anon key). Never the service-role key. */
   key: string;
+  /** Upper bound for each request, in milliseconds. Defaults to 2500. */
+  timeoutMs?: number;
 }
 
+export const DEFAULT_TIMEOUT_MS = 2500;
+
 export function createFinalMealClient(opts: FinalMealClientOptions): FinalMealClient {
-  return createClient<Database>(opts.url, opts.key);
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  // A request that hangs (black-holed host) must not hang its caller: bound every request,
+  // combined with any signal the caller passes.
+  const boundedFetch: typeof fetch = (input, init) => {
+    const timeout = AbortSignal.timeout(timeoutMs);
+    const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+    return fetch(input, { ...init, signal });
+  };
+  return createClient<Database>(opts.url, opts.key, { global: { fetch: boundedFetch } });
 }

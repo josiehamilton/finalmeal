@@ -7,12 +7,9 @@ describe('loadStatsLine', () => {
     expect(await loadStatsLine('http://127.0.0.1:54321', '')).toBeNull();
   });
 
-  // supabase-js retries refused connections with backoff (about 7s) before giving up.
-  it(
-    'returns null instead of throwing when the API is unreachable',
-    { timeout: 20_000 },
-    async () => {
-      expect(await loadStatsLine('http://127.0.0.1:1', 'not-a-real-key')).toBeNull();
-    },
-  );
+  it('returns null, quickly, instead of throwing when the API is unreachable', async () => {
+    const started = Date.now();
+    expect(await loadStatsLine('http://127.0.0.1:1', 'not-a-real-key')).toBeNull();
+    expect(Date.now() - started).toBeLessThan(3000);
+  });
 });

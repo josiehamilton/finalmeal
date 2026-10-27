@@ -22,6 +22,8 @@ Final Meal keeps all of its data (people, dishes, places, picks, lists) in a Sup
 | `apps/mobile/.env.local` | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY` |
 | `packages/api/.env.test.local` | `SUPABASE_URL`, `SUPABASE_KEY` (read by the `@finalmeal/api` integration tests) |
 
+`NEXT_PUBLIC_*` values are baked in at `next build`, so each environment's web build must be run with that environment's values.
+
 Apps must only ever be given the publishable key. The service-role key is never written to a file.
 
 `@finalmeal/api` tests: `pnpm --filter @finalmeal/api test` (unit, no Supabase needed) and `pnpm --filter @finalmeal/api test:integration` (needs Supabase running, seeded, and `pnpm env:local` run). After a schema change, refresh `packages/api/src/database.types.ts` with `pnpm --filter @finalmeal/api gen:types`.

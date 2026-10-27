@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createFinalMealClient, getFoundationStats, throwIfError } from './index';
+import { ApiError, createFinalMealClient, getFoundationStats, throwIfError } from './index';
 import type { FinalMealClient } from './index';
 
 const ENV_FILE = fileURLToPath(new URL('../.env.test.local', import.meta.url));
@@ -56,5 +56,14 @@ describe('against local Supabase (seeded)', () => {
       })
       .then(({ error }) => throwIfError(error));
     await expect(attempt).rejects.toMatchObject({ name: 'ApiError', code: '42501' });
+  });
+});
+
+describe('when the backend is unreachable', () => {
+  it('rejects with an ApiError within 3s instead of retrying for several seconds', async () => {
+    const client = createFinalMealClient({ url: 'http://127.0.0.1:1', key: 'unused' });
+    const started = Date.now();
+    await expect(getFoundationStats(client)).rejects.toBeInstanceOf(ApiError);
+    expect(Date.now() - started).toBeLessThan(3000);
   });
 });
