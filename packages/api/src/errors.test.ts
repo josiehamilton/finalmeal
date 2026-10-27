@@ -39,6 +39,15 @@ describe('throwIfError', () => {
     ).toThrow(expect.objectContaining({ code: 'network' }));
   });
 
+  it.each(['The request timed out after 15000 ms', 'The operation was aborted due to timeout'])(
+    'maps an auth-js retryable fetch error saying "%s" to timeout',
+    (message) => {
+      expect(() => throwIfError({ name: 'AuthRetryableFetchError', message, status: 0 })).toThrow(
+        expect.objectContaining({ code: 'timeout' }),
+      );
+    },
+  );
+
   it('keeps an empty code for other unnamed failures', () => {
     expect(() => throwIfError({ message: 'something odd', code: '' })).toThrow(
       expect.objectContaining({ code: '' }),

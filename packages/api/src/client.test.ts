@@ -1,7 +1,14 @@
 import { createServer } from 'node:net';
 import type { AddressInfo, Server, Socket } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ApiError, createFinalMealClient, getFoundationStats } from './index';
+import {
+  ApiError,
+  DEFAULT_AUTH_TIMEOUT_MS,
+  createFinalMealClient,
+  getFoundationStats,
+  sendEmailCode,
+  verifyEmailCode,
+} from './index';
 
 let server: Server | undefined;
 const sockets = new Set<Socket>();
@@ -43,20 +50,40 @@ describe('createFinalMealClient request timeout', () => {
     expect(Date.now() - started).toBeLessThan(2000);
   });
 
-  it('only bounds PostgREST reads: an /auth/v1/ request is not aborted at the read timeout', async () => {
+  it('bounds /auth/v1/ requests at authTimeoutMs: signInWithOtp rejects as "timeout"', async () => {
     const url = await listenAndNeverRespond();
-    const client = createFinalMealClient({ url, key: 'unused', timeoutMs: 200 });
-    // Auth calls (for example signInWithOtp waiting on SMTP) can legitimately take longer.
+    const client = createFinalMealClient({ url, key: 'unused', timeoutMs: 5000, authTimeoutMs: 300 });
+    const started = Date.now();
+    const attempt = sendEmailCode(client, 'someone@example.com');
+    await expect(attempt).rejects.toBeInstanceOf(ApiError);
+    await expect(attempt).rejects.toMatchObject({ code: 'timeout' });
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it('bounds verifying a code at authTimeoutMs too', async () => {
+    const url = await listenAndNeverRespond();
+    const client = createFinalMealClient({ url, key: 'unused', timeoutMs: 5000, authTimeoutMs: 300 });
+    await expect(verifyEmailCode(client, 'someone@example.com', '123456')).rejects.toMatchObject({
+      code: 'timeout',
+    });
+  });
+
+  it('keeps the auth bound separate from the read bound: auth waits past timeoutMs', async () => {
+    const url = await listenAndNeverRespond();
+    const client = createFinalMealClient({ url, key: 'unused', timeoutMs: 200, authTimeoutMs: 5000 });
     const request = client.auth.signInWithOtp({ email: 'someone@example.com' });
-    const settledEarly = await Promise.race([
-      request.then(
-        () => true,
-        () => true,
-      ),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 800)),
-    ]);
-    // The test's own wait ended first, so the request was still pending well past 200 ms.
-    expect(settledEarly).toBe(false);
+    expect(await settlesWithin(request, 800)).toBe(false);
+  });
+
+  it('defaults the auth bound to 15000 ms', () => {
+    expect(DEFAULT_AUTH_TIMEOUT_MS).toBe(15000);
+  });
+
+  it('does not bound Storage requests', async () => {
+    const url = await listenAndNeverRespond();
+    const client = createFinalMealClient({ url, key: 'unused', timeoutMs: 200, authTimeoutMs: 200 });
+    const request = client.storage.from('avatars').upload('x.jpg', new ArrayBuffer(4));
+    expect(await settlesWithin(request, 800)).toBe(false);
   });
 
   it('does not bound a PostgREST write: a POST to /rest/v1/ is not aborted at the read timeout', async () => {

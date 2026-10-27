@@ -1,5 +1,5 @@
 export type { Database } from './database.types';
-export { createFinalMealClient } from './client';
+export { DEFAULT_AUTH_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, createFinalMealClient } from './client';
 export type { FinalMealClient, FinalMealClientOptions } from './client';
 export { ApiError, throwIfError } from './errors';
 export type { FriendlyCode } from './errors';

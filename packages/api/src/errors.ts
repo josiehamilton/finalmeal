@@ -88,8 +88,12 @@ function codeFor(error: ErrorLike): string {
     if (/^(TimeoutError|AbortError)\b/.test(error.message)) return 'timeout';
     if (FETCH_FAILURE.test(error.message)) return 'network';
   }
-  // auth-js wraps a failed fetch (status 0) in this error.
-  if (error.name === 'AuthRetryableFetchError') return 'network';
+  // auth-js wraps a failed fetch (status 0) in this error: a timeout we raised, or a lost network.
+  if (error.name === 'AuthRetryableFetchError') {
+    return /^(TimeoutError|AbortError)\b|timed out|aborted due to timeout/.test(error.message)
+      ? 'timeout'
+      : 'network';
+  }
   if (code === 'otp_expired') return 'code_expired';
   if (code === 'invalid_credentials' || code === 'otp_disabled') return 'invalid_code';
   if (RATE_LIMIT_CODES.has(code) || error.status === 429) return 'rate_limited';
