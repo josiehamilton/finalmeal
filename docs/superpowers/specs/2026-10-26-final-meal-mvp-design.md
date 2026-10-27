@@ -184,7 +184,7 @@ These apply until Josie decides otherwise; each is a single setting to change.
 
 ## 8. Local development (Docker)
 
-- **Prerequisites on Josie's Mac:** Docker Desktop (installed; must be running), Node (installed), Xcode + iOS Simulator (installed), pnpm (Claude installs it). Android Studio + emulator is installed **only after asking Josie** (several GB).
+- **Prerequisites on Josie's Mac:** Docker Desktop (installed; must be running), Node (installed), Xcode + iOS Simulator with Expo Go installed in it (installed), pnpm (Claude installs it). The Supabase CLI is not a global install: it is pinned in the root `package.json` and arrives with `pnpm install`. Android Studio + emulator is installed **only after asking Josie** (several GB).
 - **`supabase start`** runs Postgres (PostGIS, pg_trgm), Auth, Storage, Realtime, Edge Functions, Studio, and a local inbox (Inbucket/Mailpit) that catches sign-in code emails.
 - **`pnpm dev`** runs Next.js (`localhost:3000`) and Expo (development build on the iOS Simulator).
 - **Seed data** covers the canvas cast (Josie, Mike, Ari, Alli, Dev, Sam), their dishes and places (Marutama, Kin Kao, Miku, Skewers, …), sample shared lists, and the Vancouver places extract.

@@ -6,7 +6,9 @@ A social food app for iOS, Android and the web. Each person picks the five dishe
 
 - **Docker Desktop**, running. The local database lives in Docker.
 - **Node 22 or newer**, plus **pnpm** (`npm install -g pnpm`).
-- **Xcode**, for the iPhone Simulator.
+- **Xcode**, for the iPhone Simulator, with **Expo Go** installed in the Simulator. If it isn't there yet, run `pnpm --filter @finalmeal/mobile ios` once: it opens the Simulator and installs Expo Go (stop it with Ctrl+C afterwards).
+
+The database tool (the Supabase CLI) is not a separate install: `pnpm install` adds the exact version the project uses.
 
 ## Get it running
 
