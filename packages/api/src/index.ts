@@ -19,3 +19,20 @@ export type { City } from './cities';
 export { looksLikeJpeg, uploadMyAvatar } from './avatar';
 export { formatStats, getFoundationStats } from './stats';
 export type { FoundationStats } from './stats';
+export { createPersonalTag, searchTags } from './tags';
+export type { Tag, TagKind } from './tags';
+export { createCustomPlace, formatPlaceLabel, getPlace, searchPlaces } from './places';
+export type { Place } from './places';
+export { suggestDishes } from './dishes';
+export type { DishSuggestion } from './dishes';
+export {
+  addPick,
+  demotePick,
+  getMyPicks,
+  getPick,
+  moveFinal,
+  promotePick,
+  removePick,
+  updatePick,
+} from './picks';
+export type { AddPickInput, Pick, PickPatch } from './picks';

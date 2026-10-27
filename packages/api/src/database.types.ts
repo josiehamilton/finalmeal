@@ -238,6 +238,13 @@ export type Database = {
             foreignKeyName: 'dishes_merged_into_id_fkey';
             columns: ['merged_into_id'];
             isOneToOne: false;
+            referencedRelation: 'dish_stats';
+            referencedColumns: ['dish_id'];
+          },
+          {
+            foreignKeyName: 'dishes_merged_into_id_fkey';
+            columns: ['merged_into_id'];
+            isOneToOne: false;
             referencedRelation: 'dishes';
             referencedColumns: ['id'];
           },
@@ -404,6 +411,13 @@ export type Database = {
             foreignKeyName: 'picks_dish_id_fkey';
             columns: ['dish_id'];
             isOneToOne: false;
+            referencedRelation: 'dish_stats';
+            referencedColumns: ['dish_id'];
+          },
+          {
+            foreignKeyName: 'picks_dish_id_fkey';
+            columns: ['dish_id'];
+            isOneToOne: false;
             referencedRelation: 'dishes';
             referencedColumns: ['id'];
           },
@@ -418,9 +432,12 @@ export type Database = {
       };
       places: {
         Row: {
+          address: string | null;
           area: string | null;
           category_ids: string[];
+          category_labels: string[];
           city: string;
+          closed_at: string | null;
           country: string;
           created_at: string;
           created_by: string | null;
@@ -428,16 +445,44 @@ export type Database = {
           location: unknown;
           merged_into_id: string | null;
           name: string;
+          no_fixed_address: boolean;
+          postcode: string | null;
           region: string | null;
+          search_key: string | null;
           source: Database['public']['Enums']['place_source'];
           source_id: string | null;
           updated_at: string;
+          mask_place: {
+            address: string | null;
+            area: string | null;
+            category_ids: string[];
+            category_labels: string[];
+            city: string;
+            closed_at: string | null;
+            country: string;
+            created_at: string;
+            created_by: string | null;
+            id: string;
+            location: unknown;
+            merged_into_id: string | null;
+            name: string;
+            no_fixed_address: boolean;
+            postcode: string | null;
+            region: string | null;
+            search_key: string | null;
+            source: Database['public']['Enums']['place_source'];
+            source_id: string | null;
+            updated_at: string;
+          } | null;
         };
-        ComputedFields: never;
+        ComputedFields: 'mask_place';
         Insert: {
+          address?: string | null;
           area?: string | null;
           category_ids?: string[];
+          category_labels?: string[];
           city: string;
+          closed_at?: string | null;
           country: string;
           created_at?: string;
           created_by?: string | null;
@@ -445,15 +490,21 @@ export type Database = {
           location: unknown;
           merged_into_id?: string | null;
           name: string;
+          no_fixed_address?: boolean;
+          postcode?: string | null;
           region?: string | null;
+          search_key?: never;
           source: Database['public']['Enums']['place_source'];
           source_id?: string | null;
           updated_at?: string;
         };
         Update: {
+          address?: string | null;
           area?: string | null;
           category_ids?: string[];
+          category_labels?: string[];
           city?: string;
+          closed_at?: string | null;
           country?: string;
           created_at?: string;
           created_by?: string | null;
@@ -461,7 +512,10 @@ export type Database = {
           location?: unknown;
           merged_into_id?: string | null;
           name?: string;
+          no_fixed_address?: boolean;
+          postcode?: string | null;
           region?: string | null;
+          search_key?: never;
           source?: Database['public']['Enums']['place_source'];
           source_id?: string | null;
           updated_at?: string;
@@ -643,6 +697,13 @@ export type Database = {
             foreignKeyName: 'saves_dish_id_fkey';
             columns: ['dish_id'];
             isOneToOne: false;
+            referencedRelation: 'dish_stats';
+            referencedColumns: ['dish_id'];
+          },
+          {
+            foreignKeyName: 'saves_dish_id_fkey';
+            columns: ['dish_id'];
+            isOneToOne: false;
             referencedRelation: 'dishes';
             referencedColumns: ['id'];
           },
@@ -747,9 +808,85 @@ export type Database = {
       };
     };
     Views: {
-      [_ in never]: never;
+      dish_stats: {
+        Row: {
+          dish_id: string | null;
+          final_count: number | null;
+          honorable_count: number | null;
+          list_count: number | null;
+        };
+        ComputedFields: never;
+        Relationships: [];
+      };
     };
     Functions: {
+      _begin_pick_write: { Args: Record<PropertyKey, never>; Returns: string };
+      _check_pick_photo: { Args: { p_path: string; p_uid: string }; Returns: undefined };
+      _claim_final_slot: {
+        Args: { p_replace_slot: number; p_uid: string };
+        Returns: Record<string, unknown>;
+      };
+      _close_slot_gap: { Args: { p_slot: number; p_uid: string }; Returns: undefined };
+      _own_pick: {
+        Args: { p_pick_id: string; p_uid: string };
+        Returns: {
+          created_at: string;
+          dish_id: string;
+          id: string;
+          note: string | null;
+          original_dish_name: string;
+          photo_path: string | null;
+          slot: number | null;
+          tier: Database['public']['Enums']['pick_tier'];
+          updated_at: string;
+          user_id: string;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'picks';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      _resolve_dish: {
+        Args: { p_dish_id: string; p_dish_name: string; p_place_id: string };
+        Returns: string;
+      };
+      _set_pick_tags: {
+        Args: { p_personal_tags: string[]; p_pick_id: string; p_tag_ids: string[] };
+        Returns: undefined;
+      };
+      add_pick: {
+        Args: {
+          p_dish_id: string;
+          p_dish_name: string;
+          p_note?: string;
+          p_personal_tags?: string[];
+          p_photo_path?: string;
+          p_place_id: string;
+          p_replace_slot?: number;
+          p_tag_ids?: string[];
+          p_tier: Database['public']['Enums']['pick_tier'];
+        };
+        Returns: {
+          created_at: string;
+          dish_id: string;
+          id: string;
+          note: string | null;
+          original_dish_name: string;
+          photo_path: string | null;
+          slot: number | null;
+          tier: Database['public']['Enums']['pick_tier'];
+          updated_at: string;
+          user_id: string;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'picks';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       apply_tag_vocabulary: { Args: Record<PropertyKey, never>; Returns: undefined };
       city_fold: { Args: { input: string }; Returns: string };
       city_label: {
@@ -760,6 +897,42 @@ export type Database = {
           >;
         };
         Returns: string;
+      };
+      create_custom_place: {
+        Args: {
+          p_address?: string;
+          p_city_id: string;
+          p_name: string;
+          p_no_fixed_address?: boolean;
+        };
+        Returns: {
+          address: string | null;
+          area: string | null;
+          category_ids: string[];
+          category_labels: string[];
+          city: string;
+          closed_at: string | null;
+          country: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          location: unknown;
+          merged_into_id: string | null;
+          name: string;
+          no_fixed_address: boolean;
+          postcode: string | null;
+          region: string | null;
+          search_key: string | null;
+          source: Database['public']['Enums']['place_source'];
+          source_id: string | null;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'places';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
       };
       create_my_profile: {
         Args: { p_display_name: string; p_username: string };
@@ -808,6 +981,27 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      demote_pick: {
+        Args: { p_pick_id: string };
+        Returns: {
+          created_at: string;
+          dish_id: string;
+          id: string;
+          note: string | null;
+          original_dish_name: string;
+          photo_path: string | null;
+          slot: number | null;
+          tier: Database['public']['Enums']['pick_tier'];
+          updated_at: string;
+          user_id: string;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'picks';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       finish_onboarding: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -835,7 +1029,95 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      get_place: {
+        Args: { p_id: string };
+        Returns: {
+          address: string | null;
+          area: string | null;
+          category_ids: string[];
+          category_labels: string[];
+          city: string;
+          closed_at: string | null;
+          country: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          location: unknown;
+          merged_into_id: string | null;
+          name: string;
+          no_fixed_address: boolean;
+          postcode: string | null;
+          region: string | null;
+          search_key: string | null;
+          source: Database['public']['Enums']['place_source'];
+          source_id: string | null;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'places';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       is_username_available: { Args: { p_username: string }; Returns: boolean };
+      mask_place: {
+        Args: {
+          p: Omit<
+            Database['public']['Tables']['places']['Row'],
+            Database['public']['Tables']['places']['ComputedFields']
+          >;
+        };
+        Returns: {
+          address: string | null;
+          area: string | null;
+          category_ids: string[];
+          category_labels: string[];
+          city: string;
+          closed_at: string | null;
+          country: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          location: unknown;
+          merged_into_id: string | null;
+          name: string;
+          no_fixed_address: boolean;
+          postcode: string | null;
+          region: string | null;
+          search_key: string | null;
+          source: Database['public']['Enums']['place_source'];
+          source_id: string | null;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: 'places';
+          to: 'places';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      move_final: {
+        Args: { p_pick_id: string; p_to_slot: number };
+        Returns: {
+          created_at: string;
+          dish_id: string;
+          id: string;
+          note: string | null;
+          original_dish_name: string;
+          photo_path: string | null;
+          slot: number | null;
+          tier: Database['public']['Enums']['pick_tier'];
+          updated_at: string;
+          user_id: string;
+        }[];
+        SetofOptions: {
+          from: '*';
+          to: 'picks';
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
       nearest_city: {
         Args: { lat: number; lng: number };
         Returns: {
@@ -858,6 +1140,7 @@ export type Database = {
         };
       };
       normalize_dish_name: { Args: { input: string }; Returns: string };
+      place_search_key: { Args: { input: string }; Returns: string };
       popular_tags: {
         Args: { p_kind: Database['public']['Enums']['tag_kind'] };
         Returns: {
@@ -878,6 +1161,28 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      promote_pick: {
+        Args: { p_pick_id: string; p_replace_slot?: number };
+        Returns: {
+          created_at: string;
+          dish_id: string;
+          id: string;
+          note: string | null;
+          original_dish_name: string;
+          photo_path: string | null;
+          slot: number | null;
+          tier: Database['public']['Enums']['pick_tier'];
+          updated_at: string;
+          user_id: string;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'picks';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      remove_pick: { Args: { p_pick_id: string }; Returns: undefined };
       search_cities: {
         Args: { lim?: number; q: string };
         Returns: {
@@ -898,6 +1203,13 @@ export type Database = {
           isOneToOne: false;
           isSetofReturn: true;
         };
+      };
+      search_places: {
+        Args: { p_lat?: number; p_lim?: number; p_lng?: number; p_q: string };
+        Returns: {
+          distance_m: number;
+          place: Database['public']['Tables']['places']['Row'];
+        }[];
       };
       search_tags: {
         Args: { p_kind: Database['public']['Enums']['tag_kind']; p_lim?: number; p_q: string };
@@ -946,7 +1258,41 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      suggest_dishes: {
+        Args: { p_lim?: number; p_place_id: string; p_q: string };
+        Returns: {
+          dish: Database['public']['Tables']['dishes']['Row'];
+          pick_count: number;
+        }[];
+      };
       tag_slug: { Args: { input: string }; Returns: string };
+      update_pick: {
+        Args: {
+          p_note: string;
+          p_personal_tags: string[];
+          p_photo_path: string;
+          p_pick_id: string;
+          p_tag_ids: string[];
+        };
+        Returns: {
+          created_at: string;
+          dish_id: string;
+          id: string;
+          note: string | null;
+          original_dish_name: string;
+          photo_path: string | null;
+          slot: number | null;
+          tier: Database['public']['Enums']['pick_tier'];
+          updated_at: string;
+          user_id: string;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'picks';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
     };
     Enums: {
       activity_type:

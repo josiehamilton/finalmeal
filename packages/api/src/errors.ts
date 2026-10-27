@@ -12,6 +12,17 @@ export type FriendlyCode =
   | 'profile_exists'
   | 'city_not_found'
   | 'profile_not_found'
+  | 'final_full'
+  | 'duplicate_pick'
+  | 'place_not_found'
+  | 'invalid_dish_name'
+  | 'invalid_place_name'
+  | 'pick_not_found'
+  | 'invalid_photo'
+  | 'invalid_slot'
+  | 'invalid_tag'
+  | 'invalid_tag_name'
+  | 'address_required'
   | 'timeout'
   | 'network'
   | 'unknown';
@@ -26,6 +37,17 @@ const FRIENDLY_CODES: ReadonlySet<string> = new Set<FriendlyCode>([
   'profile_exists',
   'city_not_found',
   'profile_not_found',
+  'final_full',
+  'duplicate_pick',
+  'place_not_found',
+  'invalid_dish_name',
+  'invalid_place_name',
+  'pick_not_found',
+  'invalid_photo',
+  'invalid_slot',
+  'invalid_tag',
+  'invalid_tag_name',
+  'address_required',
   'timeout',
   'network',
   'unknown',
@@ -64,6 +86,18 @@ const DOMAIN_MESSAGES: ReadonlySet<string> = new Set([
   'invalid_username',
   'city_not_found',
   'profile_not_found',
+  'rate_limited',
+  'final_full',
+  'duplicate_pick',
+  'place_not_found',
+  'invalid_dish_name',
+  'invalid_place_name',
+  'pick_not_found',
+  'invalid_photo',
+  'invalid_slot',
+  'invalid_tag',
+  'invalid_tag_name',
+  'address_required',
 ]);
 
 const RATE_LIMIT_CODES: ReadonlySet<string> = new Set([

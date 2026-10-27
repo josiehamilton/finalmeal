@@ -36,11 +36,14 @@ describe('against local Supabase (seeded)', () => {
   });
 
   it('counts the seeded people, places, dishes and picks', async () => {
-    // The sign-up tests in this package add people while they run (and leave them behind until
-    // the next `pnpm db:reset`), so people is "at least the 6 seeded"; the rest is exact.
+    // The sign-up and pick tests in this package add people, places, dishes and picks while they
+    // run (and leave them behind until the next `pnpm db:reset`), so each count is "at least the
+    // seeded ones".
     const stats = await getFoundationStats(client);
     expect(stats.people).toBeGreaterThanOrEqual(6);
-    expect(stats).toMatchObject({ places: 14, dishes: 17, picks: 28 });
+    expect(stats.places).toBeGreaterThanOrEqual(14);
+    expect(stats.dishes).toBeGreaterThanOrEqual(17);
+    expect(stats.picks).toBeGreaterThanOrEqual(28);
   });
 
   it('rejects an anonymous insert into picks with the RLS error code', async () => {

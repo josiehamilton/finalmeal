@@ -12,9 +12,10 @@ async function countRows(
   client: FinalMealClient,
   table: 'profiles' | 'places' | 'dishes' | 'picks',
 ): Promise<number> {
+  // Name a column: clients cannot `select *` from places (column grants hide created_by).
   const { count, error } = await client
     .from(table)
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .retry(false);
   throwIfError(error);
   return count ?? 0;

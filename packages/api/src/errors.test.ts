@@ -80,6 +80,18 @@ describe('throwIfError', () => {
     'invalid_username',
     'city_not_found',
     'profile_not_found',
+    'rate_limited',
+    'final_full',
+    'duplicate_pick',
+    'place_not_found',
+    'invalid_dish_name',
+    'invalid_place_name',
+    'pick_not_found',
+    'invalid_photo',
+    'invalid_slot',
+    'invalid_tag',
+    'invalid_tag_name',
+    'address_required',
   ])('maps the P0001 message %s to the same-named code', (message) => {
     expect(() => throwIfError({ message, code: 'P0001' })).toThrow(
       expect.objectContaining({ code: message }),

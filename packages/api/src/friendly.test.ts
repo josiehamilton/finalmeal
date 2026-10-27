@@ -15,6 +15,17 @@ const COPY: Array<[string, string]> = [
   ['profile_exists', 'Something went wrong. Try again.'],
   ['city_not_found', 'Something went wrong. Try again.'],
   ['profile_not_found', 'Something went wrong. Try again.'],
+  ['final_full', 'Your five are full. Choose one to replace.'],
+  ['duplicate_pick', 'That dish is already on your list.'],
+  ['place_not_found', 'We couldn’t find that spot. Try searching again.'],
+  ['invalid_dish_name', 'Give the dish a name (up to 80 characters).'],
+  ['invalid_place_name', 'Give the spot a name (up to 80 characters).'],
+  ['pick_not_found', 'That pick isn’t there any more.'],
+  ['invalid_photo', 'That photo didn’t work. Try another.'],
+  ['invalid_slot', 'That spot in your five doesn’t exist.'],
+  ['invalid_tag', 'Something went wrong. Try again.'],
+  ['address_required', 'Add the street address, or mark it as a food truck or pop-up.'],
+  ['invalid_tag_name', 'Tags can be up to 40 characters.'],
 ];
 
 describe('friendlyMessage', () => {
