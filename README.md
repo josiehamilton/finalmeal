@@ -16,7 +16,7 @@ pnpm dev         # starts the website and the mobile app
 ```
 
 - The website is at http://localhost:3000.
-- For the phone app, `pnpm dev` starts Expo. Press `i` in that terminal to open it in the iPhone Simulator.
+- The phone app's Expo server starts too. With the iPhone Simulator open, run `xcrun simctl openurl booted exp://127.0.0.1:8081` in a second terminal to load the app in Expo Go. (Keyboard shortcuts such as `i` don't work inside `pnpm dev`.)
 - Both show the Final Meal foundation screen with live counts from the local database.
 
 ## Everyday commands
