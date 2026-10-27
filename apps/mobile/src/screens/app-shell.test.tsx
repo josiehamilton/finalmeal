@@ -4,13 +4,14 @@ import AppLayout from '../../app/(app)/_layout';
 import TabsLayout from '../../app/(app)/(tabs)/_layout';
 import Feed from '../../app/(app)/(tabs)/feed';
 import Discover from '../../app/(app)/(tabs)/discover';
-import Add from '../../app/(app)/(tabs)/add';
 import Saved from '../../app/(app)/(tabs)/saved';
 import You from '../../app/(app)/(tabs)/you';
 import Settings from '../../app/(app)/settings/index';
 import EditProfile from '../../app/(app)/settings/edit-profile';
 import Privacy from '../../app/(app)/settings/privacy';
 import HomeCity from '../../app/(app)/settings/home-city';
+import AddLayout from '../../app/(app)/add/_layout';
+import AddDish from '../../app/(app)/add/index';
 
 function Welcome() {
   return <Text>WELCOME</Text>;
@@ -20,6 +21,12 @@ function Welcome() {
 // structure: tabs, Settings pushed over them, and back.
 jest.mock('../lib/supabase', () => ({ getSupabase: () => ({ fake: 'client' }) }));
 let mockSignedIn = true;
+jest.mock('@finalmeal/api', () => ({
+  ...jest.requireActual('@finalmeal/api'),
+  getMyPicks: jest.fn().mockResolvedValue([]),
+  searchTags: jest.fn().mockResolvedValue([]),
+  suggestDishes: jest.fn().mockResolvedValue([]),
+}));
 jest.mock('../providers/SessionProvider', () => ({
   useSession: () => ({
     session: mockSignedIn ? {} : null,
@@ -37,9 +44,10 @@ const routes = () => ({
   '(app)/(tabs)/_layout': TabsLayout,
   '(app)/(tabs)/feed': Feed,
   '(app)/(tabs)/discover': Discover,
-  '(app)/(tabs)/add': Add,
   '(app)/(tabs)/saved': Saved,
   '(app)/(tabs)/you': You,
+  '(app)/add/_layout': AddLayout,
+  '(app)/add/index': AddDish,
   '(app)/settings/index': Settings,
   '(app)/settings/edit-profile': EditProfile,
   '(app)/settings/privacy': Privacy,
@@ -76,6 +84,18 @@ describe('app shell navigation', () => {
     expect(await screen.findByText('@josiehamilton')).toBeOnTheScreen();
     expect(screen.queryByText('Log out')).toBeNull();
     expect(screen.getByRole('button', { name: 'Add a dish' })).toBeOnTheScreen();
+  });
+
+  it('opens Add a dish as a modal over the tabs from the + button, and closing returns to You', async () => {
+    await renderRouter(routes(), { initialUrl: '/(app)/you' });
+    await screen.findByText('@josiehamilton');
+    await fireEvent.press(screen.getByRole('button', { name: 'Add a dish' }));
+    expect(await screen.findByPlaceholderText('e.g. Smash Burger')).toBeOnTheScreen();
+    expect(screen.getByText('Choose a restaurant')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    expect(await screen.findByText('@josiehamilton')).toBeOnTheScreen();
+    expect(screen.queryByPlaceholderText('e.g. Smash Burger')).toBeNull();
   });
 
   it('opens Edit profile from You and returns to You', async () => {

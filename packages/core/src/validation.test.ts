@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   BIO_MAX,
+  DISH_NAME_MAX,
+  FINAL_MEAL_SIZE,
+  NOTE_MAX,
+  PLACE_ADDRESS_MAX,
+  PLACE_NAME_MAX,
+  TAG_NAME_MAX,
   DISPLAY_NAME_MAX,
   ONBOARDING_STEPS,
   PLACEHOLDER_LINK_DOMAIN,
@@ -42,6 +48,10 @@ describe('constants', () => {
   it('has the agreed limits', () => {
     expect(DISPLAY_NAME_MAX).toBe(60);
     expect(BIO_MAX).toBe(100);
+    expect([DISH_NAME_MAX, PLACE_NAME_MAX, PLACE_ADDRESS_MAX, NOTE_MAX, TAG_NAME_MAX]).toEqual([
+      80, 80, 200, 280, 40,
+    ]);
+    expect(FINAL_MEAL_SIZE).toBe(5);
     expect(ONBOARDING_STEPS).toBe(6);
     expect(PLACEHOLDER_LINK_DOMAIN).toBe('finalmeal.example');
   });

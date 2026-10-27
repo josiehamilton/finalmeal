@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FinalMealClient } from './client';
-import { formatCityLabel, nearestCity, searchCities } from './cities';
+import { formatCityLabel, getCity, nearestCity, searchCities } from './cities';
 
 describe('formatCityLabel', () => {
   it('uses the region code for Canada', () => {
@@ -100,5 +100,39 @@ describe('searchCities', () => {
 describe('nearestCity', () => {
   it('returns null for coordinates that are not finite numbers without calling the backend', async () => {
     await expect(nearestCity(clientThatMustNotBeCalled(), Number.NaN, 5)).resolves.toBeNull();
+  });
+});
+
+describe('getCity', () => {
+  function clientReading(data: unknown) {
+    const retry = vi.fn().mockResolvedValue({ data, error: null });
+    const eq = vi.fn(() => ({ maybeSingle: () => ({ retry }) }));
+    const select = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ select }));
+    return { client: { from } as unknown as FinalMealClient, from, eq };
+  }
+
+  it('returns the city with its point (longitude first in GeoJSON)', async () => {
+    const { client, from, eq } = clientReading({
+      id: 'c1',
+      name: 'Vancouver',
+      region_code: 'BC',
+      region_name: 'British Columbia',
+      country: 'CA',
+      country_name: 'Canada',
+      location: { type: 'Point', coordinates: [-123.1207, 49.2827] },
+    });
+    await expect(getCity(client, 'c1')).resolves.toMatchObject({
+      id: 'c1',
+      label: 'Vancouver, BC, Canada',
+      lat: 49.2827,
+      lng: -123.1207,
+    });
+    expect(from).toHaveBeenCalledWith('cities');
+    expect(eq).toHaveBeenCalledWith('id', 'c1');
+  });
+
+  it('returns null when there is no such city', async () => {
+    await expect(getCity(clientReading(null).client, 'nope')).resolves.toBeNull();
   });
 });

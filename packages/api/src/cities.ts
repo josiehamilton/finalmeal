@@ -1,6 +1,7 @@
 import type { FinalMealClient } from './client';
 import { throwIfError } from './errors';
 import type { Database } from './database.types';
+import { readPoint } from './places';
 
 export interface City {
   id: string;
@@ -73,4 +74,22 @@ export async function nearestCity(
   // A function returning a row type answers with an all-null row when nothing matched.
   if (!data || data.id == null) return null;
   return toCity(data);
+}
+
+export type CityWithPoint = City & { lat: number; lng: number };
+
+/**
+ * One city by id with its map point, or null when there is no such city. The point is only for
+ * ranking place search around a chosen city; it is never the person's own location.
+ */
+export async function getCity(client: FinalMealClient, id: string): Promise<CityWithPoint | null> {
+  const { data, error } = await client
+    .from('cities')
+    .select('id, name, region_code, region_name, country, country_name, location')
+    .eq('id', id)
+    .maybeSingle()
+    .retry(false);
+  throwIfError(error);
+  if (!data) return null;
+  return { ...toCity(data), ...readPoint(data.location) };
 }

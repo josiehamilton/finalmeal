@@ -55,11 +55,22 @@ function LocateIcon() {
 interface CityPickerProps {
   /** The chosen city, or null while nothing (or something edited) is chosen. */
   onChange: (city: City | null) => void;
+  /** Text to start with, such as the label of a city that is already chosen. */
+  initialLabel?: string;
+  /**
+   * Whether to offer "Use my current location". Leave it on for choosing where you live; turn it
+   * off wherever the phone's position must never be used (the Add-a-dish flow is a post-meal diary).
+   */
+  allowCurrentLocation?: boolean;
 }
 
-/** Type-ahead city search plus "Use my current location". */
-export function CityPicker({ onChange }: CityPickerProps) {
-  const [text, setText] = useState('');
+/** Type-ahead city search plus (unless turned off) "Use my current location". */
+export function CityPicker({
+  onChange,
+  initialLabel = '',
+  allowCurrentLocation = true,
+}: CityPickerProps) {
+  const [text, setText] = useState(initialLabel);
   const [results, setResults] = useState<City[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -177,16 +188,18 @@ export function CityPicker({ onChange }: CityPickerProps) {
         ) : null}
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Use my current location"
-        accessibilityState={{ busy: locating }}
-        onPress={useCurrentLocation}
-        style={styles.locate}
-      >
-        <LocateIcon />
-        <Text style={styles.locateText}>Use my current location</Text>
-      </Pressable>
+      {allowCurrentLocation ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Use my current location"
+          accessibilityState={{ busy: locating }}
+          onPress={useCurrentLocation}
+          style={styles.locate}
+        >
+          <LocateIcon />
+          <Text style={styles.locateText}>Use my current location</Text>
+        </Pressable>
+      ) : null}
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
     </View>
   );

@@ -51,7 +51,7 @@ export function formatPlaceLabel(p: {
  * Reads a point from what PostgREST sends for a geography column: an (E)WKB hex string
  * (PostGIS's default text form) or, in case the column is ever cast, a GeoJSON point.
  */
-function readPoint(location: unknown): { lat: number; lng: number } {
+export function readPoint(location: unknown): { lat: number; lng: number } {
   if (typeof location === 'string') {
     const point = readWkbPoint(location);
     if (point) return point;

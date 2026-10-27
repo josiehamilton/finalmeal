@@ -19,6 +19,27 @@ const GLYPHS = {
   ),
   bookmark: <Path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />,
   back: <Path d="m15 18-6-6 6-6" />,
+  close: <Path d="M18 6 6 18M6 6l12 12" />,
+  search: (
+    <>
+      <Circle cx={11} cy={11} r={7} />
+      <Path d="m21 21-4.3-4.3" />
+    </>
+  ),
+  tag: (
+    <>
+      <Path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z" />
+      <Circle cx={7} cy={7} r={1.5} />
+    </>
+  ),
+  chevUp: <Path d="m18 15-6-6-6 6" />,
+  image: (
+    <>
+      <Rect x={3} y={3} width={18} height={18} rx={2} />
+      <Circle cx={8.5} cy={8.5} r={1.5} />
+      <Path d="m21 15-5-5L5 21" />
+    </>
+  ),
   chev: <Path d="m9 18 6-6-6-6" />,
   pin: (
     <>

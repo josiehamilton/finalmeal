@@ -14,8 +14,8 @@ export {
   updateMyProfile,
 } from './profile';
 export type { MyProfile, ProfilePatch } from './profile';
-export { formatCityLabel, nearestCity, searchCities } from './cities';
-export type { City } from './cities';
+export { formatCityLabel, getCity, nearestCity, searchCities } from './cities';
+export type { City, CityWithPoint } from './cities';
 export { looksLikeJpeg, uploadMyAvatar } from './avatar';
 export { formatStats, getFoundationStats } from './stats';
 export type { FoundationStats } from './stats';

@@ -18,8 +18,13 @@ const TABS: { name: string; label: string; icon: IconName }[] = [
   { name: 'you', label: 'You', icon: 'user' },
 ];
 
+interface TabBarOwnProps {
+  /** The centre + is not a tab: it opens the Add-a-dish flow. */
+  onAdd: () => void;
+}
+
 /** The canvas tab bar: Feed, Discover, a centre ember +, Saved, You. */
-export function TabBar({ state, emitter, navigateToTab }: TabBarProps) {
+export function TabBar({ state, emitter, navigateToTab, onAdd }: TabBarProps & TabBarOwnProps) {
   const current = state.routes[state.index]?.name;
 
   function press(name: string) {
@@ -40,8 +45,7 @@ export function TabBar({ state, emitter, navigateToTab }: TabBarProps) {
                 key={name}
                 accessibilityRole="button"
                 accessibilityLabel={label}
-                accessibilityState={{ selected: on }}
-                onPress={() => press(name)}
+                onPress={onAdd}
                 style={styles.add}
               >
                 <Icon name="plus" size={26} color={colors.white} strokeWidth={2.25} />
