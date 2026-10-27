@@ -24,8 +24,12 @@ A social food app (iOS, Android, web). Each person picks the five dishes for the
 ## Current status
 
 - **Phase 1 (Foundations): done and merged to `main`** (2026-10-27). Monorepo, brand tokens, local Supabase schema/RLS/seed, typed API client, web and mobile foundation screens, CI.
-- **Phase 2 (Accounts & profile): built, reviewed and device-verified on branch `phase-2-accounts-profile`** (iPhone 17 and Pixel 10, 2026-10-27; device fixes reviewed on Opus 5.5; CI green). **Awaiting Josie's OK to merge into `main`.** Plan: `docs/superpowers/plans/2026-10-27-phase-2-accounts-profile.md`. Next up is the Phase 3 plan.
+- **Phase 2 (Accounts & profile): merged to `main`** (2026-10-27).
+- **Phase 3 (Places, dishes & your Final Meal): plan at `docs/superpowers/plans/2026-10-27-phase-3-places-dishes.md`, awaiting Josie's review.** The real Vancouver restaurant extract waits on her Hugging Face token (needs list item 1); everything else can be built first.
+- _(history)_ Phase 2 was built, reviewed and device-verified on branch `phase-2-accounts-profile` (iPhone 17 and Pixel 10, 2026-10-27; device fixes reviewed on Opus 5.5; CI green). **Awaiting Josie's OK to merge into `main`.** Plan: `docs/superpowers/plans/2026-10-27-phase-2-accounts-profile.md`. Next up is the Phase 3 plan.
 - **Leftovers and later work:** `docs/known-gaps.md`.
+- **What Claude needs from Josie** (accounts, keys, design, decisions): `docs/needs-from-josie.md`. Keep it current: add each new need when it comes up and move items to "Done" when she finishes them. Remind her of anything that's about to block a phase.
+- **Product framing:** Final Meal is a post-meal diary. People often log dishes after they've left, so features must never depend on the phone's current location. Places are found by a chosen city; custom spots take an address, not a map pin.
 - **Dev:** `pnpm bootstrap` once, then `pnpm dev` (web at http://localhost:3000, Expo for the mobile app). See `README.md`.
 - **Devices (Josie's Mac only):** iPhone 17 simulator and the `Pixel_10` Android emulator, both running the app in Expo Go.
 - **Placeholders until Josie decides:** link domain `finalmeal.example`; a generated ember-skull app icon and splash.

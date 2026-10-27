@@ -32,7 +32,7 @@ Feed ads + paid ad removal (pricing decided after the cost model), story-image s
 |---|---|
 | Name and brand | **Final Meal**. Ember `#C04B28` + Ember Glow `#E8693F` only. Instrument Serif wordmark, Newsreader for display text, Manrope for UI. The skull marks Final Meal only; Honorable uses a bone dot or outline badge. |
 | Stack | Expo (React Native) for iOS + Android, Next.js for the web, Supabase backend, TypeScript throughout, one monorepo |
-| Places | Foursquare Open Source Places (Apache 2.0, monthly) imported into our own database; custom place fallback (name + pin) |
+| Places | Foursquare Open Source Places (Apache 2.0, monthly) imported into our own database; custom place fallback (name + optional address + city) |
 | Dish identity | Suggest existing dishes at the place while typing; normalise and fuzzy-match names; merges keep each person's original wording |
 | Sign-in | Email code, Apple, Google. No phone at sign-up; phone verification only as a step-up for flagged accounts |
 | Authenticity | Core requirement: device attestation, trusted-only counts and rankings, pattern checks, owner disclosure, reporting |
@@ -130,7 +130,9 @@ Apple and Google sign-in skip steps 1–2 and land on Name. Their buttons stay h
 
 ### 5.2 Add a dish (one screen)
 
-1. **Restaurant search.** `search_places(query, near)` queries our `places` table with trigram matching on the name, ranked by distance from the person's current or home location. "Can't find it? Add it" creates a custom place (name + map pin + city).
+1. **Restaurant search.** Final Meal is a post-meal diary: people often log a dish after they've left or after a trip, so nothing uses their current location.
+   - `search_places(query, city point)` queries our `places` table with trigram matching on the name, ranked near a chosen city. The city defaults to the home city and can be switched in the search.
+   - "Can't find it? Add it" creates a custom place: a name, an optional address and a city. There's no map pin and no location permission.
 2. **Dish field.** As you type, `suggest_dishes(place_id, text)` returns existing dishes at that place, ranked by similarity and pick count ("Tonkotsu Ramen · 14 picks here"). Choosing a suggestion links to it. Typing a new name creates a dish, and its `name_key` normalisation (lower case, accents removed, whitespace and punctuation collapsed, simple plural folding) prevents near-duplicates. If an unchosen name is a close fuzzy match (similarity ≥ 0.85) to an existing dish at the same place, it's linked and the person's wording is kept in `original_dish_name`.
 3. **Final Meal or Honorable.** Choosing Final Meal with five already filled opens the swap screen, and `swap_final(new, replaced_slot)` moves the replaced pick to Honorable and records `dethroned`, all in one transaction.
 4. **Optional parts:** photo (uploaded straight to storage, resized on read), note, and tags (expanding inline; "More" searches the full food-type and dietary lists; personal tags can be created inline).
