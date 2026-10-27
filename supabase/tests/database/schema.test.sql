@@ -155,15 +155,7 @@ select is(
   (select name from public.dishes where id = '20000000-0000-0000-0000-0000000000f1'),
   'ラーメン', 'dish name round-trips unchanged');
 
--- The owner check must still fire for a signed-in user under RLS. No policies
--- exist yet, so add throwaway ones here (rolled back with the transaction):
--- tags are visible only to their owner, and signed-in users may insert pick_tags.
-create policy tmp_tags_owner_select on public.tags for select to authenticated
-  using (owner_id = auth.uid());
-create policy tmp_pick_tags_insert on public.pick_tags for insert to authenticated
-  with check (true);
-grant insert on public.pick_tags to authenticated;
-
+-- The owner check must still fire for a signed-in user under the real RLS policies.
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);

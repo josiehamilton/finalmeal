@@ -78,10 +78,31 @@ All installed into the `extensions` schema by `20261026233813_extensions_and_typ
 
 ### Tables (schema `public`, row-level security on)
 
-Migrations: `20261026234036_core_tables.sql` and `20261026234037_social_tables.sql`. Policies arrive in a later migration; until then no one but the service role can read or write.
+Migrations: `20261026234036_core_tables.sql` and `20261026234037_social_tables.sql`. Policies are in `20261027000454_rls_baseline.sql` (see Row-level security below).
 
 - Core: `profiles`, `places`, `dishes`, `picks`, `tags`, `pick_tags`
 - Social and operations: `follows`, `saves`, `blocks`, `shared_lists`, `activities`, `notifications`, `push_tokens`, `device_attestations`, `reports`
+
+### Row-level security
+
+Migration: `20261027000454_rls_baseline.sql`; tests: `supabase/tests/database/rls.test.sql`. This is a deliberately simple baseline ("who owns this row"). Phase 3 and Phase 7 will add SQL functions and tighten privacy (private profiles, blocked users, follow requests). "Own" means the row's user column equals the signed-in user. Every update policy also checks that the row stays owned by the caller, so ownership cannot be transferred. Anything without a policy is reachable only through the service role.
+
+| Table | Signed out (`anon`) | Signed in (`authenticated`) |
+|---|---|---|
+| `places`, `dishes` | read | read; no direct writes |
+| `profiles` | read | read; insert and update own |
+| `picks` | read | read; insert, update, delete own |
+| `tags` | read global tags | read global tags and own personal tags; insert, update, delete own personal tags only |
+| `pick_tags` | read when the tag is visible | same; insert and delete when the pick is own |
+| `follows` | none | read; follow as yourself; delete when either party |
+| `saves`, `blocks`, `push_tokens` | none | all operations, own rows only |
+| `device_attestations` | none | read own |
+| `shared_lists` | read active lists | read active lists and own inactive ones; insert, update, delete own |
+| `activities` | none | read; no direct writes |
+| `notifications` | none | read and update own |
+| `reports` | none | insert as yourself; cannot read |
+
+Known gaps left for Phase 3/7: users can edit their own `profiles.trust_level` and `is_business_affiliated`, and set their own follow `status`, because policies are row-level, not column-level.
 
 ### Storage buckets
 
