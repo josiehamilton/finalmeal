@@ -26,6 +26,9 @@ Each item names the phase that closes it.
 
 ## Phase 8: launch
 
+- `KeyboardAvoider` (apps/mobile) adds `StatusBar.currentHeight` on Android to match `measureInWindow`. Verify it on real devices with cutouts, a hidden status bar and landscape; add an Android-platform unit test and an unmount listener-removal assertion.
+- iOS keyboard padding jumps instead of easing; consider animating it with the keyboard's duration.
+
 - Replace the placeholder skull icon and splash with Josie's final designs (re-run `pnpm brand:assets` from new source art).
 - Use development builds instead of Expo Go.
 - Verify the splash background colour on real devices.
