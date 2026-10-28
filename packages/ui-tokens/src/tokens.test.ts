@@ -32,6 +32,21 @@ describe('colors', () => {
   });
 });
 
+describe('translucent colours', () => {
+  it('has only the approved rgba tokens, with scrim the one overlay for photos and sheets', () => {
+    const rgba = Object.entries(colors)
+      .filter(([, v]) => v.startsWith('rgba('))
+      .map(([name]) => name)
+      .sort();
+    expect(rgba).toEqual(['emberWash', 'line', 'lineStrong', 'scrim']);
+    expect(colors.scrim).toBe('rgba(11,10,9,0.6)');
+  });
+
+  it('exposes scrim as a css variable', () => {
+    expect(cssVariables()).toContain('--fm-scrim:rgba(11,10,9,0.6)');
+  });
+});
+
 describe('skull', () => {
   it('uses the path from the brand SVG', () => {
     const svgUrl = new URL('../../../design/brand/icon-skull-small.svg', import.meta.url);

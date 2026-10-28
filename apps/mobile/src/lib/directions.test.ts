@@ -31,6 +31,14 @@ describe('directionsUrl', () => {
     );
   });
 
+  it('strips parentheses from the Android label, which they would end early', () => {
+    const place = { ...PLACE, name: 'Marutama (Bidwell)' };
+    expect(directionsUrl(place, 'android')).toBe(
+      'geo:49.29,-123.13?q=49.29,-123.13(Marutama%20Bidwell)',
+    );
+    expect(directionsUrl(place, 'ios')).toContain('q=Marutama%20(Bidwell)');
+  });
+
   it('uses name, address and city for a custom spot, never its coordinates', () => {
     expect(directionsUrl(CUSTOM, 'ios')).toBe(
       'https://maps.apple.com/?q=Taco%20Truck%2C%20123%20Main%20St%2C%20Vancouver',

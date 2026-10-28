@@ -19,9 +19,11 @@ import { pickPhoto } from '../lib/pick-photo';
 import { PLACE, RAMEN, VEGAN, readDraft, withDraft } from '../test-support/add-dish';
 import { resetPickChanges, usePhotoNotice } from '../state/pick-changes';
 
+const mockModalSetOptions = jest.fn();
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), dismissTo: jest.fn() };
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
+  useNavigation: () => ({ getParent: () => ({ setOptions: mockModalSetOptions }) }),
   useFocusEffect: (cb: () => void | (() => void)) => jest.requireActual('react').useEffect(cb, [cb]),
 }));
 jest.mock('@finalmeal/api', () => ({
@@ -548,6 +550,29 @@ describe('Add a dish form', () => {
     await act(async () => buttons.find((b) => b.text === 'Choose from library')?.onPress?.());
     expect(readDraft(screen).photoUri).toBe('file:///x.jpg');
     expect(pickPhoto).toHaveBeenCalledWith('library', { crop: false });
+  });
+
+  describe('swipe-down to dismiss', () => {
+    it('is allowed while the form is empty', async () => {
+      await render(withDraft(<AddDish />));
+      await settle();
+      expect(mockModalSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
+    });
+
+    it('is blocked once there is something typed, and again when it is cleared', async () => {
+      await render(withDraft(<AddDish />));
+      await settle();
+      await fireEvent.changeText(screen.getByPlaceholderText('e.g. Smash Burger'), 'Ramen');
+      expect(mockModalSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+      await fireEvent.changeText(screen.getByPlaceholderText('e.g. Smash Burger'), '');
+      expect(mockModalSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
+    });
+
+    it('is blocked with a restaurant chosen', async () => {
+      await render(withDraft(<AddDish />, { place: PLACE }));
+      await settle();
+      expect(mockModalSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+    });
   });
 
   it('closes with the X', async () => {

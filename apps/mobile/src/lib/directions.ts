@@ -4,6 +4,11 @@ import type { Place } from '@finalmeal/api';
 
 const enc = encodeURIComponent;
 
+/** A geo: label sits inside parentheses, so parentheses in a name would end it early. */
+function geoLabel(name: string): string {
+  return name.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 /**
  * What to search for when a spot has no trustworthy coordinates (a custom spot, whose point is
  * never the real location): the name, address and city, or only the city and region for a spot
@@ -24,7 +29,7 @@ export function directionsUrl(place: Place, os: 'ios' | 'android'): string {
   if (place.source === 'fsq') {
     const point = `${place.lat},${place.lng}`;
     return os === 'android'
-      ? `geo:${point}?q=${point}(${enc(place.name)})`
+      ? `geo:${point}?q=${point}(${enc(geoLabel(place.name))})`
       : `https://maps.apple.com/?ll=${point}&q=${enc(place.name)}`;
   }
   const query = enc(customQuery(place));

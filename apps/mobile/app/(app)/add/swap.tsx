@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { friendlyMessage, getMyPicks, promotePick } from '@finalmeal/api';
+import { ApiError, friendlyMessage, getMyPicks, promotePick } from '@finalmeal/api';
 import type { Pick } from '@finalmeal/api';
 import { colors } from '@finalmeal/ui-tokens';
 import { Icon } from '../../../src/components/Icon';
@@ -11,8 +11,8 @@ import { ScreenHeader } from '../../../src/components/ScreenHeader';
 import { SlotRow } from '../../../src/components/SlotRow';
 import { fontFamily } from '../../../src/lib/fonts';
 import { getSupabase } from '../../../src/lib/supabase';
-import { useBlockBack } from '../../../src/lib/use-block-back';
-import { useAddDish } from '../../../src/state/add-dish';
+import { useBlockBack, useBlockSwipeBack, useModalSwipe } from '../../../src/lib/use-block-back';
+import { draftHasContent, findExistingPick, useAddDish } from '../../../src/state/add-dish';
 import { announcePicksChanged } from '../../../src/state/pick-changes';
 import { useSavePick } from '../../../src/state/save-pick';
 
@@ -37,8 +37,13 @@ export default function Swap() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [slot, setSlot] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** The dish was refused as a duplicate and is an honorable pick: it can be promoted into the chosen slot. */
+  const [promotable, setPromotable] = useState<Pick | null>(null);
   const busy = saving || promoting;
   useBlockBack(busy);
+  useBlockSwipeBack(busy);
+  // Swipe-down dismisses only when there is nothing to lose (promote mode starts with an empty draft).
+  useModalSwipe(!busy && !draftHasContent(draft));
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -66,6 +71,7 @@ export default function Swap() {
   async function replace() {
     if (!chosen || busy || slot === null) return;
     setError(null);
+    setPromotable(null);
     if (promote) {
       setPromoting(true);
       try {
@@ -85,6 +91,31 @@ export default function Swap() {
       router.dismissTo('/(app)/you');
     } else {
       setError(friendlyMessage(outcome.error));
+      const e = outcome.error;
+      if (e instanceof ApiError && e.code === 'duplicate_pick') {
+        try {
+          const existing = findExistingPick(await getMyPicks(getSupabase()), draft);
+          if (existing?.tier === 'honorable') setPromotable(existing);
+        } catch {
+          // The refusal is already on screen; without the lookup there is just no shortcut.
+        }
+      }
+    }
+  }
+
+  /** The dish is already an honorable pick: make that one the Final Meal pick in the chosen slot. */
+  async function promoteExisting() {
+    if (!promotable || slot === null || busy) return;
+    setError(null);
+    setPromoting(true);
+    try {
+      await promotePick(getSupabase(), promotable.id, slot);
+      announcePicksChanged();
+      router.dismissTo('/(app)/you');
+    } catch (e) {
+      setError(friendlyMessage(e));
+      setPromotable(null);
+      setPromoting(false);
     }
   }
 
@@ -155,6 +186,14 @@ export default function Swap() {
                 {error}
               </Text>
             ) : null}
+            {promotable ? (
+              <PrimaryButton
+                label="Make it a Final Meal instead"
+                variant="secondary"
+                onPress={() => void promoteExisting()}
+                disabled={busy || !chosen}
+              />
+            ) : null}
             <PrimaryButton
               label={chosen ? `Replace ${chosen.dish.name}` : 'Choose one to replace'}
               onPress={() => void replace()}
@@ -218,7 +257,7 @@ const styles = StyleSheet.create({
   },
   help: { fontFamily: fontFamily.ui, fontSize: 14, lineHeight: 14 * 1.5, color: colors.smoke },
   rows: { gap: 8 },
-  bottom: { gap: 4, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8 },
+  bottom: { gap: 8, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8 },
   error: { fontFamily: fontFamily.uiMedium, fontSize: 13, color: colors.danger, paddingBottom: 8 },
   cancel: { alignSelf: 'center', padding: 12 },
   cancelText: { fontFamily: fontFamily.uiSemiBold, fontSize: 14, color: colors.smoke },

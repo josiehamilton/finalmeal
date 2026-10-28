@@ -8,9 +8,15 @@ import { resetPickChanges } from '../state/pick-changes';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), dismissTo: jest.fn() };
 let mockParams: Record<string, string> = {};
+const mockSetOptions = jest.fn();
+const mockParentSetOptions = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
   useLocalSearchParams: () => mockParams,
+  useNavigation: () => ({
+    setOptions: mockSetOptions,
+    getParent: () => ({ setOptions: mockParentSetOptions }),
+  }),
   useFocusEffect: (cb: () => void | (() => void)) => jest.requireActual('react').useEffect(cb, [cb]),
 }));
 jest.mock('@finalmeal/api', () => ({
@@ -130,12 +136,88 @@ describe('Swap', () => {
     await render(withDraft(<Swap />, READY));
     await settle();
     await fireEvent.press(row('Dish 3'));
+    expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
     await fireEvent.press(screen.getByRole('button', { name: 'Replace Dish 3' }));
     expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled();
+    // iOS swipe-back is off while saving, so a success can never pop past where it was meant to.
+    expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     await fireEvent.press(screen.getByRole('button', { name: 'Replace Dish 3' }));
     expect(mockAddPick).toHaveBeenCalledTimes(1);
     await act(async () => finish({ pick: makePick(), photoFailed: false }));
+  });
+
+  describe('the dish is already an honorable pick (five full)', () => {
+    const honorable = () =>
+      makePick({ id: 'h9', tier: 'honorable', slot: null, dish: { id: 'd1', name: 'Tonkotsu Ramen' } });
+    const replaceDish4 = async () => {
+      await fireEvent.press(row('Dish 4'));
+      await fireEvent.press(screen.getByRole('button', { name: 'Replace Dish 4' }));
+      await settle();
+    };
+
+    beforeEach(() => {
+      mockAddPick.mockRejectedValue(new ApiError('duplicate', 'duplicate_pick'));
+      mockGetPicks.mockResolvedValue([...makeFinals(5), honorable()]);
+    });
+
+    it('offers Make it a Final Meal instead, and promotes into the chosen slot', async () => {
+      await render(withDraft(<Swap />, READY));
+      await settle();
+      await replaceDish4();
+      expect(screen.getByText('That dish is already on your list.')).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('button', { name: 'Make it a Final Meal instead' }));
+      await settle();
+      expect(mockPromote).toHaveBeenCalledWith(CLIENT, 'h9', 4);
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+    });
+
+    it('recognises the pick by the dish name as typed, however it is spelled', async () => {
+      await render(withDraft(<Swap />, { ...READY, dishName: 'tonkotsu  ramen!' }));
+      await settle();
+      await replaceDish4();
+      expect(screen.getByRole('button', { name: 'Make it a Final Meal instead' })).toBeOnTheScreen();
+    });
+
+    it('shows friendly copy when that promote fails', async () => {
+      mockPromote.mockRejectedValue(new ApiError('gone', 'pick_not_found'));
+      await render(withDraft(<Swap />, READY));
+      await settle();
+      await replaceDish4();
+      await fireEvent.press(screen.getByRole('button', { name: 'Make it a Final Meal instead' }));
+      await settle();
+      expect(screen.getByText('That pick isn’t there any more.')).toBeOnTheScreen();
+      expect(mockRouter.dismissTo).not.toHaveBeenCalled();
+    });
+
+    it('does not offer it when the dish is already a Final Meal', async () => {
+      const finals = makeFinals(5);
+      finals[2] = makePick({ ...finals[2]!, dish: { id: 'd1', name: 'Tonkotsu Ramen' } });
+      mockGetPicks.mockResolvedValue(finals);
+      await render(withDraft(<Swap />, READY));
+      await settle();
+      await replaceDish4();
+      expect(screen.getByText('That dish is already on your list.')).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'Make it a Final Meal instead' })).toBeNull();
+    });
+
+    it('promotes into whichever slot is chosen after the refusal', async () => {
+      await render(withDraft(<Swap />, READY));
+      await settle();
+      await replaceDish4();
+      await fireEvent.press(row('Dish 2'));
+      await fireEvent.press(screen.getByRole('button', { name: 'Make it a Final Meal instead' }));
+      await settle();
+      expect(mockPromote).toHaveBeenCalledWith(CLIENT, 'h9', 2);
+    });
+  });
+
+  describe('the Add modal', () => {
+    it('stays shut to swipe-down while the draft has content', async () => {
+      await render(withDraft(<Swap />, READY));
+      await settle();
+      expect(mockParentSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+    });
   });
 
   describe('promoting an honorable pick when the five are full', () => {
@@ -158,6 +240,19 @@ describe('Swap', () => {
       expect(screen.getByText('Gyoza')).toBeOnTheScreen();
       expect(screen.getByText('Incoming')).toBeOnTheScreen();
       expect(screen.getAllByRole('radio')).toHaveLength(5);
+    });
+
+    it('allows swipe-down while idle (the draft is empty) and not while promoting', async () => {
+      let finish: (p: ReturnType<typeof makePick>) => void = () => {};
+      mockPromote.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+      await render(withDraft(<Swap />));
+      await settle();
+      expect(mockParentSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
+      await fireEvent.press(row('Dish 2'));
+      await fireEvent.press(screen.getByRole('button', { name: 'Replace Dish 2' }));
+      expect(mockParentSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+      expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+      await act(async () => finish(makePick()));
     });
 
     it('promotes with the chosen slot instead of adding', async () => {

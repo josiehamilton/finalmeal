@@ -21,10 +21,17 @@ describe('SlotRow', () => {
     expect(onPress).toHaveBeenCalled();
   });
 
-  it('strikes the dish through when selected', async () => {
+  it('strikes the dish through in ember glow when selected, with a line drawn the same on both platforms', async () => {
     await render(<SlotRow pick={pick} selectable selected onPress={jest.fn()} />);
     expect(screen.getByRole('radio', { name: /Plain Biryani/ })).toBeChecked();
-    expect(screen.getByText('Plain Biryani')).toHaveStyle({ textDecorationLine: 'line-through' });
+    expect(screen.getByTestId('strike-line')).toHaveStyle({ backgroundColor: '#E8693F', height: 1.5 });
+    // The native text decoration colour is iOS-only, so it is not used.
+    expect(screen.getByText('Plain Biryani')).not.toHaveStyle({ textDecorationLine: 'line-through' });
+  });
+
+  it('has no strike line when not selected', async () => {
+    await render(<SlotRow pick={pick} selectable selected={false} onPress={jest.fn()} />);
+    expect(screen.queryByTestId('strike-line')).toBeNull();
   });
 
   it('is a plain button otherwise', async () => {

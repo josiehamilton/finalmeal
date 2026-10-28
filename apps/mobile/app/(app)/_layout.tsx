@@ -15,7 +15,7 @@ export default function AppLayout() {
     <Stack
       screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.night } }}
     >
-      <Stack.Screen name="add" options={{ presentation: 'modal', gestureEnabled: false }} />
+      <Stack.Screen name="add" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

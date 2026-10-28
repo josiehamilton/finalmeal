@@ -16,9 +16,25 @@ import { TextField } from '../../../../../src/components/TextField';
 import { fontFamily } from '../../../../../src/lib/fonts';
 import { preparePickPhoto } from '../../../../../src/lib/prepare-pick-photo';
 import { getSupabase } from '../../../../../src/lib/supabase';
-import { useBlockBack } from '../../../../../src/lib/use-block-back';
-import { useAddDish } from '../../../../../src/state/add-dish';
+import { useBlockBack, useBlockSwipeBack } from '../../../../../src/lib/use-block-back';
+import type { AddDishDraft } from '../../../../../src/state/add-dish';
+import { personalKey, useAddDish } from '../../../../../src/state/add-dish';
 import { announcePicksChanged } from '../../../../../src/state/pick-changes';
+
+/** Whether the draft differs from the saved pick in its note, photo or tags. */
+function hasChanges(pick: Pick, draft: AddDishDraft): boolean {
+  if (draft.note.trim() !== (pick.note ?? '').trim()) return true;
+  if (draft.photoUri !== pick.photoUrl) return true;
+  const savedTags = pick.tags.filter((t) => t.kind !== 'personal').map((t) => t.id);
+  if (draft.tags.length !== savedTags.length || draft.tags.some((t) => !savedTags.includes(t.id))) {
+    return true;
+  }
+  const savedPersonal = pick.tags.filter((t) => t.kind === 'personal').map((t) => personalKey(t.name));
+  const draftPersonal = draft.personalTags.map(personalKey);
+  return (
+    draftPersonal.length !== savedPersonal.length || draftPersonal.some((n) => !savedPersonal.includes(n))
+  );
+}
 
 /** Edit a pick's photo, note and tags. The dish and restaurant are fixed: remove the pick and add it again to change them. */
 export default function EditPick() {
@@ -33,6 +49,8 @@ export default function EditPick() {
   const [error, setError] = useState<string | null>(null);
   const hydrated = useRef(false);
   useBlockBack(busy);
+  // This is the first screen of its own stack, so the swipe belongs to the route above it too.
+  useBlockSwipeBack(busy, { includeParent: true });
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -42,6 +60,8 @@ export default function EditPick() {
       setPick(found);
       if (found && !hydrated.current) {
         hydrated.current = true;
+        // A pick that has tags opens with them showing.
+        setTagsOpen(found.tags.length > 0);
         dispatch({
           type: 'hydrate',
           draft: {
@@ -60,8 +80,10 @@ export default function EditPick() {
     void load();
   }, [load]);
 
+  const dirty = pick !== null && hasChanges(pick, draft);
+
   async function save() {
-    if (!pick || busy) return;
+    if (!pick || busy || !dirty) return;
     setBusy(true);
     setError(null);
     try {
@@ -176,7 +198,7 @@ export default function EditPick() {
               {error}
             </Text>
           ) : null}
-          <PrimaryButton label="Save" onPress={() => void save()} busy={busy} />
+          <PrimaryButton label="Save" onPress={() => void save()} busy={busy} disabled={!dirty} />
         </View>
       </KeyboardAvoider>
     </SafeAreaView>

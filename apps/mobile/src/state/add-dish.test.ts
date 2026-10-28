@@ -2,6 +2,7 @@ import type { Pick, Place, Tag } from '@finalmeal/api';
 import {
   addDishReducer,
   ctaFor,
+  draftHasContent,
   findExistingPick,
   initialDraft,
   suggestionLabel,
@@ -230,5 +231,30 @@ describe('findExistingPick', () => {
   it('finds nothing without a place or a name', () => {
     expect(findExistingPick([pick()], draft({ dishName: 'Tonkotsu Ramen' }))).toBeNull();
     expect(findExistingPick([pick()], draft({ place: PLACE, dishName: ' ' }))).toBeNull();
+  });
+});
+
+describe('draftHasContent', () => {
+  it('is false for an untouched draft, even with the tier or the search city changed', () => {
+    expect(draftHasContent(initialDraft)).toBe(false);
+    expect(draftHasContent({ ...initialDraft, tier: 'honorable' })).toBe(false);
+    expect(
+      draftHasContent({ ...initialDraft, searchCity: { id: 'c1', label: 'Vancouver', point: null } }),
+    ).toBe(false);
+  });
+
+  it('is false for a dish name of only spaces', () => {
+    expect(draftHasContent({ ...initialDraft, dishName: '   ' })).toBe(false);
+  });
+
+  it.each([
+    ['a restaurant', { place: PLACE }],
+    ['a dish name', { dishName: 'Ramen' }],
+    ['a note', { note: 'x' }],
+    ['a photo', { photoUri: 'file:///a.jpg' }],
+    ['a tag', { tags: [RAMEN] }],
+    ['a personal tag', { personalTags: ['Rainy day'] }],
+  ] as [string, Partial<AddDishDraft>][])('is true with %s', (_name, patch) => {
+    expect(draftHasContent({ ...initialDraft, ...patch })).toBe(true);
   });
 });

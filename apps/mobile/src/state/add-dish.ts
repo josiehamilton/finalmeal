@@ -109,6 +109,18 @@ export function addDishReducer(state: AddDishDraft, action: AddDishAction): AddD
   }
 }
 
+/** True once the person has put anything in the form (the tier and the search city do not count). */
+export function draftHasContent(draft: AddDishDraft): boolean {
+  return (
+    draft.place !== null ||
+    draft.dishName.trim() !== '' ||
+    draft.note !== '' ||
+    draft.photoUri !== null ||
+    draft.tags.length > 0 ||
+    draft.personalTags.length > 0
+  );
+}
+
 export interface Cta {
   label: string;
   disabled: boolean;

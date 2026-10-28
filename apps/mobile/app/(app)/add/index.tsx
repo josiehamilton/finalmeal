@@ -17,8 +17,8 @@ import { TextField } from '../../../src/components/TextField';
 import { TierChooser } from '../../../src/components/TierChooser';
 import { fontFamily } from '../../../src/lib/fonts';
 import { getSupabase } from '../../../src/lib/supabase';
-import { useBlockBack } from '../../../src/lib/use-block-back';
-import { ctaFor, findExistingPick, useAddDish } from '../../../src/state/add-dish';
+import { useBlockBack, useModalSwipe } from '../../../src/lib/use-block-back';
+import { ctaFor, draftHasContent, findExistingPick, useAddDish } from '../../../src/state/add-dish';
 import { announcePicksChanged } from '../../../src/state/pick-changes';
 import { useSavePick } from '../../../src/state/save-pick';
 
@@ -32,6 +32,8 @@ export default function AddDish() {
   const [promoting, setPromoting] = useState(false);
   const busy = saving || promoting;
   useBlockBack(busy);
+  // Swipe-down dismisses an empty form, but not one with content or a save in flight.
+  useModalSwipe(!busy && !draftHasContent(draft));
   const [error, setError] = useState<string | null>(null);
   /** Set when the dish is already an honorable pick that the person was adding to the Final Meal. */
   const [promotable, setPromotable] = useState<Pick | null>(null);

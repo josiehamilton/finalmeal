@@ -12,6 +12,8 @@ export const colors = Object.freeze({
   ember: '#C04B28',
   emberGlow: '#E8693F',
   emberWash: 'rgba(192,75,40,0.14)',
+  /** Darkens what is under it: round buttons over a photo, and the backdrop behind a sheet. */
+  scrim: 'rgba(11,10,9,0.6)',
   honorable: '#E6DFD5',
   danger: '#FF7A6B',
   white: '#FFFFFF',

@@ -9,10 +9,16 @@ import { makePick } from '../test-support/picks';
 import { AddDishProvider } from '../state/add-dish';
 import { resetPickChanges, usePicksVersion } from '../state/pick-changes';
 
+const mockSetOptions = jest.fn();
+const mockParentSetOptions = jest.fn();
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), dismissTo: jest.fn() };
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
   useLocalSearchParams: () => ({ id: 'pk1' }),
+  useNavigation: () => ({
+    setOptions: mockSetOptions,
+    getParent: () => ({ setOptions: mockParentSetOptions }),
+  }),
   useFocusEffect: (cb: () => void | (() => void)) => jest.requireActual('react').useEffect(cb, [cb]),
 }));
 jest.mock('@finalmeal/api', () => ({
@@ -100,8 +106,6 @@ describe('Edit pick', () => {
 
   it('changes tags with the same picker as Add', async () => {
     await show();
-    await fireEvent.press(screen.getByRole('button', { name: /Add tags/ }));
-    await act(async () => {});
     await fireEvent.press(screen.getByRole('button', { name: 'Vegan' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Ramen' }));
     await fireEvent.press(save());
@@ -115,13 +119,92 @@ describe('Edit pick', () => {
 
   it('opens tag search inside the edit flow from More', async () => {
     await show();
-    await fireEvent.press(screen.getByRole('button', { name: /Add tags/ }));
-    await act(async () => {});
     await fireEvent.press(screen.getAllByRole('button', { name: 'More' })[0]!);
     expect(mockRouter.push).toHaveBeenCalledWith({
       pathname: '/pick/pk1/edit/tags-search',
       params: { kind: 'food_type' },
     });
+  });
+
+  describe('tags', () => {
+    it('opens expanded when the pick already has tags, so they can be seen', async () => {
+      await show();
+      expect(screen.getByRole('button', { name: 'Ramen' })).toBeSelected();
+      expect(screen.getByRole('button', { name: 'Rainy day' })).toBeSelected();
+      expect(screen.getByRole('button', { name: 'Hide' })).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'Add tags' })).toBeNull();
+    });
+
+    it('stays collapsed, with Add tags, when the pick has none', async () => {
+      jest.mocked(getMyPicks).mockResolvedValue([makePick({ note: 'Great broth.' })]);
+      await show();
+      expect(screen.getByRole('button', { name: 'Add tags' })).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'Hide' })).toBeNull();
+      await fireEvent.press(screen.getByRole('button', { name: 'Add tags' }));
+      await act(async () => {});
+      expect(screen.getByRole('button', { name: 'Hide' })).toBeOnTheScreen();
+    });
+  });
+
+  describe('Save', () => {
+    it('is off until something changes', async () => {
+      await show();
+      expect(save()).toBeDisabled();
+      await fireEvent.press(save());
+      expect(updatePick).not.toHaveBeenCalled();
+    });
+
+    it('comes on with a changed note and goes off again when it is put back', async () => {
+      await show();
+      await fireEvent.changeText(screen.getByLabelText('Note (optional)'), 'Different.');
+      expect(save()).toBeEnabled();
+      await fireEvent.changeText(screen.getByLabelText('Note (optional)'), 'Great broth.');
+      expect(save()).toBeDisabled();
+    });
+
+    it('ignores whitespace around the note', async () => {
+      await show();
+      await fireEvent.changeText(screen.getByLabelText('Note (optional)'), '  Great broth.  ');
+      expect(save()).toBeDisabled();
+    });
+
+    it('comes on with a changed tag, and goes off when it is toggled back', async () => {
+      await show();
+      await fireEvent.press(screen.getByRole('button', { name: 'Vegan' }));
+      expect(save()).toBeEnabled();
+      await fireEvent.press(screen.getByRole('button', { name: 'Vegan' }));
+      expect(save()).toBeDisabled();
+    });
+
+    it('comes on when a personal tag is toggled off', async () => {
+      await show();
+      await fireEvent.press(screen.getByRole('button', { name: 'Rainy day' }));
+      expect(save()).toBeEnabled();
+    });
+
+    it('comes on when the photo is removed', async () => {
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      await show();
+      await fireEvent.press(screen.getByRole('button', { name: 'Photo' }));
+      await act(async () =>
+        alert.mock.calls[0]![2]?.find((b) => b.text === 'Remove photo')?.onPress?.(),
+      );
+      expect(save()).toBeEnabled();
+      alert.mockRestore();
+    });
+  });
+
+  it('turns iOS swipe-back off, on this screen and the edit route, while saving', async () => {
+    let finish: (p: ReturnType<typeof makePick>) => void = () => {};
+    jest.mocked(updatePick).mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    await show();
+    expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
+    expect(mockParentSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
+    await fireEvent.changeText(screen.getByLabelText('Note (optional)'), 'Different.');
+    await fireEvent.press(save());
+    expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+    expect(mockParentSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+    await act(async () => finish(makePick()));
   });
 
   it('uploads a newly chosen photo', async () => {
@@ -174,6 +257,7 @@ describe('Edit pick', () => {
   it('stays with friendly copy when saving fails, and can try again', async () => {
     jest.mocked(updatePick).mockRejectedValueOnce(new ApiError('gone', 'pick_not_found'));
     await show();
+    await fireEvent.changeText(screen.getByLabelText('Note (optional)'), 'Different.');
     await fireEvent.press(save());
     await act(async () => {});
     expect(screen.getByText('That pick isn’t there any more.')).toBeOnTheScreen();
@@ -185,6 +269,7 @@ describe('Edit pick', () => {
     let finish: (p: ReturnType<typeof makePick>) => void = () => {};
     jest.mocked(updatePick).mockReturnValue(new Promise((resolve) => (finish = resolve)));
     await show();
+    await fireEvent.changeText(screen.getByLabelText('Note (optional)'), 'Different.');
     await fireEvent.press(save());
     expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled();
     await fireEvent.press(save());

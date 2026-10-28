@@ -32,9 +32,13 @@ export function SlotRow({ pick, onPress, selectable = false, selected = false }:
         )}
       </View>
       <View style={styles.text}>
-        <Text style={[styles.dish, selected && styles.struck]} numberOfLines={1}>
-          {pick.dish.name}
-        </Text>
+        {/* The strike is drawn as a line: textDecorationColor only works on iOS. */}
+        <View style={styles.dishWrap}>
+          <Text style={styles.dish} numberOfLines={1}>
+            {pick.dish.name}
+          </Text>
+          {selected ? <View testID="strike-line" pointerEvents="none" style={styles.strike} /> : null}
+        </View>
         <Text style={styles.where} numberOfLines={1}>
           {pick.place.label}
         </Text>
@@ -82,7 +86,14 @@ const styles = StyleSheet.create({
   thumbImage: { width: 44, height: 44 },
   text: { flex: 1, gap: 2, minWidth: 0 },
   dish: { fontFamily: fontFamily.uiBold, fontSize: 15, color: colors.bone },
-  struck: { textDecorationLine: 'line-through', textDecorationColor: colors.emberGlow },
+  dishWrap: { alignSelf: 'flex-start', maxWidth: '100%', justifyContent: 'center' },
+  strike: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1.5,
+    backgroundColor: colors.emberGlow,
+  },
   where: { fontFamily: fontFamily.ui, fontSize: 12, color: colors.smoke },
   radio: {
     width: 22,
