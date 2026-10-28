@@ -58,17 +58,18 @@ interface CityPickerProps {
   /** Text to start with, such as the label of a city that is already chosen. */
   initialLabel?: string;
   /**
-   * Whether to offer "Use my current location". Leave it on for choosing where you live; turn it
-   * off wherever the phone's position must never be used (the Add-a-dish flow is a post-meal diary).
+   * Whether to offer "Use my current location". Off by default, so a screen must opt in: only the
+   * ones for choosing where you live do (onboarding's city step and Settings > Home city). The
+   * Add-a-dish flow is a post-meal diary and never uses the phone's position.
    */
   allowCurrentLocation?: boolean;
 }
 
-/** Type-ahead city search plus (unless turned off) "Use my current location". */
+/** Type-ahead city search, plus "Use my current location" when a screen opts in. */
 export function CityPicker({
   onChange,
   initialLabel = '',
-  allowCurrentLocation = true,
+  allowCurrentLocation = false,
 }: CityPickerProps) {
   const [text, setText] = useState(initialLabel);
   const [results, setResults] = useState<City[]>([]);

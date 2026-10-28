@@ -8,7 +8,8 @@ export default function TabsLayout() {
     <Tabs
       backBehavior="history"
       // The centre + is not a tab: it opens the Add-a-dish modal (the add group), over the tabs.
-      tabBar={(props) => <TabBar {...props} onAdd={() => router.push('/add')} />}
+      // `navigate`, not `push`: a quick double tap must not stack two Add modals.
+      tabBar={(props) => <TabBar {...props} onAdd={() => router.navigate('/add')} />}
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.night } }}
     >
       <Tabs.Screen name="feed" />

@@ -11,6 +11,10 @@ import { personalKey } from '../state/add-dish';
 import { Icon } from './Icon';
 import { TagChip } from './TagChip';
 
+/** How many suggested chips each group shows before More (the AddDishTags board's density). */
+export const SUGGESTED_FOOD_TYPES = 5;
+export const SUGGESTED_DIETARY = 7;
+
 interface TagPickerProps {
   /** The chosen food-type and dietary tags. */
   tags: Tag[];
@@ -73,7 +77,10 @@ export function TagPicker({
 
   /** The featured tags, plus any chosen from tag search (so they can be unchosen here). */
   function withChosen(kind: 'food_type' | 'dietary'): Tag[] {
-    const list = featured[kind];
+    const list = featured[kind].slice(
+      0,
+      kind === 'food_type' ? SUGGESTED_FOOD_TYPES : SUGGESTED_DIETARY,
+    );
     const extra = tags.filter((t) => t.kind === kind && !list.some((f) => f.id === t.id));
     return [...list, ...extra];
   }

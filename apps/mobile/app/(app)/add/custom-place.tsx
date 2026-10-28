@@ -52,6 +52,12 @@ export default function CustomPlace() {
         noFixedAddress,
       });
       dispatch({ type: 'setPlace', place });
+      // The city chosen here is the flow's city from now on (the restaurant search starts from it).
+      // A custom spot sits on its city's point, so that is the city's point for ranking.
+      dispatch({
+        type: 'setSearchCity',
+        city: { id: city.id, label: city.label, point: { lat: place.lat, lng: place.lng } },
+      });
       router.dismissTo('/add');
     } catch (e) {
       setError(friendlyMessage(e));
@@ -95,7 +101,7 @@ export default function CustomPlace() {
         />
         <CityPicker
           initialLabel={start?.label}
-          allowCurrentLocation={false}
+         
           onChange={(next) => setCity(next ? { id: next.id, label: next.label } : null)}
         />
         <Checkbox label="This spot is open to the public" checked={isPublic} onChange={setIsPublic} />

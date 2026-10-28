@@ -8,6 +8,7 @@ import {
   getMyPicks,
   getPick,
   getPlace,
+  getPopularPlaces,
   moveFinal,
   promotePick,
   removePick,
@@ -103,6 +104,19 @@ describe('tags, places and dishes (local Supabase)', () => {
     const dishes = await suggestDishes(client, places[0]!.id, 'tonk');
     expect(dishes[0]).toMatchObject({ name: 'Tonkotsu Ramen' });
     expect(dishes[0]!.pickCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it('lists the most-picked spots in a city, and only that city', async () => {
+    const vancouver = await getPopularPlaces(client, cityId, 12);
+    expect(vancouver.slice(0, 3).map((p) => p.name)).toEqual(['Kin Kao', 'Marutama', 'Skewers']);
+    expect(vancouver.every((p) => p.country === 'CA' && p.city !== 'Saskatoon')).toBe(true);
+    expect(vancouver.some((p) => p.name === 'Sushi Itto')).toBe(false);
+    expect(vancouver[0]!.lat).toBeCloseTo(49.262, 2);
+
+    const tokyo = (await searchCities(client, 'tokyo'))[0]!;
+    const inTokyo = await getPopularPlaces(client, tokyo.id, 12);
+    expect(inTokyo.slice(0, 2).map((p) => p.name)).toEqual(['Sushi Itto', 'Sushi Dai']);
+    expect(inTokyo.some((p) => p.city === 'Vancouver')).toBe(false);
   });
 
   it('adds a custom spot with an address, or a food truck without one', async () => {

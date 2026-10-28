@@ -101,8 +101,9 @@ export function toPlace(row: PlaceRow): Place {
 
 /**
  * Type-ahead search over places. `inCity` is the city's point (not the person's location): when
- * given, nearby places rank first. A blank query with no point returns nothing, without asking
- * the backend.
+ * given, nearby places rank first. A blank query returns the nearest places to the point from any
+ * city (use `getPopularPlaces` for a city's most-picked spots); with no point it returns nothing,
+ * without asking the backend.
  */
 export async function searchPlaces(
   client: FinalMealClient,
@@ -149,4 +150,22 @@ export async function getPlace(client: FinalMealClient, id: string): Promise<Pla
   // A function returning a row type answers with an all-null row when nothing matched.
   if (!data || data.id == null) return null;
   return toPlace(data as PlaceRow);
+}
+
+/**
+ * The most-picked spots in a city, for the restaurant search's empty field: places within 25 km
+ * of the city's point, most picks first, then nearest. Unlike `searchPlaces` with no text, it
+ * never reaches into other cities. It uses the city's point, never the person's location.
+ */
+export async function getPopularPlaces(
+  client: FinalMealClient,
+  cityId: string,
+  limit = 12,
+): Promise<Place[]> {
+  // GET, so the client's read timeout still bounds this call.
+  const { data, error } = await client
+    .rpc('popular_places', { p_city_id: cityId, p_lim: limit }, { get: true })
+    .retry(false);
+  throwIfError(error);
+  return (data ?? []).map((row) => toPlace(row.place as PlaceRow));
 }

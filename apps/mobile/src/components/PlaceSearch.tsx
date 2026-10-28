@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { friendlyMessage, getCity, searchPlaces } from '@finalmeal/api';
+import { friendlyMessage, getCity, getPopularPlaces, searchPlaces } from '@finalmeal/api';
 import type { City, Place } from '@finalmeal/api';
 import { colors, radii } from '@finalmeal/ui-tokens';
 import { fontFamily } from '../lib/fonts';
@@ -36,7 +36,9 @@ async function pointOf(id: string): Promise<SearchCity['point']> {
 
 /**
  * Restaurant type-ahead for a chosen city (never the phone's location: Final Meal is a post-meal
- * diary, so people log dishes from trips after they are home). Empty field: the city's most-picked spots.
+ * diary, so people log dishes from trips after they are home). Typing searches places, ranked
+ * around the city's point. An empty field lists that city's most-picked spots (`getPopularPlaces`,
+ * keyed by the city's id); without a city there is nothing to list yet.
  */
 export function PlaceSearch({ homeCity, city, onCityChange, onChoose, onAddNew }: PlaceSearchProps) {
   const [text, setText] = useState('');
@@ -60,14 +62,20 @@ export function PlaceSearch({ homeCity, city, onCityChange, onChoose, onAddNew }
     };
   }, [hasCity, homeId, homeLabel]);
 
+  const cityId = city?.id;
   const lat = city?.point?.lat;
   const lng = city?.point?.lng;
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const point = lat !== undefined && lng !== undefined ? { lat, lng } : undefined;
-        const found = await searchPlaces(getSupabase(), text, point, RESULT_LIMIT);
+        let found: Place[] = [];
+        if (text.trim() === '') {
+          if (cityId) found = await getPopularPlaces(getSupabase(), cityId, RESULT_LIMIT);
+        } else {
+          const point = lat !== undefined && lng !== undefined ? { lat, lng } : undefined;
+          found = await searchPlaces(getSupabase(), text, point, RESULT_LIMIT);
+        }
         if (cancelled) return;
         setResults(found);
         setError(null);
@@ -81,7 +89,7 @@ export function PlaceSearch({ homeCity, city, onCityChange, onChoose, onAddNew }
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [text, lat, lng]);
+  }, [text, cityId, lat, lng]);
 
   async function chooseCity(next: City | null) {
     if (!next) return;
@@ -119,21 +127,19 @@ export function PlaceSearch({ homeCity, city, onCityChange, onChoose, onAddNew }
       ) : (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Choose a city · Change"
+          accessibilityLabel="Choose a city"
           onPress={() => setChanging((open) => !open)}
           hitSlop={6}
           style={styles.chip}
         >
           <Icon name="pin" size={16} color={colors.emberGlow} />
-          <Text style={styles.chipText}>
-            Choose a city · <Text style={styles.chipChange}>Change</Text>
-          </Text>
+          <Text style={[styles.chipText, styles.chipChange]}>Choose a city</Text>
         </Pressable>
       )}
 
       {changing ? (
         <View style={styles.picker}>
-          <CityPicker onChange={chooseCity} allowCurrentLocation={false} />
+          <CityPicker onChange={chooseCity} />
         </View>
       ) : null}
 

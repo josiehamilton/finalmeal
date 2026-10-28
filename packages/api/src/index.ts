@@ -21,7 +21,13 @@ export { formatStats, getFoundationStats } from './stats';
 export type { FoundationStats } from './stats';
 export { createPersonalTag, searchTags } from './tags';
 export type { Tag, TagKind } from './tags';
-export { createCustomPlace, formatPlaceLabel, getPlace, searchPlaces } from './places';
+export {
+  createCustomPlace,
+  formatPlaceLabel,
+  getPlace,
+  getPopularPlaces,
+  searchPlaces,
+} from './places';
 export type { Place } from './places';
 export { suggestDishes } from './dishes';
 export type { DishSuggestion } from './dishes';

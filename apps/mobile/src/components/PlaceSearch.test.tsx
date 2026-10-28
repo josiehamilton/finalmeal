@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { getCity, searchPlaces } from '@finalmeal/api';
+import { getCity, getPopularPlaces, searchPlaces } from '@finalmeal/api';
 import type { Place } from '@finalmeal/api';
 import { PLACE } from '../test-support/add-dish';
 import { PlaceSearch } from './PlaceSearch';
@@ -9,6 +9,7 @@ import type { SearchCity } from '../state/add-dish';
 jest.mock('@finalmeal/api', () => ({
   ...jest.requireActual('@finalmeal/api'),
   searchPlaces: jest.fn(),
+  getPopularPlaces: jest.fn(),
   getCity: jest.fn(),
 }));
 jest.mock('../lib/supabase', () => ({ getSupabase: () => ({ fake: 'client' }) }));
@@ -29,12 +30,13 @@ jest.mock('./CityPicker', () => {
         >
           <Text>pick Tokyo</Text>
         </Pressable>
-        <Text>{allowCurrentLocation === false ? 'no location button' : 'location button'}</Text>
+        <Text>{allowCurrentLocation ? 'location button' : 'no location button'}</Text>
       </>
     ),
   };
 });
 const mockSearch = jest.mocked(searchPlaces);
+const mockPopular = jest.mocked(getPopularPlaces);
 const mockGetCity = jest.mocked(getCity);
 
 const VANCOUVER = { lat: 49.2827, lng: -123.1207 };
@@ -44,17 +46,19 @@ const RESULT: Place = { ...PLACE };
 
 function Harness({
   initial = null,
+  home = HOME,
   onChoose = jest.fn(),
   onAddNew = jest.fn(),
 }: {
   initial?: SearchCity | null;
+  home?: { id: string; label: string } | null;
   onChoose?: (p: Place) => void;
   onAddNew?: (text: string) => void;
 }) {
   const [city, setCity] = useState<SearchCity | null>(initial);
   return (
     <PlaceSearch
-      homeCity={HOME}
+      homeCity={home}
       city={city}
       onCityChange={setCity}
       onChoose={onChoose}
@@ -74,6 +78,7 @@ describe('PlaceSearch', () => {
     jest.useFakeTimers();
     jest.clearAllMocks();
     mockSearch.mockResolvedValue([RESULT]);
+    mockPopular.mockResolvedValue([RESULT]);
     mockGetCity.mockImplementation(async (_client, id) =>
       id === 'c9'
         ? { id: 'c9', label: 'Tokyo, Japan', name: 'Tokyo', ...TOKYO } as never
@@ -88,7 +93,8 @@ describe('PlaceSearch', () => {
     expect(mockGetCity).toHaveBeenCalledWith({ fake: 'client' }, 'c1');
     expect(screen.getByRole('button', { name: 'In Vancouver, BC, Canada · Change' })).toBeOnTheScreen();
     await wait(300);
-    expect(mockSearch).toHaveBeenCalledWith({ fake: 'client' }, '', VANCOUVER, 12);
+    expect(mockPopular).toHaveBeenCalledWith({ fake: 'client' }, 'c1', 12);
+    expect(mockSearch).not.toHaveBeenCalled();
   });
 
   it('uses the last city chosen in the flow instead of the home city', async () => {
@@ -96,12 +102,16 @@ describe('PlaceSearch', () => {
     await wait(300);
     expect(mockGetCity).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'In Tokyo, Japan · Change' })).toBeOnTheScreen();
-    expect(mockSearch).toHaveBeenCalledWith({ fake: 'client' }, '', TOKYO, 12);
+    expect(mockPopular).toHaveBeenCalledWith({ fake: 'client' }, 'c9', 12);
+    expect(mockSearch).not.toHaveBeenCalled();
   });
 
-  it('shows the most-picked spots for an empty field, then results with name and area · city', async () => {
+  it('shows the city’s most-picked spots for an empty field (by city id), with name and area · city', async () => {
+    mockPopular.mockResolvedValue([RESULT, { ...RESULT, id: 'p2', name: 'Kin Kao', label: 'Main St · Vancouver' }]);
     await render(<Harness />);
     await wait(300);
+    expect(screen.getByText('Kin Kao')).toBeOnTheScreen();
+    expect(mockSearch).not.toHaveBeenCalled();
     expect(screen.getByText('Marutama Ramen')).toBeOnTheScreen();
     expect(screen.getByText('Bidwell St · Vancouver')).toBeOnTheScreen();
     expect(screen.queryByText(/ km| m$/)).toBeNull();
@@ -111,6 +121,7 @@ describe('PlaceSearch', () => {
     await render(<Harness />);
     await wait(300);
     mockSearch.mockClear();
+    mockPopular.mockClear();
     const field = screen.getByPlaceholderText('Search restaurants');
     await fireEvent.changeText(field, 'mar');
     await wait(200);
@@ -120,6 +131,7 @@ describe('PlaceSearch', () => {
     await wait(1);
     expect(mockSearch).toHaveBeenCalledTimes(1);
     expect(mockSearch).toHaveBeenCalledWith({ fake: 'client' }, 'maru', VANCOUVER, 12);
+    expect(mockPopular).not.toHaveBeenCalled();
   });
 
   it('changing the city re-runs the search with the new point', async () => {
@@ -135,6 +147,29 @@ describe('PlaceSearch', () => {
     expect(screen.getByRole('button', { name: 'In Tokyo, Japan · Change' })).toBeOnTheScreen();
     await wait(300);
     expect(mockSearch).toHaveBeenCalledWith({ fake: 'client' }, 'ramen', TOKYO, 12);
+  });
+
+  it('changing the city with an empty field lists the new city’s popular spots', async () => {
+    await render(<Harness />);
+    await wait(300);
+    mockPopular.mockClear();
+    await fireEvent.press(screen.getByRole('button', { name: 'In Vancouver, BC, Canada · Change' }));
+    await fireEvent.press(screen.getByText('pick Tokyo'));
+    await wait(300);
+    expect(mockPopular).toHaveBeenCalledWith({ fake: 'client' }, 'c9', 12);
+  });
+
+  it('says Choose a city, with no Change, and lists nothing while there is no city', async () => {
+    await render(<Harness home={null} />);
+    await wait(300);
+    expect(screen.getByRole('button', { name: 'Choose a city' })).toBeOnTheScreen();
+    expect(screen.queryByText(/Change/)).toBeNull();
+    expect(mockPopular).not.toHaveBeenCalled();
+    expect(mockSearch).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole('button', { name: 'Choose a city' }));
+    await fireEvent.press(screen.getByText('pick Tokyo'));
+    await wait(300);
+    expect(mockPopular).toHaveBeenCalledWith({ fake: 'client' }, 'c9', 12);
   });
 
   it('opens the city picker without the current-location button', async () => {
@@ -162,7 +197,7 @@ describe('PlaceSearch', () => {
   });
 
   it('shows friendly copy when the search fails', async () => {
-    mockSearch.mockRejectedValue(new TypeError('Network request failed'));
+    mockPopular.mockRejectedValue(new TypeError('Network request failed'));
     await render(<Harness />);
     await wait(300);
     expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();

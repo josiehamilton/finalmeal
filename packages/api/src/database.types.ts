@@ -1204,6 +1204,14 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      popular_places: {
+        Args: { p_city_id: string; p_lim?: number };
+        Returns: {
+          distance_m: number;
+          pick_count: number;
+          place: Database['public']['Tables']['places']['Row'];
+        }[];
+      };
       search_places: {
         Args: { p_lat?: number; p_lim?: number; p_lng?: number; p_q: string };
         Returns: {

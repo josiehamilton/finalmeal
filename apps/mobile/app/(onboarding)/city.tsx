@@ -41,6 +41,7 @@ export default function CityStep() {
       cta={{ label: 'Continue', onPress: next, disabled: city === null, busy }}
     >
       <CityPicker
+        allowCurrentLocation
         onChange={(next) => {
           setCity(next);
           setError(null);

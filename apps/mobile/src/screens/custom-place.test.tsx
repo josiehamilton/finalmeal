@@ -36,7 +36,7 @@ jest.mock('../components/CityPicker', () => {
     }) => (
       <>
         <Text testID="city-prefill">{initialLabel ?? ''}</Text>
-        <Text>{allowCurrentLocation === false ? 'no location button' : 'location button'}</Text>
+        <Text>{allowCurrentLocation ? 'location button' : 'no location button'}</Text>
         <Pressable
           accessibilityRole="button"
           onPress={() => onChange({ id: 'c9', label: 'Tokyo, Japan' })}
@@ -141,6 +141,21 @@ describe('Add a spot', () => {
     );
     expect(readDraft(screen).place?.id).toBe('p-new');
     expect(mockRouter.dismissTo).toHaveBeenCalledWith('/add');
+  });
+
+  it('makes the city chosen here the flow’s search city', async () => {
+    mockCreate.mockResolvedValue({ ...PLACE, id: 'p-new', name: 'Taco Truck', lat: 35.68, lng: 139.69 });
+    await show();
+    await fireEvent.press(screen.getByText('pick Tokyo'));
+    await fireEvent.changeText(screen.getByPlaceholderText('123 Main St'), '1 Chome');
+    await fireEvent.press(publicBox());
+    await fireEvent.press(addSpot());
+    await act(async () => {});
+    expect(readDraft(screen).searchCity).toEqual({
+      id: 'c9',
+      label: 'Tokyo, Japan',
+      point: { lat: 35.68, lng: 139.69 },
+    });
   });
 
   it('sends noFixedAddress and no address for a food truck, in the city picked', async () => {

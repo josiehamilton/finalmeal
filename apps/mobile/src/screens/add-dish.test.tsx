@@ -6,8 +6,8 @@ import {
   createPersonalTag,
   getCity,
   getMyPicks,
+  getPopularPlaces,
   promotePick,
-  searchPlaces,
   searchTags,
   suggestDishes,
 } from '@finalmeal/api';
@@ -28,6 +28,7 @@ jest.mock('@finalmeal/api', () => ({
   getCity: jest.fn(),
   promotePick: jest.fn(),
   searchPlaces: jest.fn().mockResolvedValue([]),
+  getPopularPlaces: jest.fn().mockResolvedValue([]),
   searchTags: jest.fn(),
   suggestDishes: jest.fn(),
 }));
@@ -360,6 +361,30 @@ describe('Add a dish form', () => {
       );
     });
 
+    it('shows the first 5 food types and 7 dietary tags, then More; chosen extras still show', async () => {
+      const many = (kind: 'food_type' | 'dietary', n: number, prefix: string) =>
+        Array.from({ length: n }, (_, i) => ({
+          id: `${prefix}${i}`,
+          kind,
+          name: `${prefix}${i}`,
+          slug: `${prefix}${i}`,
+          featured: true,
+        }));
+      mockSearchTags.mockImplementation(async (_c, kind) =>
+        kind === 'food_type' ? many('food_type', 9, 'F') : kind === 'dietary' ? many('dietary', 10, 'D') : [],
+      );
+      const extra = { id: 'x1', kind: 'food_type' as const, name: 'Korean', slug: 'korean', featured: false };
+      await render(withDraft(<AddDish />, { ...READY, tags: [extra] }));
+      await settle();
+      await expand();
+      for (let i = 0; i < 5; i++) expect(screen.getByRole('button', { name: `F${i}` })).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'F5' })).toBeNull();
+      for (let i = 0; i < 7; i++) expect(screen.getByRole('button', { name: `D${i}` })).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'D7' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Korean' })).toBeSelected();
+      expect(screen.getAllByRole('button', { name: 'More' })).toHaveLength(2);
+    });
+
     it('opens tag search for the kind from More', async () => {
       await render(withDraft(<AddDish />, READY));
       await settle();
@@ -441,7 +466,7 @@ describe('Choose a restaurant screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(getCity).mockResolvedValue(null);
-    jest.mocked(searchPlaces).mockResolvedValue([PLACE]);
+    jest.mocked(getPopularPlaces).mockResolvedValue([PLACE]);
   });
 
   it('sets the place on the draft and goes back to the form', async () => {

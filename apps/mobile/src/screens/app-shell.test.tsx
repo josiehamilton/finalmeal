@@ -98,6 +98,18 @@ describe('app shell navigation', () => {
     expect(screen.queryByPlaceholderText('e.g. Smash Burger')).toBeNull();
   });
 
+  it('does not stack two Add modals when + is tapped twice quickly', async () => {
+    await renderRouter(routes(), { initialUrl: '/(app)/you' });
+    await screen.findByText('@josiehamilton');
+    const plus = screen.getByRole('button', { name: 'Add a dish' });
+    await fireEvent.press(plus);
+    await fireEvent.press(plus);
+    expect(await screen.findByPlaceholderText('e.g. Smash Burger')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    expect(await screen.findByText('@josiehamilton')).toBeOnTheScreen();
+    expect(screen.queryByPlaceholderText('e.g. Smash Burger')).toBeNull();
+  });
+
   it('opens Edit profile from You and returns to You', async () => {
     await renderRouter(routes(), { initialUrl: '/(app)/you' });
     await fireEvent.press(await screen.findByRole('button', { name: 'Edit profile' }));

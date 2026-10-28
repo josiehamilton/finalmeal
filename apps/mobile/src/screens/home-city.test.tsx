@@ -13,10 +13,19 @@ jest.mock('../lib/supabase', () => ({ getSupabase: () => ({ fake: 'client' }) })
 jest.mock('../components/CityPicker', () => {
   const { Pressable, Text } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    CityPicker: ({ onChange }: { onChange: (city: unknown) => void }) => (
-      <Pressable accessibilityRole="button" onPress={() => onChange({ id: 'c9', label: 'Tokyo' })}>
-        <Text>pick Tokyo</Text>
-      </Pressable>
+    CityPicker: ({
+      onChange,
+      allowCurrentLocation,
+    }: {
+      onChange: (city: unknown) => void;
+      allowCurrentLocation?: boolean;
+    }) => (
+      <>
+        <Pressable accessibilityRole="button" onPress={() => onChange({ id: 'c9', label: 'Tokyo' })}>
+          <Text>pick Tokyo</Text>
+        </Pressable>
+        <Text>{allowCurrentLocation ? 'location button' : 'no location button'}</Text>
+      </>
     ),
   };
 });
@@ -40,6 +49,11 @@ describe('Home city', () => {
     mockProfile = makeProfile();
     mockSetCity.mockResolvedValue(makeProfile());
     mockRefresh.mockResolvedValue(null);
+  });
+
+  it('offers "Use my current location" (it opts in)', async () => {
+    await render(<HomeCity />);
+    expect(screen.getByText('location button')).toBeOnTheScreen();
   });
 
   it('keeps Save off until a city is chosen', async () => {

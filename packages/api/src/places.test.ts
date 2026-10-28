@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FinalMealClient } from './client';
-import { formatPlaceLabel, searchPlaces, toPlace } from './places';
+import { formatPlaceLabel, getPopularPlaces, searchPlaces, toPlace } from './places';
 
 const ROW = {
   id: 'p1',
@@ -115,5 +115,38 @@ describe('searchPlaces', () => {
       { get: true },
     );
     expect(places.map((p) => p.name)).toEqual(['Marutama']);
+  });
+});
+
+describe('getPopularPlaces', () => {
+  it('asks for the city by id and maps the rows, in the order given', async () => {
+    const retry = vi.fn().mockResolvedValue({
+      data: [
+        { place: ROW, pick_count: 3, distance_m: 10 },
+        { place: { ...ROW, id: 'p2', name: 'Kin Kao' }, pick_count: 1, distance_m: 20 },
+      ],
+      error: null,
+    });
+    const rpc = vi.fn().mockReturnValue({ retry });
+    const client = { rpc } as unknown as FinalMealClient;
+    const places = await getPopularPlaces(client, 'c1', 6);
+    expect(rpc).toHaveBeenCalledWith('popular_places', { p_city_id: 'c1', p_lim: 6 }, { get: true });
+    expect(retry).toHaveBeenCalledWith(false);
+    expect(places.map((p) => p.name)).toEqual(['Marutama', 'Kin Kao']);
+    expect(places[0]).toMatchObject({ lat: 49.2905, lng: -123.1366 });
+  });
+
+  it('defaults to 12 and returns an empty list for no rows', async () => {
+    const retry = vi.fn().mockResolvedValue({ data: null, error: null });
+    const rpc = vi.fn().mockReturnValue({ retry });
+    const client = { rpc } as unknown as FinalMealClient;
+    await expect(getPopularPlaces(client, 'c1')).resolves.toEqual([]);
+    expect(rpc).toHaveBeenCalledWith('popular_places', { p_city_id: 'c1', p_lim: 12 }, { get: true });
+  });
+
+  it('turns a backend failure into an ApiError', async () => {
+    const retry = vi.fn().mockResolvedValue({ data: null, error: { message: 'boom', code: '57014' } });
+    const client = { rpc: vi.fn().mockReturnValue({ retry }) } as unknown as FinalMealClient;
+    await expect(getPopularPlaces(client, 'c1')).rejects.toMatchObject({ name: 'ApiError' });
   });
 });

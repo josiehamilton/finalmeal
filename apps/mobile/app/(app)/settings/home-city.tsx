@@ -63,6 +63,7 @@ export default function HomeCity() {
       }
     >
       <CityPicker
+        allowCurrentLocation
         onChange={(next) => {
           setCity(next);
           setError(null);
