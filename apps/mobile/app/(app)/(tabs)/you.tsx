@@ -120,10 +120,13 @@ export default function You() {
     () => (chip ? new Set(finals.filter((p) => !matchingIds.has(p.id)).map((p) => p.id)) : null),
     [chip, finals, matchingIds],
   );
-  const matchingFinals = matching.filter((p) => p.tier === 'final').length;
+  const matchingFinals = useMemo(() => matching.filter((p) => p.tier === 'final').length, [matching]);
   const matchingHonorables = useMemo(() => matching.filter((p) => p.tier === 'honorable'), [matching]);
   const groups = useMemo(() => groupPicksByPlace(matchingHonorables), [matchingHonorables]);
-  const summary = chip ? `${chip.label} · ${summarizeGroups(groupPicksByPlace(matching))}` : null;
+  const summary = useMemo(
+    () => (chip ? `${chip.label} · ${summarizeGroups(groupPicksByPlace(matching))}` : null),
+    [chip, matching],
+  );
 
   function openPick(pick: Pick) {
     router.push(`/pick/${pick.id}`);

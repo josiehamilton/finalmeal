@@ -1,4 +1,6 @@
 import { Text } from 'react-native';
+import { act } from '@testing-library/react-native';
+import { router } from 'expo-router';
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 import AppLayout from '../../app/(app)/_layout';
 import TabsLayout from '../../app/(app)/(tabs)/_layout';
@@ -96,6 +98,24 @@ describe('app shell navigation', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
     expect(await screen.findByText('@josiehamilton')).toBeOnTheScreen();
     expect(screen.queryByPlaceholderText('e.g. Smash Burger')).toBeNull();
+  });
+
+  it('opens Add a dish on the tier named in the route param, through the real router', async () => {
+    await renderRouter(routes(), { initialUrl: '/(app)/you' });
+    await screen.findByText('@josiehamilton');
+    await act(async () => router.navigate({ pathname: '/add', params: { tier: 'honorable' } }));
+    expect(await screen.findByRole('button', { name: 'Add to Honorable' })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    expect(await screen.findByText('@josiehamilton')).toBeOnTheScreen();
+    // Opened again with Final Meal, the tier is Final Meal: nothing is left over from before.
+    await act(async () => router.navigate({ pathname: '/add', params: { tier: 'final' } }));
+    expect(await screen.findByRole('button', { name: 'Add to Final Meal' })).toBeOnTheScreen();
+  });
+
+  it('opens Add a dish with Final Meal chosen from an empty seat on You', async () => {
+    await renderRouter(routes(), { initialUrl: '/(app)/you' });
+    await fireEvent.press(await screen.findByRole('button', { name: 'Add a dish, seat 1' }));
+    expect(await screen.findByRole('button', { name: 'Add to Final Meal' })).toBeOnTheScreen();
   });
 
   it('does not stack two Add modals when + is tapped twice quickly', async () => {

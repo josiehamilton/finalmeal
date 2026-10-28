@@ -12,9 +12,11 @@ interface SlotRowProps {
   selected?: boolean;
 }
 
-/** A Final Meal row: the slot numeral, a thumbnail, the dish and its place. The selected row is struck through in ember glow. */
+/** A Final Meal row: the slot numeral, a thumbnail, the dish and its restaurant and city. The selected row is struck through in ember glow. */
 export function SlotRow({ pick, onPress, selectable = false, selected = false }: SlotRowProps) {
-  const label = `${pick.slot ? `${pick.slot}. ` : ''}${pick.dish.name}, ${pick.place.label}`;
+  // The line under the dish is the restaurant and its city, as on the Profile and Swap boards.
+  const where = `${pick.place.name} · ${pick.place.city}`;
+  const label = `${pick.slot ? `${pick.slot}. ` : ''}${pick.dish.name}, ${where}`;
   return (
     <Pressable
       accessibilityRole={selectable ? 'radio' : 'button'}
@@ -40,7 +42,7 @@ export function SlotRow({ pick, onPress, selectable = false, selected = false }:
           {selected ? <View testID="strike-line" pointerEvents="none" style={styles.strike} /> : null}
         </View>
         <Text style={styles.where} numberOfLines={1}>
-          {pick.place.label}
+          {where}
         </Text>
       </View>
       {selectable ? (

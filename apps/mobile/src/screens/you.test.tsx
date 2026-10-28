@@ -115,7 +115,9 @@ describe('You tab', () => {
       expect(screen.getByText('Wagyu Beef Don')).toBeOnTheScreen();
       expect(screen.getByText('Plain Biryani')).toBeOnTheScreen();
       expect(screen.getByText('Lobster Roll')).toBeOnTheScreen();
-      expect(screen.getByText('4th Ave · Vancouver')).toBeOnTheScreen();
+      expect(screen.getByText('Skewers · Vancouver')).toBeOnTheScreen();
+      expect(screen.getByText('Sushi Itto · Tokyo')).toBeOnTheScreen();
+      expect(screen.queryByText('4th Ave · Vancouver')).toBeNull();
       expect(screen.getByText('One seat left. Choose wisely.')).toBeOnTheScreen();
       expect(screen.queryByText('Add a dish')).toBeNull();
       expect(mockGetPicks).toHaveBeenCalledWith({ fake: 'client' });

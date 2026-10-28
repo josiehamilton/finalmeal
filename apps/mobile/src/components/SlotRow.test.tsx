@@ -5,11 +5,13 @@ import { makePick } from '../test-support/picks';
 describe('SlotRow', () => {
   const pick = makePick({ slot: 3, dish: { id: 'd', name: 'Plain Biryani' } });
 
-  it('shows the numeral, dish and place label', async () => {
+  it('shows the numeral, dish and the restaurant with its city', async () => {
     await render(<SlotRow pick={pick} onPress={jest.fn()} />);
     expect(screen.getByText('3')).toBeOnTheScreen();
     expect(screen.getByText('Plain Biryani')).toBeOnTheScreen();
-    expect(screen.getByText('Bidwell St · Vancouver')).toBeOnTheScreen();
+    expect(screen.getByText('Marutama Ramen · Vancouver')).toBeOnTheScreen();
+    // The area is not shown here: the restaurant name is what the row is for.
+    expect(screen.queryByText(/Bidwell St/)).toBeNull();
   });
 
   it('is a radio when selectable, reporting whether it is chosen', async () => {

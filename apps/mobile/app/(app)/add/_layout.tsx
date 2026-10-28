@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useGlobalSearchParams } from 'expo-router';
 import { colors } from '@finalmeal/ui-tokens';
 import { AddDishProvider, tierFromParam } from '../../../src/state/add-dish';
 
@@ -8,7 +8,10 @@ import { AddDishProvider, tierFromParam } from '../../../src/state/add-dish';
  * (the You tab's empty seats pass `final`) sets the tier the draft starts with.
  */
 export default function AddLayout() {
-  const { tier } = useLocalSearchParams<{ tier?: string }>();
+  // Global, not local: expo-router attaches search params only to the focused leaf route
+  // (add/index), so this layout would never see them through useLocalSearchParams. Safe here
+  // because AddDishProvider reads `initial` once, when the modal opens.
+  const { tier } = useGlobalSearchParams<{ tier?: string }>();
   const startTier = tierFromParam(tier);
   return (
     <AddDishProvider initial={startTier ? { tier: startTier } : undefined}>

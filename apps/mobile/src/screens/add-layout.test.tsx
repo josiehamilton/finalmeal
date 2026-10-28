@@ -10,7 +10,7 @@ jest.mock('expo-router', () => {
   // The stack stands in for the add screens: it just shows the tier the draft starts with.
   const Stack = () => createElement(Text, { testID: 'tier' }, useAddDish().draft.tier);
   Stack.Screen = () => null;
-  return { Stack, useLocalSearchParams: () => mockParams };
+  return { Stack, useGlobalSearchParams: () => mockParams };
 });
 
 describe('Add-a-dish layout', () => {
