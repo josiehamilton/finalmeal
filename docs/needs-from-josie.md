@@ -32,6 +32,7 @@ A running list, newest needs added as they come up. Nothing here blocks today's 
 | 12 | How often ads appear in the feed, and whether they're sold directly to restaurants or through an ad network | After the MVP | About every 5th card, restaurants directly |
 | 13 | Pricing for removing ads (or a subscription) | After Claude's running-cost model | Not built yet |
 | 14 | Optional: allow a startup hook so cloud sessions install the project automatically | Any time | Sessions run `pnpm install` themselves (fine as is) |
+| 15 | Copy for First landing when all five Final Meal spots are filled (it currently says "0 seats left") | Phase 3 wrap-up | Claude drafts something celebratory for you to approve |
 
 ## Done
 
