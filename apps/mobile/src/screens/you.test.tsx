@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import You from '../../app/(app)/(tabs)/you';
 import { makeProfile } from '../test-support/profile';
+import { announcePicksChanged, resetPickChanges } from '../state/pick-changes';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter }));
@@ -21,6 +22,7 @@ jest.mock('../providers/SessionProvider', () => ({
 describe('You tab', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetPickChanges();
     mockRefresh.mockResolvedValue(null);
     mockProfile = makeProfile();
     mockSessionError = null;
@@ -150,6 +152,26 @@ describe('You tab', () => {
       mockLoading = true;
       await render(<You />);
       expect(screen.getByTestId('you-loading')).toBeOnTheScreen();
+    });
+  });
+
+  describe('after saving a dish', () => {
+    it('shows the saved-without-photo banner, which can be dismissed', async () => {
+      await render(<You />);
+      expect(screen.queryByText('Saved without the photo. Add it from the dish any time.')).toBeNull();
+      await act(async () => announcePicksChanged({ photoFailed: true }));
+      expect(
+        screen.getByText('Saved without the photo. Add it from the dish any time.'),
+      ).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('button', { name: 'Dismiss' }));
+      expect(screen.queryByText('Saved without the photo. Add it from the dish any time.')).toBeNull();
+    });
+
+    it('refreshes the profile (the dish count) when picks change', async () => {
+      await render(<You />);
+      expect(mockRefresh).not.toHaveBeenCalled();
+      await act(async () => announcePicksChanged());
+      expect(mockRefresh).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, Text } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import {
   ApiError,
@@ -17,9 +17,13 @@ import ChooseRestaurant from '../../app/(app)/add/place';
 import { preparePickPhoto } from '../lib/prepare-pick-photo';
 import { pickPhoto } from '../lib/pick-photo';
 import { PLACE, RAMEN, VEGAN, readDraft, withDraft } from '../test-support/add-dish';
+import { resetPickChanges, usePhotoNotice } from '../state/pick-changes';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), dismissTo: jest.fn() };
-jest.mock('expo-router', () => ({ useRouter: () => mockRouter }));
+jest.mock('expo-router', () => ({
+  useRouter: () => mockRouter,
+  useFocusEffect: (cb: () => void | (() => void)) => jest.requireActual('react').useEffect(cb, [cb]),
+}));
 jest.mock('@finalmeal/api', () => ({
   ...jest.requireActual('@finalmeal/api'),
   addPick: jest.fn(),
@@ -85,6 +89,7 @@ async function settle() {
 describe('Add a dish form', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetPickChanges();
     mockGetPicks.mockResolvedValue(finals(2));
     mockSearchTags.mockImplementation(async (_c, kind) =>
       kind === 'food_type'
@@ -293,7 +298,21 @@ describe('Add a dish form', () => {
       expect(screen.queryByRole('button', { name: 'Make it a Final Meal instead' })).toBeNull();
     });
 
-    it('shows friendly copy when promoting fails', async () => {
+    it('shows friendly copy when promoting fails for another reason', async () => {
+      mockAddPick.mockRejectedValue(duplicate());
+      mockGetPicks.mockResolvedValue([pickAt('honorable', null, 'pk9')]);
+      mockPromote.mockRejectedValue(new ApiError('gone', 'pick_not_found'));
+      await render(withDraft(<AddDish />, READY));
+      await settle();
+      await fireEvent.press(cta('Add to Final Meal'));
+      await settle();
+      await fireEvent.press(screen.getByRole('button', { name: 'Make it a Final Meal instead' }));
+      await settle();
+      expect(screen.getByText('That pick isn’t there any more.')).toBeOnTheScreen();
+      expect(mockRouter.dismissTo).not.toHaveBeenCalled();
+    });
+
+    it('opens Swap in promote mode when promoting finds the five full', async () => {
       mockAddPick.mockRejectedValue(duplicate());
       mockGetPicks.mockResolvedValue([pickAt('honorable', null, 'pk9')]);
       mockPromote.mockRejectedValue(new ApiError('full', 'final_full'));
@@ -303,7 +322,94 @@ describe('Add a dish form', () => {
       await settle();
       await fireEvent.press(screen.getByRole('button', { name: 'Make it a Final Meal instead' }));
       await settle();
-      expect(screen.getByText('Your five are full. Choose one to replace.')).toBeOnTheScreen();
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        pathname: '/add/swap',
+        params: { promote: 'pk9' },
+      });
+    });
+  });
+
+  describe('saving', () => {
+    function Notice() {
+      return <Text testID="notice">{String(usePhotoNotice())}</Text>;
+    }
+    const withNotice = (draft: Parameters<typeof withDraft>[1]) => (
+      <>
+        {withDraft(<AddDish />, draft)}
+        <Notice />
+      </>
+    );
+
+    it('keeps the button busy and the screen shut while saving, and saves once', async () => {
+      let finish: (v: { pick: Pick; photoFailed: boolean }) => void = () => {};
+      mockAddPick.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+      await render(withDraft(<AddDish />, READY));
+      await settle();
+      await fireEvent.press(cta('Add to Final Meal'));
+      expect(screen.getByTestId('cta-busy')).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled();
+      await fireEvent.press(screen.getByTestId('cta-busy'));
+      expect(mockAddPick).toHaveBeenCalledTimes(1);
+      await act(async () => finish({ pick: pickAt('final', 3), photoFailed: false }));
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+    });
+
+    it('raises the saved-without-photo notice for You when the upload failed', async () => {
+      mockAddPick.mockResolvedValue({ pick: pickAt('final', 3), photoFailed: true });
+      jest.mocked(preparePickPhoto).mockResolvedValue(new ArrayBuffer(8));
+      await render(withNotice({ ...READY, photoUri: 'file:///a.jpg' }));
+      await settle();
+      expect(screen.getByTestId('notice')).toHaveTextContent('false');
+      await fireEvent.press(cta('Add to Final Meal'));
+      await settle();
+      expect(screen.getByTestId('notice')).toHaveTextContent('true');
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+    });
+
+    it('saves without the photo, with the notice, when it cannot be prepared', async () => {
+      jest.mocked(preparePickPhoto).mockRejectedValue(new Error('resize failed'));
+      await render(withNotice({ ...READY, photoUri: 'file:///a.jpg' }));
+      await settle();
+      await fireEvent.press(cta('Add to Final Meal'));
+      await settle();
+      expect(mockAddPick).toHaveBeenCalledTimes(1);
+      expect(mockAddPick.mock.calls[0]![1].photo).toBeUndefined();
+      expect(screen.getByTestId('notice')).toHaveTextContent('true');
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+    });
+
+    it('shows no notice when the photo went up', async () => {
+      await render(withNotice(READY));
+      await settle();
+      await fireEvent.press(cta('Add to Final Meal'));
+      await settle();
+      expect(screen.getByTestId('notice')).toHaveTextContent('false');
+    });
+
+    it('counts a duplicate after a lost connection as saved, instead of showing an error', async () => {
+      mockAddPick
+        .mockRejectedValueOnce(new TypeError('Network request failed'))
+        .mockRejectedValueOnce(new ApiError('duplicate', 'duplicate_pick'));
+      await render(withDraft(<AddDish />, READY));
+      await settle();
+      await fireEvent.press(cta('Add to Final Meal'));
+      await settle();
+      expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+      mockGetPicks.mockResolvedValue([pickAt('final', 3)]);
+      await fireEvent.press(cta('Add to Final Meal'));
+      await settle();
+      expect(mockAddPick).toHaveBeenCalledTimes(2);
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+    });
+
+    it('still reports a duplicate that was there before any retry', async () => {
+      mockAddPick.mockRejectedValue(new ApiError('duplicate', 'duplicate_pick'));
+      mockGetPicks.mockResolvedValue([pickAt('final', 3)]);
+      await render(withDraft(<AddDish />, READY));
+      await settle();
+      await fireEvent.press(cta('Add to Final Meal'));
+      await settle();
+      expect(screen.getByText('That dish is already on your list.')).toBeOnTheScreen();
       expect(mockRouter.dismissTo).not.toHaveBeenCalled();
     });
   });

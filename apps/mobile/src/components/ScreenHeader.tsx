@@ -9,15 +9,18 @@ interface ScreenHeaderProps {
   onBack: () => void;
   /** An action at the right edge, such as Save. */
   right?: ReactNode;
+  /** Back is off, such as while something is saving. */
+  backDisabled?: boolean;
 }
 
 /** The canvas top bar for pushed screens: back arrow, 17-point bold title, optional action. */
-export function ScreenHeader({ title, onBack, right }: ScreenHeaderProps) {
+export function ScreenHeader({ title, onBack, right, backDisabled = false }: ScreenHeaderProps) {
   return (
     <View style={styles.bar}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Back"
+        disabled={backDisabled}
         onPress={onBack}
         hitSlop={8}
         style={styles.back}

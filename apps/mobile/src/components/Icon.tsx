@@ -86,6 +86,22 @@ const GLYPHS = {
       <Path d="m16 17 5-5-5-5M21 12H9" />
     </>
   ),
+  more: (
+    <>
+      <Circle cx={5} cy={12} r={1.4} />
+      <Circle cx={12} cy={12} r={1.4} />
+      <Circle cx={19} cy={12} r={1.4} />
+    </>
+  ),
+  directions: <Path d="m3 11 19-9-9 19-2-8z" />,
+  swap: (
+    <>
+      <Path d="M17 1l4 4-4 4" />
+      <Path d="M3 11V9a4 4 0 0 1 4-4h14" />
+      <Path d="M7 23l-4-4 4-4" />
+      <Path d="M21 13v2a4 4 0 0 1-4 4H3" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof GLYPHS;

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -18,6 +18,7 @@ import { PrimaryButton } from '../../../src/components/PrimaryButton';
 import { ProfileHeader } from '../../../src/components/ProfileHeader';
 import { fontFamily } from '../../../src/lib/fonts';
 import { useSession } from '../../../src/providers/SessionProvider';
+import { dismissPhotoNotice, usePhotoNotice, usePicksVersion } from '../../../src/state/pick-changes';
 
 type ProfileTab = 'final' | 'honorable' | 'map';
 
@@ -34,6 +35,11 @@ export default function You() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // A save, swap, move or removal elsewhere changed the picks: refresh the profile's dish count.
+  const picksVersion = usePicksVersion();
+  const seenVersion = useRef(picksVersion);
+  const photoNotice = usePhotoNotice();
+
   async function refresh() {
     setRefreshing(true);
     setError(null);
@@ -45,6 +51,12 @@ export default function You() {
       setRefreshing(false);
     }
   }
+
+  useEffect(() => {
+    if (picksVersion === seenVersion.current) return;
+    seenVersion.current = picksVersion;
+    void refresh();
+  }, [picksVersion]);
 
   if (!profile) {
     // No profile to show: never a blank screen. Say why and offer a retry.
@@ -94,6 +106,21 @@ export default function You() {
         }
       >
         <ProfileHeader profile={profile} onEdit={() => router.push('/settings/edit-profile')} />
+        {photoNotice ? (
+          <View style={styles.notice} accessibilityRole="alert">
+            <Text style={styles.noticeText}>
+              Saved without the photo. Add it from the dish any time.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss"
+              onPress={dismissPhotoNotice}
+              hitSlop={8}
+            >
+              <Icon name="close" size={18} color={colors.smoke} />
+            </Pressable>
+          </View>
+        ) : null}
         {error ? (
           <Text style={styles.error} accessibilityRole="alert">
             {error}
@@ -166,6 +193,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.danger,
   },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: colors.ash,
+    borderWidth: 1,
+    borderColor: colors.lineStrong,
+  },
+  noticeText: { flex: 1, fontFamily: fontFamily.uiMedium, fontSize: 13, color: colors.bone },
   tabs: {
     flexDirection: 'row',
     gap: 24,

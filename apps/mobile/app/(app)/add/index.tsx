@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addPick, ApiError, friendlyMessage, getMyPicks, promotePick } from '@finalmeal/api';
+import { ApiError, friendlyMessage, getMyPicks, promotePick } from '@finalmeal/api';
 import type { Pick } from '@finalmeal/api';
 import { colors } from '@finalmeal/ui-tokens';
 import { NOTE_MAX } from '@finalmeal/core';
@@ -16,11 +16,11 @@ import { TagPicker } from '../../../src/components/TagPicker';
 import { TextField } from '../../../src/components/TextField';
 import { TierChooser } from '../../../src/components/TierChooser';
 import { fontFamily } from '../../../src/lib/fonts';
-import { preparePickPhoto } from '../../../src/lib/prepare-pick-photo';
 import { getSupabase } from '../../../src/lib/supabase';
+import { useBlockBack } from '../../../src/lib/use-block-back';
 import { ctaFor, findExistingPick, useAddDish } from '../../../src/state/add-dish';
-
-const PHOTO_PROBLEM = 'invalid_photo';
+import { announcePicksChanged } from '../../../src/state/pick-changes';
+import { useSavePick } from '../../../src/state/save-pick';
 
 /** Add a dish: photo, dish, restaurant, which list, a note and optional tags, in one sheet. */
 export default function AddDish() {
@@ -28,7 +28,10 @@ export default function AddDish() {
   const { draft, dispatch } = useAddDish();
   const [finalCount, setFinalCount] = useState<number | null>(null);
   const [tagsOpen, setTagsOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const { busy: saving, save } = useSavePick();
+  const [promoting, setPromoting] = useState(false);
+  const busy = saving || promoting;
+  useBlockBack(busy);
   const [error, setError] = useState<string | null>(null);
   /** Set when the dish is already an honorable pick that the person was adding to the Final Meal. */
   const [promotable, setPromotable] = useState<Pick | null>(null);
@@ -68,59 +71,51 @@ export default function AddDish() {
       router.push('/add/swap');
       return;
     }
-    setBusy(true);
     setError(null);
     setPromotable(null);
-    try {
-      let photo: ArrayBuffer | undefined;
-      if (draft.photoUri) {
-        try {
-          photo = await preparePickPhoto(draft.photoUri);
-        } catch {
-          throw new ApiError('The photo could not be prepared', PHOTO_PROBLEM);
-        }
-      }
-      await addPick(getSupabase(), {
-        placeId: place!.id,
-        dishId: draft.dishId ?? undefined,
-        dishName: draft.dishName.trim(),
-        tier: draft.tier,
-        note: draft.note.trim() === '' ? undefined : draft.note.trim(),
-        tagIds: draft.tags.map((t) => t.id),
-        personalTags: draft.personalTags,
-        photo,
-      });
+    const outcome = await save(draft);
+    if (!outcome) return;
+    if (outcome.status === 'saved') {
+      announcePicksChanged({ photoFailed: outcome.photoFailed });
       done();
-    } catch (e) {
-      setBusy(false);
-      if (e instanceof ApiError && e.code === 'final_full') {
-        setFinalCount(5);
-        router.push('/add/swap');
-        return;
-      }
-      setError(friendlyMessage(e));
-      if (e instanceof ApiError && e.code === 'duplicate_pick' && draft.tier === 'final') {
-        try {
-          const existing = findExistingPick(await getMyPicks(getSupabase()), draft);
-          if (existing?.tier === 'honorable') setPromotable(existing);
-        } catch {
-          // The refusal is already on screen; without the lookup there is just no shortcut.
-        }
+      return;
+    }
+    const e = outcome.error;
+    if (e instanceof ApiError && e.code === 'final_full') {
+      setFinalCount(5);
+      router.push('/add/swap');
+      return;
+    }
+    setError(friendlyMessage(e));
+    if (e instanceof ApiError && e.code === 'duplicate_pick' && draft.tier === 'final') {
+      try {
+        const existing = findExistingPick(await getMyPicks(getSupabase()), draft);
+        if (existing?.tier === 'honorable') setPromotable(existing);
+      } catch {
+        // The refusal is already on screen; without the lookup there is just no shortcut.
       }
     }
   }
 
   async function promote() {
     if (!promotable || busy) return;
-    setBusy(true);
+    setPromoting(true);
     setError(null);
     try {
       await promotePick(getSupabase(), promotable.id);
+      announcePicksChanged();
       done();
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'final_full') {
+        // The five are full: choose which Final Meal dish this one replaces.
+        setFinalCount(5);
+        setPromoting(false);
+        router.push({ pathname: '/add/swap', params: { promote: promotable.id } });
+        return;
+      }
       setError(friendlyMessage(e));
       setPromotable(null);
-      setBusy(false);
+      setPromoting(false);
     }
   }
 
@@ -134,8 +129,9 @@ export default function AddDish() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close"
+            disabled={busy}
             onPress={() => router.back()}
-            style={styles.close}
+            style={[styles.close, busy && styles.closeOff]}
           >
             <Icon name="close" size={21} color={colors.bone} />
           </Pressable>
@@ -272,13 +268,13 @@ export default function AddDish() {
             <PrimaryButton
               label="Make it a Final Meal instead"
               variant="secondary"
-              onPress={promote}
+              onPress={() => void promote()}
               disabled={busy}
             />
           ) : null}
           <PrimaryButton
             label={cta.label}
-            onPress={submit}
+            onPress={() => void submit()}
             disabled={cta.disabled}
             busy={busy}
             icon={
@@ -314,6 +310,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  closeOff: { opacity: 0.4 },
   content: { gap: 16, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
   group: { gap: 8 },
   label: {
