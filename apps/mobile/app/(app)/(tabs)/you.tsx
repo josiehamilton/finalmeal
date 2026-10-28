@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -10,13 +10,24 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { friendlyMessage } from '@finalmeal/api';
+import { friendlyMessage, getMyPicks } from '@finalmeal/api';
+import type { Pick } from '@finalmeal/api';
+import {
+  chipOptions,
+  filterPicks,
+  groupPicksByPlace,
+  summarizeGroups,
+} from '@finalmeal/core';
+import type { ChipOption, PickFilter } from '@finalmeal/core';
 import { colors } from '@finalmeal/ui-tokens';
-import { EmptySeats } from '../../../src/components/EmptySeats';
+import { FilterChips, chipKey } from '../../../src/components/FilterChips';
+import { FinalMealList } from '../../../src/components/FinalMealList';
+import { HonorableList } from '../../../src/components/HonorableList';
 import { Icon } from '../../../src/components/Icon';
 import { PrimaryButton } from '../../../src/components/PrimaryButton';
 import { ProfileHeader } from '../../../src/components/ProfileHeader';
 import { fontFamily } from '../../../src/lib/fonts';
+import { getSupabase } from '../../../src/lib/supabase';
 import { useSession } from '../../../src/providers/SessionProvider';
 import { dismissPhotoNotice, usePhotoNotice, usePicksVersion } from '../../../src/state/pick-changes';
 
@@ -28,23 +39,43 @@ const TABS: { key: ProfileTab; label: string }[] = [
   { key: 'map', label: 'Map' },
 ];
 
+/** The chip as the `filterPicks` filter it stands for. */
+function filterFor(chip: ChipOption | null): PickFilter {
+  if (!chip) return {};
+  if (chip.kind === 'city') return { city: chip.value };
+  return chip.tagKind === 'personal' ? { personalTagSlug: chip.value } : { tagSlug: chip.value };
+}
+
 export default function You() {
   const router = useRouter();
   const { profile, loading, error: sessionError, refreshProfile } = useSession();
   const [tab, setTab] = useState<ProfileTab>('final');
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [picks, setPicks] = useState<Pick[] | null>(null);
+  const [picksLoading, setPicksLoading] = useState(true);
+  const [chosenChip, setChosenChip] = useState<ChipOption | null>(null);
+  // Only the newest load may set the picks: an older, slower one must not overwrite it.
+  const loadId = useRef(0);
 
   // A save, swap, move or removal elsewhere changed the picks: refresh the profile's dish count.
   const picksVersion = usePicksVersion();
   const seenVersion = useRef(picksVersion);
   const photoNotice = usePhotoNotice();
 
+  /** Loads the person's picks. Rejects when they cannot be loaded, keeping any picks already shown. */
+  async function loadPicks() {
+    const id = ++loadId.current;
+    const loaded = await getMyPicks(getSupabase());
+    if (id !== loadId.current) return;
+    setPicks(loaded);
+  }
+
   async function refresh() {
     setRefreshing(true);
     setError(null);
     try {
-      await refreshProfile();
+      await Promise.all([refreshProfile(), loadPicks()]);
     } catch (e) {
       setError(friendlyMessage(e));
     } finally {
@@ -52,11 +83,54 @@ export default function You() {
     }
   }
 
+  // The first load, once there is a profile. Later loads come from refresh().
+  const profileId = profile?.id;
+  useEffect(() => {
+    if (!profileId) return;
+    let cancelled = false;
+    setPicksLoading(true);
+    loadPicks()
+      .catch((e) => {
+        if (!cancelled) setError(friendlyMessage(e));
+      })
+      .finally(() => {
+        if (!cancelled) setPicksLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId]);
+
   useEffect(() => {
     if (picksVersion === seenVersion.current) return;
     seenVersion.current = picksVersion;
     void refresh();
   }, [picksVersion]);
+
+  const finals = useMemo(() => (picks ?? []).filter((p) => p.tier === 'final'), [picks]);
+  const options = useMemo(() => chipOptions(picks ?? []), [picks]);
+  // A filter whose chip has gone (its last pick was removed) falls back to All.
+  const chip = useMemo(
+    () => (chosenChip ? (options.find((o) => chipKey(o) === chipKey(chosenChip)) ?? null) : null),
+    [options, chosenChip],
+  );
+  const matching = useMemo(() => filterPicks(picks ?? [], filterFor(chip)), [picks, chip]);
+  const matchingIds = useMemo(() => new Set(matching.map((p) => p.id)), [matching]);
+  const dimmedIds = useMemo(
+    () => (chip ? new Set(finals.filter((p) => !matchingIds.has(p.id)).map((p) => p.id)) : null),
+    [chip, finals, matchingIds],
+  );
+  const matchingFinals = matching.filter((p) => p.tier === 'final').length;
+  const matchingHonorables = useMemo(() => matching.filter((p) => p.tier === 'honorable'), [matching]);
+  const groups = useMemo(() => groupPicksByPlace(matchingHonorables), [matchingHonorables]);
+  const summary = chip ? `${chip.label} · ${summarizeGroups(groupPicksByPlace(matching))}` : null;
+
+  function openPick(pick: Pick) {
+    router.push(`/pick/${pick.id}`);
+  }
+  function addFinal() {
+    router.navigate({ pathname: '/add', params: { tier: 'final' } });
+  }
 
   if (!profile) {
     // No profile to show: never a blank screen. Say why and offer a retry.
@@ -105,7 +179,11 @@ export default function You() {
           />
         }
       >
-        <ProfileHeader profile={profile} onEdit={() => router.push('/settings/edit-profile')} />
+        <ProfileHeader
+          profile={profile}
+          dishes={picks?.length}
+          onEdit={() => router.push('/settings/edit-profile')}
+        />
         {photoNotice ? (
           <View style={styles.notice} accessibilityRole="alert">
             <Text style={styles.noticeText}>
@@ -129,30 +207,53 @@ export default function You() {
         <View accessibilityRole="tablist" style={styles.tabs}>
           {TABS.map(({ key, label }) => {
             const on = tab === key;
+            const count =
+              key === 'final' ? matchingFinals : key === 'honorable' ? matchingHonorables.length : null;
             return (
               <Pressable
                 key={key}
                 accessibilityRole="tab"
-                accessibilityLabel={label}
+                accessibilityLabel={count === null ? label : `${label} ${count}`}
                 accessibilityState={{ selected: on }}
                 onPress={() => setTab(key)}
                 style={[styles.tab, on && styles.tabOn]}
               >
-                <Text style={[styles.tabText, on && styles.tabTextOn]}>{label}</Text>
+                <Text style={[styles.tabText, on && styles.tabTextOn]}>
+                  {label}
+                  {count === null ? null : <Text style={styles.tabCount}>{` ${count}`}</Text>}
+                </Text>
               </Pressable>
             );
           })}
         </View>
+        {tab !== 'map' && options.length > 0 ? (
+          <View style={styles.filters}>
+            <FilterChips options={options} selected={chip} onSelect={setChosenChip} />
+            {summary ? (
+              <View style={styles.summaryRow}>
+                {/* "Share these" joins this row in Phase 6, when sharing lists exists. */}
+                <Text style={styles.summary}>{summary}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
         <View style={styles.panel}>
-          {tab === 'final' ? (
-            <>
-              <EmptySeats />
-              <Text style={styles.smoke}>Adding dishes arrives in the next build.</Text>
-            </>
-          ) : tab === 'honorable' ? (
-            <Text style={styles.empty}>No honorable mentions yet.</Text>
-          ) : (
+          {tab === 'map' ? (
             <Text style={styles.empty}>Your map fills in as you add dishes.</Text>
+          ) : picks === null ? (
+            picksLoading || refreshing ? (
+              <ActivityIndicator testID="picks-loading" color={colors.emberGlow} />
+            ) : (
+              <PrimaryButton label="Try again" onPress={refresh} />
+            )
+          ) : tab === 'final' ? (
+            <FinalMealList picks={finals} dimmedIds={dimmedIds} onOpen={openPick} onAdd={addFinal} />
+          ) : groups.length > 0 ? (
+            <HonorableList groups={groups} onOpen={openPick} />
+          ) : (
+            <Text style={styles.empty}>
+              {chip ? 'No honorable mentions match this filter.' : 'No honorable mentions yet.'}
+            </Text>
           )}
         </View>
       </ScrollView>
@@ -223,8 +324,11 @@ const styles = StyleSheet.create({
   tabOn: { borderBottomColor: colors.emberGlow },
   tabText: { fontFamily: fontFamily.uiBold, fontSize: 14, color: colors.dim },
   tabTextOn: { color: colors.bone },
+  tabCount: { fontFamily: fontFamily.uiSemiBold, color: colors.dim },
+  filters: { gap: 10, paddingTop: 12, paddingBottom: 6 },
+  summaryRow: { paddingHorizontal: 20 },
+  summary: { fontFamily: fontFamily.ui, fontSize: 13, color: colors.smoke },
   panel: { gap: 16, paddingHorizontal: 20, paddingTop: 20 },
-  smoke: { fontFamily: fontFamily.ui, fontSize: 13, color: colors.smoke, textAlign: 'center' },
   empty: {
     paddingTop: 24,
     fontFamily: fontFamily.ui,

@@ -39,6 +39,12 @@ export const initialDraft: AddDishDraft = {
   searchCity: null,
 };
 
+/** The tier named by a route param (`/add?tier=final`), or undefined when it is missing or unknown. */
+export function tierFromParam(value: string | string[] | undefined): 'final' | 'honorable' | undefined {
+  const tier = Array.isArray(value) ? value[0] : value;
+  return tier === 'final' || tier === 'honorable' ? tier : undefined;
+}
+
 export type AddDishAction =
   | { type: 'setPlace'; place: Place }
   | { type: 'setDishName'; name: string }

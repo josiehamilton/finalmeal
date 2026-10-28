@@ -22,12 +22,15 @@ function Stat({ n, label }: StatProps) {
 
 interface ProfileHeaderProps {
   profile: MyProfile;
+  /** The number of picks on screen. It stands in for the profile's own count, which can lag behind a change. */
+  dishes?: number;
   onEdit: () => void;
 }
 
 /** Avatar, name, home city, bio, follower stats and Edit profile. */
-export function ProfileHeader({ profile, onEdit }: ProfileHeaderProps) {
+export function ProfileHeader({ profile, dishes, onEdit }: ProfileHeaderProps) {
   const { counts } = profile;
+  const dishCount = dishes ?? counts.dishes;
   const city = profile.showHomeCity ? profile.homeCity : null;
   return (
     <View style={styles.wrap}>
@@ -49,7 +52,7 @@ export function ProfileHeader({ profile, onEdit }: ProfileHeaderProps) {
       <View style={styles.stats}>
         <Stat n={counts.followers} label={counts.followers === 1 ? 'follower' : 'followers'} />
         <Stat n={counts.following} label="following" />
-        <Stat n={counts.dishes} label={counts.dishes === 1 ? 'dish' : 'dishes'} />
+        <Stat n={dishCount} label={dishCount === 1 ? 'dish' : 'dishes'} />
       </View>
       <PrimaryButton label="Edit profile" variant="ghost" size="compact" onPress={onEdit} />
     </View>
