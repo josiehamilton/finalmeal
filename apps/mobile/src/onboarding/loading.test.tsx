@@ -34,13 +34,13 @@ describe('Loading screen', () => {
     expect(screen.getByText('Setting your table…')).toBeOnTheScreen();
   });
 
-  it('goes to You after 1200 ms, having refreshed the profile', async () => {
+  it('goes to the Feed tab (First landing) after 1200 ms, having refreshed the profile', async () => {
     await render(<Loading />);
     await tick(1199);
     expect(mockRouter.replace).not.toHaveBeenCalled();
     await tick(1);
     expect(mockRefresh).toHaveBeenCalledTimes(1);
-    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/you');
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/feed');
   });
 
   it('starts the profile load at once and waits only for the slower of the two', async () => {
@@ -52,7 +52,7 @@ describe('Loading screen', () => {
     // The minimum has passed but the profile has not arrived yet.
     expect(mockRouter.replace).not.toHaveBeenCalled();
     await act(async () => finish(null));
-    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/you');
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/feed');
   });
 
   it('adds no wait after the minimum when the profile is already there', async () => {
@@ -74,11 +74,11 @@ describe('Loading screen', () => {
     }
   });
 
-  it('still goes to You when the refresh fails', async () => {
+  it('still goes to the Feed tab when the refresh fails', async () => {
     mockRefresh.mockRejectedValue(new TypeError('Network request failed'));
     await render(<Loading />);
     await tick(1200);
-    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/you');
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/feed');
   });
 
   it('does nothing after it is closed', async () => {

@@ -10,7 +10,7 @@ import { useSession } from '../../src/providers/SessionProvider';
 
 const MIN_VISIBLE_MS = 1200;
 
-/** Shown for at least 1.2 s after onboarding finishes, then hands over to the app. */
+/** Shown for at least 1.2 s after onboarding finishes, then hands over to the app: the Feed tab, which shows First landing until the real feed arrives. */
 export default function LoadingStep() {
   const router = useRouter();
   const { refreshProfile } = useSession();
@@ -35,7 +35,7 @@ export default function LoadingStep() {
       timer = setTimeout(resolve, MIN_VISIBLE_MS);
     });
     Promise.all([loaded, minimum]).then(() => {
-      if (!cancelled) router.replace('/(app)/you');
+      if (!cancelled) router.replace('/(app)/feed');
     });
     return () => {
       cancelled = true;

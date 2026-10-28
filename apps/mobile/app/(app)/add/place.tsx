@@ -7,12 +7,17 @@ import { PlaceSearch } from '../../../src/components/PlaceSearch';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
 import { useSession } from '../../../src/providers/SessionProvider';
 import { useAddDish } from '../../../src/state/add-dish';
+import { useAddFlowBase } from '../../../src/state/add-flow-base';
 
-/** Choose a restaurant: search around a chosen city (the home city to start with). */
+/**
+ * Choose a restaurant: search around a chosen city (the home city to start with). Shared with the
+ * onboarding first pick, which mounts it under its own route base (see add-flow-base).
+ */
 export default function ChooseRestaurant() {
   const router = useRouter();
   const { profile } = useSession();
   const { draft, dispatch } = useAddDish();
+  const base = useAddFlowBase();
   return (
     <SafeAreaView style={styles.screen}>
       <KeyboardAvoider>
@@ -32,7 +37,7 @@ export default function ChooseRestaurant() {
               router.back();
             }}
             onAddNew={(typed) =>
-              router.push({ pathname: '/add/custom-place', params: { name: typed } })
+              router.push({ pathname: `${base}/custom-place`, params: { name: typed } })
             }
           />
         </ScrollView>

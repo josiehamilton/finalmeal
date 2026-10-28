@@ -11,6 +11,7 @@ import { Icon } from '../../../src/components/Icon';
 import { KeyboardAvoider } from '../../../src/components/KeyboardAvoider';
 import { PhotoField } from '../../../src/components/PhotoField';
 import { PrimaryButton } from '../../../src/components/PrimaryButton';
+import { RestaurantField } from '../../../src/components/RestaurantField';
 import { SkullMark } from '../../../src/components/SkullMark';
 import { TagPicker } from '../../../src/components/TagPicker';
 import { TextField } from '../../../src/components/TextField';
@@ -196,37 +197,7 @@ export default function AddDish() {
                 onChoose={(suggestion) => dispatch({ type: 'chooseSuggestion', suggestion })}
               />
 
-              <View style={styles.group}>
-                <Text style={styles.label}>Restaurant</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    place ? `Restaurant: ${place.name}, ${place.label}. Change` : 'Restaurant: Choose a restaurant'
-                  }
-                  onPress={() => router.push('/add/place')}
-                  style={styles.restaurant}
-                >
-                  <Icon name="pin" size={20} color={place ? colors.emberGlow : colors.smoke} />
-                  {place ? (
-                    <>
-                      <View style={styles.restaurantText}>
-                        <Text style={styles.restaurantName} numberOfLines={1}>
-                          {place.name}
-                        </Text>
-                        <Text style={styles.restaurantWhere} numberOfLines={1}>
-                          {place.label}
-                        </Text>
-                      </View>
-                      <Text style={styles.change}>Change</Text>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={styles.restaurantEmpty}>Choose a restaurant</Text>
-                      <Icon name="chev" size={18} color={colors.smoke} />
-                    </>
-                  )}
-                </Pressable>
-              </View>
+              <RestaurantField place={place} onPress={() => router.push('/add/place')} />
 
               <TierChooser
                 value={draft.tier}
@@ -314,30 +285,6 @@ const styles = StyleSheet.create({
   },
   closeOff: { opacity: 0.4 },
   content: { gap: 16, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
-  group: { gap: 8 },
-  label: {
-    fontFamily: fontFamily.uiBold,
-    fontSize: 11,
-    letterSpacing: 0.12 * 11,
-    textTransform: 'uppercase',
-    color: colors.dim,
-  },
-  restaurant: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    height: 64,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: colors.ash,
-    borderWidth: 1,
-    borderColor: colors.lineStrong,
-  },
-  restaurantText: { flex: 1, gap: 2, minWidth: 0 },
-  restaurantName: { fontFamily: fontFamily.uiSemiBold, fontSize: 16, color: colors.bone },
-  restaurantWhere: { fontFamily: fontFamily.ui, fontSize: 12, color: colors.smoke },
-  restaurantEmpty: { flex: 1, fontFamily: fontFamily.uiMedium, fontSize: 16, color: colors.dim },
-  change: { fontFamily: fontFamily.uiSemiBold, fontSize: 13, color: colors.smoke },
   addTags: {
     flexDirection: 'row',
     alignItems: 'center',

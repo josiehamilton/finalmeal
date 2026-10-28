@@ -6,6 +6,9 @@ import { join } from 'path';
 const root = join(__dirname, '..', '..');
 const FILES = [
   'app/(app)/add',
+  'app/(onboarding)/add-first',
+  'src/state/add-flow-base.ts',
+  'src/components/RestaurantField.tsx',
   'src/state/add-dish.ts',
   'src/components/PlaceSearch.tsx',
   'src/components/DishField.tsx',

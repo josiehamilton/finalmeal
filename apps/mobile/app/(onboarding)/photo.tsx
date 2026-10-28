@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
-import { finishOnboarding, friendlyMessage, uploadMyAvatar } from '@finalmeal/api';
+import { friendlyMessage, uploadMyAvatar } from '@finalmeal/api';
 import { colors } from '@finalmeal/ui-tokens';
 import { OnboardingScreen } from '../../src/components/OnboardingScreen';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
@@ -45,15 +45,13 @@ function LibraryIcon() {
   );
 }
 
-/** Step 6. The last step; finishing it shows the loading screen. */
+/** Step 6. The last numbered step; the first pick comes next, and onboarding finishes there. */
 export default function PhotoStep() {
   const router = useRouter();
   const [uri, setUri] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // The photo that is already uploaded, so a retry after a later failure does not upload it again.
-  const uploaded = useRef<string | null>(null);
 
   async function pick(source: PhotoSource) {
     setNotice(null);
@@ -67,12 +65,10 @@ export default function PhotoStep() {
     setBusy(true);
     setError(null);
     try {
-      if (withPhoto && uri && uploaded.current !== uri) {
+      if (withPhoto && uri) {
         await uploadMyAvatar(getSupabase(), await prepareAvatar(uri));
-        uploaded.current = uri;
       }
-      await finishOnboarding(getSupabase());
-      router.replace('/loading');
+      router.replace('/first-pick');
     } catch (e) {
       setError(friendlyMessage(e));
       setBusy(false);

@@ -8,10 +8,12 @@ import { Icon } from './Icon';
 interface PhotoFieldProps {
   uri: string | null;
   onChange: (uri: string | null) => void;
+  /** `tile` is the Add form's square tile beside its copy; `banner` is the full-width onboarding tile. */
+  layout?: 'tile' | 'banner';
 }
 
-/** The square Photo tile beside "Photo (optional)." Tapping it offers the camera or the library. */
-export function PhotoField({ uri, onChange }: PhotoFieldProps) {
+/** The Photo field. Tapping it offers the camera or the library. */
+export function PhotoField({ uri, onChange, layout = 'tile' }: PhotoFieldProps) {
   async function pick(source: PhotoSource) {
     const result = await pickPhoto(source, { crop: false });
     if (result.status === 'picked') onChange(result.uri);
@@ -25,6 +27,26 @@ export function PhotoField({ uri, onChange }: PhotoFieldProps) {
       ...(uri ? [{ text: 'Remove photo', style: 'destructive' as const, onPress: () => onChange(null) }] : []),
       { text: 'Cancel', style: 'cancel' as const },
     ]);
+  }
+
+  if (layout === 'banner') {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={uri ? 'Photo' : 'Add a photo (optional)'}
+        onPress={choose}
+        style={styles.banner}
+      >
+        {uri ? (
+          <Image source={{ uri }} accessibilityLabel="Your photo" style={styles.bannerImage} />
+        ) : (
+          <>
+            <Icon name="camera" size={28} color={colors.smoke} />
+            <Text style={styles.bannerLabel}>Add a photo (optional)</Text>
+          </>
+        )}
+      </Pressable>
+    );
   }
 
   return (
@@ -68,6 +90,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   image: { width: 72, height: 72 },
+  banner: {
+    height: 104,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.lineStrong,
+    backgroundColor: colors.ash,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    overflow: 'hidden',
+  },
+  bannerImage: { width: '100%', height: '100%' },
+  bannerLabel: { fontFamily: fontFamily.uiSemiBold, fontSize: 14, color: colors.smoke },
   tileLabel: { fontFamily: fontFamily.uiSemiBold, fontSize: 12, color: colors.smoke },
   copy: {
     flex: 1,

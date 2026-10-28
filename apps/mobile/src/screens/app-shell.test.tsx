@@ -71,7 +71,7 @@ describe('app shell navigation', () => {
     await renderRouter(routes(), { initialUrl: '/(app)/you' });
     await screen.findByText('@josiehamilton');
     await fireEvent.press(screen.getByRole('button', { name: 'Feed' }));
-    expect(await screen.findByText('Coming soon.')).toBeOnTheScreen();
+    expect(await screen.findByText('Your table is set.')).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole('button', { name: 'You' }));
     expect(await screen.findByText('@josiehamilton')).toBeOnTheScreen();
   });

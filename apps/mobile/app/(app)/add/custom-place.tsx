@@ -12,6 +12,7 @@ import { fontFamily } from '../../../src/lib/fonts';
 import { getSupabase } from '../../../src/lib/supabase';
 import { useSession } from '../../../src/providers/SessionProvider';
 import { useAddDish } from '../../../src/state/add-dish';
+import { useAddFlowBase } from '../../../src/state/add-flow-base';
 
 const INTRO =
   'Restaurants, cafés, food trucks and pop-ups: anywhere the public can eat. Please don’t add someone’s home.';
@@ -22,6 +23,7 @@ export default function CustomPlace() {
   const params = useLocalSearchParams<{ name?: string }>();
   const { profile } = useSession();
   const { draft, dispatch } = useAddDish();
+  const base = useAddFlowBase();
   const start = draft.searchCity ?? profile?.homeCity ?? null;
 
   const [name, setName] = useState(typeof params.name === 'string' ? params.name : '');
@@ -58,7 +60,7 @@ export default function CustomPlace() {
         type: 'setSearchCity',
         city: { id: city.id, label: city.label, point: { lat: place.lat, lng: place.lng } },
       });
-      router.dismissTo('/add');
+      router.dismissTo(base);
     } catch (e) {
       setError(friendlyMessage(e));
       setBusy(false);

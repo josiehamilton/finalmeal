@@ -1,10 +1,8 @@
 import { render, screen } from '@testing-library/react-native';
 import Discover from '../../app/(app)/(tabs)/discover';
-import Feed from '../../app/(app)/(tabs)/feed';
 import Saved from '../../app/(app)/(tabs)/saved';
 
 describe.each([
-  ['Feed', Feed],
   ['Discover', Discover],
   ['Saved', Saved],
 ])('%s tab', (_name, Screen) => {

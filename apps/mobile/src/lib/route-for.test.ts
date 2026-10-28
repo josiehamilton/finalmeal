@@ -30,11 +30,21 @@ describe('routeFor', () => {
     expect(routeFor({ session: true, profile: null, loading: false })).toBe('/name');
   });
 
-  it('sends a profile that is not onboarded to the city step', () => {
+  it('sends a profile that is not onboarded and has neither city nor photo to the city step', () => {
     expect(routeFor({ session: true, profile: profile(false), loading: false })).toBe('/city');
   });
 
-  it('sends an onboarded profile into the app', () => {
-    expect(routeFor({ session: true, profile: profile(true), loading: false })).toBe('/(app)/you');
+  it('resumes at the first pick once the person has a home city', () => {
+    const withCity = { ...profile(false), homeCity: { id: 'c1', label: 'Vancouver, BC, Canada' } };
+    expect(routeFor({ session: true, profile: withCity, loading: false })).toBe('/first-pick');
+  });
+
+  it('resumes at the first pick once the person has a photo (even with the city skipped)', () => {
+    const withPhoto = { ...profile(false), avatarUrl: 'https://example.test/me.jpg' };
+    expect(routeFor({ session: true, profile: withPhoto, loading: false })).toBe('/first-pick');
+  });
+
+  it('sends an onboarded profile to the Feed tab, which shows First landing', () => {
+    expect(routeFor({ session: true, profile: profile(true), loading: false })).toBe('/(app)/feed');
   });
 });

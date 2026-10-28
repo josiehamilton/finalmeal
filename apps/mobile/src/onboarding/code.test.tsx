@@ -78,11 +78,11 @@ describe('Code step', () => {
     expect(mockRouter.replace).toHaveBeenCalledWith('/city');
   });
 
-  it('lands a returning, onboarded person on You', async () => {
+  it('lands a returning, onboarded person on the Feed tab (First landing)', async () => {
     mockRefresh.mockResolvedValue(PROFILE);
     await render(<Code />);
     await enterCode('123456');
-    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/you');
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/feed');
   });
 
   it('Verify also works and is disabled until six digits are in', async () => {

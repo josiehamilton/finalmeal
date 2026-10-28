@@ -26,7 +26,10 @@ interface TagPickerProps {
   onSelectPersonal: (name: string) => void;
   /** Opens tag search for a kind ("More"). */
   onMore: (kind: 'food_type' | 'dietary') => void;
-  onHide: () => void;
+  /** Hides the panel. Leave out for `inline`, which is always open. */
+  onHide?: () => void;
+  /** The onboarding form's version: a plain "Tags (optional)" label over the groups, no panel or Hide. */
+  inline?: boolean;
 }
 
 function Section({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
@@ -50,6 +53,7 @@ export function TagPicker({
   onSelectPersonal,
   onMore,
   onHide,
+  inline = false,
 }: TagPickerProps) {
   const [featured, setFeatured] = useState<Record<TagKind, Tag[]>>({
     food_type: [],
@@ -109,20 +113,24 @@ export function TagPicker({
   }
 
   return (
-    <View style={styles.panel}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Hide"
-        onPress={onHide}
-        style={styles.head}
-      >
-        <Icon name="tag" size={18} color={colors.emberGlow} />
-        <Text style={styles.headTitle}>
-          Tags <Text style={styles.headOptional}>· optional</Text>
-        </Text>
-        <Text style={styles.hide}>Hide</Text>
-        <Icon name="chevUp" size={16} color={colors.smoke} />
-      </Pressable>
+    <View style={inline ? styles.inline : styles.panel}>
+      {inline ? (
+        <Text style={styles.inlineLabel}>Tags (optional)</Text>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Hide"
+          onPress={onHide}
+          style={styles.head}
+        >
+          <Icon name="tag" size={18} color={colors.emberGlow} />
+          <Text style={styles.headTitle}>
+            Tags <Text style={styles.headOptional}>· optional</Text>
+          </Text>
+          <Text style={styles.hide}>Hide</Text>
+          <Icon name="chevUp" size={16} color={colors.smoke} />
+        </Pressable>
+      )}
 
       <Section title="Food type" hint="Suggested">
         {withChosen('food_type').map((tag) => (
@@ -201,6 +209,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.lineStrong,
+  },
+  inline: { gap: 16 },
+  inlineLabel: {
+    fontFamily: fontFamily.uiBold,
+    fontSize: 11,
+    letterSpacing: 0.12 * 11,
+    textTransform: 'uppercase',
+    color: colors.dim,
   },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headTitle: { flex: 1, fontFamily: fontFamily.uiBold, fontSize: 15, color: colors.bone },

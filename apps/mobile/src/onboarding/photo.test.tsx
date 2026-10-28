@@ -52,20 +52,20 @@ describe('Photo step', () => {
     expect(screen.getByRole('button', { name: 'Choose from library' })).toBeOnTheScreen();
   });
 
-  it('Skip only finishes onboarding, then shows the loading screen', async () => {
+  it('Skip goes to the first pick without finishing onboarding or uploading', async () => {
     await render(<Photo />);
     await fireEvent.press(screen.getByRole('button', { name: 'Skip' }));
-    expect(mockFinish).toHaveBeenCalledTimes(1);
+    expect(mockFinish).not.toHaveBeenCalled();
     expect(mockUpload).not.toHaveBeenCalled();
-    expect(mockRouter.replace).toHaveBeenCalledWith('/loading');
+    expect(mockRouter.replace).toHaveBeenCalledWith('/first-pick');
   });
 
-  it('Continue with no photo also just finishes', async () => {
+  it('Continue with no photo also goes to the first pick', async () => {
     await render(<Photo />);
     await fireEvent.press(cta());
     expect(mockUpload).not.toHaveBeenCalled();
-    expect(mockFinish).toHaveBeenCalledTimes(1);
-    expect(mockRouter.replace).toHaveBeenCalledWith('/loading');
+    expect(mockFinish).not.toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/first-pick');
   });
 
   it('asks for a square crop from the library and uploads the prepared photo', async () => {
@@ -78,8 +78,8 @@ describe('Photo step', () => {
     await fireEvent.press(cta());
     expect(mockPrepare).toHaveBeenCalledWith('file:///lib.jpg');
     expect(mockUpload).toHaveBeenCalledWith({ fake: 'client' }, BYTES);
-    expect(mockFinish).toHaveBeenCalledTimes(1);
-    expect(mockRouter.replace).toHaveBeenCalledWith('/loading');
+    expect(mockFinish).not.toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/first-pick');
   });
 
   it('takes a photo with the camera after asking permission', async () => {
@@ -116,8 +116,8 @@ describe('Photo step', () => {
     expect(mockUpload).not.toHaveBeenCalled();
   });
 
-  it('shows the friendly copy on failure, re-enables the buttons, and does not upload twice', async () => {
-    mockFinish.mockRejectedValueOnce(new TypeError('Network request failed'));
+  it('shows the friendly copy when the upload fails, re-enables the buttons, and retries', async () => {
+    mockUpload.mockRejectedValueOnce(new TypeError('Network request failed'));
     await render(<Photo />);
     await fireEvent.press(screen.getByRole('button', { name: 'Choose from library' }));
     await fireEvent.press(cta());
@@ -125,9 +125,8 @@ describe('Photo step', () => {
     expect(screen.queryByTestId('cta-busy')).toBeNull();
     expect(mockRouter.replace).not.toHaveBeenCalled();
     await fireEvent.press(cta());
-    expect(mockUpload).toHaveBeenCalledTimes(1);
-    expect(mockFinish).toHaveBeenCalledTimes(2);
-    expect(mockRouter.replace).toHaveBeenCalledWith('/loading');
+    expect(mockUpload).toHaveBeenCalledTimes(2);
+    expect(mockRouter.replace).toHaveBeenCalledWith('/first-pick');
   });
 
   it('goes back', async () => {

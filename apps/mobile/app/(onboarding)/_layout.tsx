@@ -15,6 +15,8 @@ export default function OnboardingLayout() {
       <Stack.Screen name="name" options={{ gestureEnabled: false }} />
       {/* The profile exists from step 5 on, and the loading screen is a hand-over: no swiping back. */}
       <Stack.Screen name="city" options={{ gestureEnabled: false }} />
+      {/* Same for the first-pick intro. The form after it can be left with Back, but not mid-save. */}
+      <Stack.Screen name="first-pick" options={{ gestureEnabled: false }} />
       <Stack.Screen name="loading" options={{ gestureEnabled: false, animation: 'fade' }} />
     </Stack>
   );
