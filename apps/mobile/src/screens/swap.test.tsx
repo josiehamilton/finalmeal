@@ -65,6 +65,14 @@ describe('Swap', () => {
     expect(screen.getAllByRole('radio')).toHaveLength(5);
   });
 
+  it('shows the incoming dish as <restaurant> · <city>, not the area', async () => {
+    const place = { ...PLACE, id: 'p9', name: 'Kin Kao', area: 'Main St', label: 'Main St · Vancouver' };
+    await render(withDraft(<Swap />, { place, dishName: 'Khao Soi' }));
+    await settle();
+    expect(screen.getByText('Kin Kao · Vancouver')).toBeOnTheScreen();
+    expect(screen.queryByText('Main St · Vancouver')).toBeNull();
+  });
+
   it('keeps the button off until a row is chosen, then names the dish', async () => {
     await render(withDraft(<Swap />, READY));
     await settle();
@@ -238,6 +246,9 @@ describe('Swap', () => {
       await render(withDraft(<Swap />));
       await settle();
       expect(screen.getByText('Gyoza')).toBeOnTheScreen();
+      // The incoming card's place line is <restaurant> · <city> too (the five finals share the place).
+      expect(screen.getAllByText('Marutama Ramen · Vancouver')).toHaveLength(6);
+      expect(screen.queryByText('Bidwell St · Vancouver')).toBeNull();
       expect(screen.getByText('Incoming')).toBeOnTheScreen();
       expect(screen.getAllByRole('radio')).toHaveLength(5);
     });

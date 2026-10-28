@@ -61,10 +61,10 @@ export default function Swap() {
   const promoted = promote ? (picks ?? []).find((p) => p.id === promote) : undefined;
   const incoming: Incoming | null = promote
     ? promoted
-      ? { name: promoted.dish.name, where: promoted.place.label, photo: promoted.photoUrl }
+      ? { name: promoted.dish.name, where: `${promoted.place.name} · ${promoted.place.city}`, photo: promoted.photoUrl }
       : null
     : draft.place && draft.dishName.trim() !== ''
-      ? { name: draft.dishName.trim(), where: draft.place.label, photo: draft.photoUri }
+      ? { name: draft.dishName.trim(), where: `${draft.place.name} · ${draft.place.city}`, photo: draft.photoUri }
       : null;
   const chosen = finals.find((p) => p.slot === slot) ?? null;
 
