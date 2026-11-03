@@ -15,6 +15,7 @@ import Loading from '../../app/(onboarding)/loading';
 import AddFirstLayout from '../../app/(onboarding)/add-first/_layout';
 import AddFirst from '../../app/(onboarding)/add-first/index';
 import AddFirstPlace from '../../app/(onboarding)/add-first/place';
+import { resetPickChanges } from '../state/pick-changes';
 import { makeFinals } from '../test-support/picks';
 import { PLACE } from '../test-support/add-dish';
 
@@ -74,6 +75,7 @@ describe('onboarding from the photo step to First landing', () => {
   beforeEach(() => {
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
     jest.clearAllMocks();
+    resetPickChanges();
     jest.mocked(finishOnboarding).mockResolvedValue({} as never);
     jest.mocked(getMyPicks).mockResolvedValue([]);
     jest.mocked(getCity).mockResolvedValue(null);
@@ -121,6 +123,24 @@ describe('onboarding from the photo step to First landing', () => {
     expect(screen.getByText('Final Meal · #1')).toBeOnTheScreen();
     expect(screen.getByText('4 seats left')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Add your next dish' })).toBeOnTheScreen();
+  });
+
+  it('a first pick saved without its photo shows the notice on First landing', async () => {
+    jest.mocked(addPick).mockResolvedValue({ pick: {} as never, photoFailed: true });
+    await renderRouter(routes(), { initialUrl: '/first-pick' });
+    await fireEvent.press(await screen.findByRole('button', { name: 'Add my first pick' }));
+    await fireEvent.press(await screen.findByRole('button', { name: /Restaurant/ }));
+    await fireEvent.press(await screen.findByText('Marutama Ramen'));
+    await fireEvent.changeText(await screen.findByLabelText('Dish'), 'Pork Gyro');
+    await fireEvent.press(screen.getByRole('button', { name: 'Lock it in' }));
+    await act(async () => {});
+    jest.mocked(getMyPicks).mockResolvedValue(makeFinals(1));
+    await waitForLoading();
+    expect(await screen.findByText('Your Final Meal has begun.')).toBeOnTheScreen();
+    const notice = 'Saved without the photo. Add it from the dish any time.';
+    expect(screen.getByText(notice)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByText(notice)).toBeNull();
   });
 
   it('Back from the form returns to the intro without finishing onboarding', async () => {

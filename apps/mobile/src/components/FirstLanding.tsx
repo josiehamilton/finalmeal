@@ -11,6 +11,7 @@ import { getSupabase } from '../lib/supabase';
 import { useSession } from '../providers/SessionProvider';
 import { usePicksVersion } from '../state/pick-changes';
 import { Icon } from './Icon';
+import { PhotoNotice } from './PhotoNotice';
 import { PrimaryButton } from './PrimaryButton';
 import { SkullMark } from './SkullMark';
 
@@ -60,11 +61,13 @@ export function FirstLanding() {
     [picks],
   );
   const hero = finals[0] ?? null;
+  const full = finals.length >= FINAL_MEAL_SIZE;
   const firstName = profile?.displayName.trim().split(/\s+/)[0] ?? '';
 
   function addDish() {
-    // navigate, not push: a quick double tap must not stack two Add modals.
-    router.navigate({ pathname: '/add', params: { tier: 'final' } });
+    // navigate, not push: a quick double tap must not stack two Add modals. With all five seats
+    // taken, the next dish can only be an Honorable Mention.
+    router.navigate({ pathname: '/add', params: { tier: full ? 'honorable' : 'final' } });
   }
 
   return (
@@ -84,6 +87,8 @@ export function FirstLanding() {
             </Text>
           ) : null}
         </View>
+
+        <PhotoNotice />
 
         {picks === null ? (
           error ? (
@@ -146,11 +151,15 @@ export function FirstLanding() {
                   </View>
                 ))}
               </View>
-              <Text style={styles.seatsLeft}>{seatsLeftLabel(finals.length)}</Text>
+              <Text style={styles.seatsLeft}>
+                {full ? 'All five seats taken' : seatsLeftLabel(finals.length)}
+              </Text>
             </View>
             <View style={styles.cta}>
               <PrimaryButton
-                label={hero ? 'Add your next dish' : 'Add your first dish'}
+                label={
+                  full ? 'Add an Honorable Mention' : hero ? 'Add your next dish' : 'Add your first dish'
+                }
                 icon={<Icon name="plus" size={18} color={colors.white} />}
                 onPress={addDish}
               />

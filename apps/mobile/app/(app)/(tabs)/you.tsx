@@ -24,12 +24,13 @@ import { FilterChips, chipKey } from '../../../src/components/FilterChips';
 import { FinalMealList } from '../../../src/components/FinalMealList';
 import { HonorableList } from '../../../src/components/HonorableList';
 import { Icon } from '../../../src/components/Icon';
+import { PhotoNotice } from '../../../src/components/PhotoNotice';
 import { PrimaryButton } from '../../../src/components/PrimaryButton';
 import { ProfileHeader } from '../../../src/components/ProfileHeader';
 import { fontFamily } from '../../../src/lib/fonts';
 import { getSupabase } from '../../../src/lib/supabase';
 import { useSession } from '../../../src/providers/SessionProvider';
-import { dismissPhotoNotice, usePhotoNotice, usePicksVersion } from '../../../src/state/pick-changes';
+import { usePicksVersion } from '../../../src/state/pick-changes';
 
 type ProfileTab = 'final' | 'honorable' | 'map';
 
@@ -61,7 +62,6 @@ export default function You() {
   // A save, swap, move or removal elsewhere changed the picks: refresh the profile's dish count.
   const picksVersion = usePicksVersion();
   const seenVersion = useRef(picksVersion);
-  const photoNotice = usePhotoNotice();
 
   /** Loads the person's picks. Rejects when they cannot be loaded, keeping any picks already shown. */
   async function loadPicks() {
@@ -187,21 +187,7 @@ export default function You() {
           dishes={picks?.length}
           onEdit={() => router.push('/settings/edit-profile')}
         />
-        {photoNotice ? (
-          <View style={styles.notice} accessibilityRole="alert">
-            <Text style={styles.noticeText}>
-              Saved without the photo. Add it from the dish any time.
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Dismiss"
-              onPress={dismissPhotoNotice}
-              hitSlop={8}
-            >
-              <Icon name="close" size={18} color={colors.smoke} />
-            </Pressable>
-          </View>
-        ) : null}
+        <PhotoNotice style={styles.notice} />
         {error ? (
           <Text style={styles.error} accessibilityRole="alert">
             {error}
@@ -297,20 +283,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.danger,
   },
-  notice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginHorizontal: 20,
-    marginBottom: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    backgroundColor: colors.ash,
-    borderWidth: 1,
-    borderColor: colors.lineStrong,
-  },
-  noticeText: { flex: 1, fontFamily: fontFamily.uiMedium, fontSize: 13, color: colors.bone },
+  notice: { marginHorizontal: 20, marginBottom: 12 },
   tabs: {
     flexDirection: 'row',
     gap: 24,

@@ -131,10 +131,48 @@ describe('First landing', () => {
     expect(screen.queryByText('Honorable Soup')).toBeNull();
   });
 
-  it('says 0 seats left with five picks', async () => {
-    mockGetPicks.mockResolvedValue(makeFinals(5));
-    await show();
-    expect(screen.getByText('0 seats left')).toBeOnTheScreen();
+  describe('with five picks', () => {
+    beforeEach(() => {
+      mockGetPicks.mockResolvedValue(makeFinals(5));
+    });
+
+    it('says all five seats are taken and offers an Honorable Mention', async () => {
+      await show();
+      expect(screen.getByText('All five seats taken')).toBeOnTheScreen();
+      expect(screen.queryByText('0 seats left')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Add your next dish' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Add an Honorable Mention' })).toBeOnTheScreen();
+    });
+
+    it('opens Add with Honorable Mention chosen', async () => {
+      await show();
+      await fireEvent.press(screen.getByRole('button', { name: 'Add an Honorable Mention' }));
+      expect(mockRouter.navigate).toHaveBeenCalledWith({
+        pathname: '/add',
+        params: { tier: 'honorable' },
+      });
+    });
+  });
+
+  describe('when a pick was saved without its photo', () => {
+    const notice = 'Saved without the photo. Add it from the dish any time.';
+
+    it('shows the notice, which can be dismissed', async () => {
+      mockGetPicks.mockResolvedValue(makeFinals(1));
+      await show();
+      expect(screen.queryByText(notice)).toBeNull();
+      await act(async () => announcePicksChanged({ photoFailed: true }));
+      expect(screen.getByText(notice)).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('button', { name: 'Dismiss' }));
+      expect(screen.queryByText(notice)).toBeNull();
+    });
+
+    it('shows a notice raised before the landing mounted', async () => {
+      await act(async () => announcePicksChanged({ photoFailed: true }));
+      mockGetPicks.mockResolvedValue(makeFinals(1));
+      await show();
+      expect(screen.getByText(notice)).toBeOnTheScreen();
+    });
   });
 
   it('shows a spinner while loading, then the content', async () => {
