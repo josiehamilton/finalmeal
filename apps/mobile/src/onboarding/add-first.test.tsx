@@ -138,6 +138,32 @@ describe('Your first pick', () => {
     expect(mockRouter.replace).toHaveBeenCalledWith('/loading');
   });
 
+  it('locks the fields once the pick is saved but unfinished, so later edits cannot be dropped', async () => {
+    mockFinish.mockRejectedValueOnce(new TypeError('Network request failed'));
+    await render(withDraft(<AddFirst />, READY));
+    await settle();
+    // Editable until the pick is saved.
+    expect(screen.getByLabelText('Dish')).toBeEnabled();
+    expect(screen.getByLabelText('Why this one? (optional)')).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Add a photo (optional)' })).toBeEnabled();
+    expect(screen.getAllByRole('button', { name: 'Ramen' })[0]).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Restaurant/ })).toBeEnabled();
+
+    await fireEvent.press(lockIt());
+    await settle();
+    expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+
+    expect(screen.getByLabelText('Dish')).toBeDisabled();
+    expect(screen.getByLabelText('Why this one? (optional)')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add a photo (optional)' })).toBeDisabled();
+    for (const chip of screen.getAllByRole('button', { name: 'Ramen' })) expect(chip).toBeDisabled();
+    for (const more of screen.getAllByRole('button', { name: 'More' })) expect(more).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Your own' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Restaurant/ })).toBeDisabled();
+    // Lock it in stays available to finish.
+    expect(lockIt()).toBeEnabled();
+  });
+
   it('goes back to the intro', async () => {
     await render(withDraft(<AddFirst />));
     await settle();

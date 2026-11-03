@@ -10,10 +10,12 @@ interface PhotoFieldProps {
   onChange: (uri: string | null) => void;
   /** `tile` is the Add form's square tile beside its copy; `banner` is the full-width onboarding tile. */
   layout?: 'tile' | 'banner';
+  /** Locks the field (the photo can't be changed). */
+  disabled?: boolean;
 }
 
 /** The Photo field. Tapping it offers the camera or the library. */
-export function PhotoField({ uri, onChange, layout = 'tile' }: PhotoFieldProps) {
+export function PhotoField({ uri, onChange, layout = 'tile', disabled = false }: PhotoFieldProps) {
   async function pick(source: PhotoSource) {
     const result = await pickPhoto(source, { crop: false });
     if (result.status === 'picked') onChange(result.uri);
@@ -34,6 +36,8 @@ export function PhotoField({ uri, onChange, layout = 'tile' }: PhotoFieldProps) 
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={uri ? 'Photo' : 'Add a photo (optional)'}
+        accessibilityState={{ disabled }}
+        disabled={disabled}
         onPress={choose}
         style={styles.banner}
       >
@@ -54,6 +58,8 @@ export function PhotoField({ uri, onChange, layout = 'tile' }: PhotoFieldProps) 
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Photo"
+        accessibilityState={{ disabled }}
+        disabled={disabled}
         onPress={choose}
         style={styles.tile}
       >

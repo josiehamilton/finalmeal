@@ -8,10 +8,12 @@ interface RestaurantFieldProps {
   place: Place | null;
   /** Opens the restaurant search. */
   onPress: () => void;
+  /** Locks the row (the restaurant can't be changed). */
+  disabled?: boolean;
 }
 
 /** The Restaurant row of the Add form: the chosen place with Change, or Choose a restaurant. */
-export function RestaurantField({ place, onPress }: RestaurantFieldProps) {
+export function RestaurantField({ place, onPress, disabled = false }: RestaurantFieldProps) {
   return (
     <View style={styles.group}>
       <Text style={styles.label}>Restaurant</Text>
@@ -20,6 +22,8 @@ export function RestaurantField({ place, onPress }: RestaurantFieldProps) {
         accessibilityLabel={
           place ? `Restaurant: ${place.name}, ${place.label}. Change` : 'Restaurant: Choose a restaurant'
         }
+        accessibilityState={{ disabled }}
+        disabled={disabled}
         onPress={onPress}
         style={styles.restaurant}
       >

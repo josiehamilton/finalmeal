@@ -12,16 +12,18 @@ interface TagChipProps {
    */
   variant?: 'tag' | 'more' | 'own';
   selected?: boolean;
+  disabled?: boolean;
 }
 
 /** The canvas pill: 36 high, ember-wash when selected. */
-export function TagChip({ label, onPress, variant = 'tag', selected = false }: TagChipProps) {
+export function TagChip({ label, onPress, variant = 'tag', selected = false, disabled = false }: TagChipProps) {
   const isTag = variant === 'tag';
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={isTag ? { selected } : undefined}
+      accessibilityState={isTag ? { selected, disabled } : { disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={[
         styles.chip,

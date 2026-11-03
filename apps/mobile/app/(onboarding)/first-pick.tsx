@@ -70,7 +70,8 @@ export default function FirstPick() {
           label="Add my first pick"
           icon={<SkullMark size={16} color={colors.white} />}
           disabled={busy}
-          onPress={() => router.push('/add-first')}
+          // navigate, not push: a quick double tap must not stack two forms.
+          onPress={() => router.navigate('/add-first')}
         />
         <Pressable
           accessibilityRole="button"

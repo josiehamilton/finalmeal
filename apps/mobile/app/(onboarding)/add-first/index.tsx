@@ -42,6 +42,8 @@ export default function AddFirst() {
   // First screen of its own stack: the swipe belongs to the route above it too.
   useBlockSwipeBack(busy, { includeParent: true });
 
+  // Once the pick is saved a retry only finishes onboarding, so any later edit would be lost.
+  const locked = pickSaved;
   const ready = draft.place !== null && draft.dishName.trim() !== '';
 
   async function lockIn() {
@@ -89,17 +91,24 @@ export default function AddFirst() {
           <PhotoField
             layout="banner"
             uri={draft.photoUri}
+            disabled={locked}
             onChange={(uri) => dispatch({ type: 'setPhoto', uri })}
           />
           <DishField
             value={draft.dishName}
             placeId={draft.place?.id ?? null}
+            disabled={locked}
             onChangeText={(name) => dispatch({ type: 'setDishName', name })}
             onChoose={(suggestion) => dispatch({ type: 'chooseSuggestion', suggestion })}
           />
-          <RestaurantField place={draft.place} onPress={() => router.push('/add-first/place')} />
+          <RestaurantField
+            place={draft.place}
+            disabled={locked}
+            onPress={() => router.push('/add-first/place')}
+          />
           <TagPicker
             inline
+            disabled={locked}
             tags={draft.tags}
             personalTags={draft.personalTags}
             onToggleTag={(tag) => dispatch({ type: 'toggleTag', tag })}
@@ -112,6 +121,7 @@ export default function AddFirst() {
             value={draft.note}
             onChangeText={(note) => dispatch({ type: 'setNote', note })}
             multiline
+            editable={!locked}
             maxLength={NOTE_MAX}
             counter={draft.note.length > 0 ? `${draft.note.length} / ${NOTE_MAX}` : undefined}
           />

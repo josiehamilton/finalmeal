@@ -18,10 +18,12 @@ interface DishFieldProps {
   placeId: string | null;
   onChangeText: (text: string) => void;
   onChoose: (suggestion: DishSuggestion) => void;
+  /** Locks the field (the dish can't be changed). */
+  disabled?: boolean;
 }
 
 /** The Dish field: once a restaurant is chosen, typing lists dishes already logged there. */
-export function DishField({ value, placeId, onChangeText, onChoose }: DishFieldProps) {
+export function DishField({ value, placeId, onChangeText, onChoose, disabled = false }: DishFieldProps) {
   const [suggestions, setSuggestions] = useState<DishSuggestion[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const latest = useRef(0);
@@ -71,8 +73,9 @@ export function DishField({ value, placeId, onChangeText, onChoose }: DishFieldP
         autoCapitalize="words"
         autoCorrect={false}
         returnKeyType="done"
+        editable={!disabled}
       />
-      {suggestions.length > 0 ? (
+      {suggestions.length > 0 && !disabled ? (
         <View>
           {suggestions.map((s) => {
             const label = suggestionLabel(s);

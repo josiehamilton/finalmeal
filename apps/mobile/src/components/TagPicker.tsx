@@ -30,6 +30,8 @@ interface TagPickerProps {
   onHide?: () => void;
   /** The onboarding form's version: a plain "Tags (optional)" label over the groups, no panel or Hide. */
   inline?: boolean;
+  /** Locks every chip (the tags can't be changed). */
+  disabled?: boolean;
 }
 
 function Section({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
@@ -54,6 +56,7 @@ export function TagPicker({
   onMore,
   onHide,
   inline = false,
+  disabled = false,
 }: TagPickerProps) {
   const [featured, setFeatured] = useState<Record<TagKind, Tag[]>>({
     food_type: [],
@@ -138,10 +141,11 @@ export function TagPicker({
             key={tag.id}
             label={tag.name}
             selected={tags.some((t) => t.id === tag.id)}
+            disabled={disabled}
             onPress={() => onToggleTag(tag)}
           />
         ))}
-        <TagChip label="More" variant="more" onPress={() => onMore('food_type')} />
+        <TagChip label="More" variant="more" disabled={disabled} onPress={() => onMore('food_type')} />
       </Section>
 
       <Section title="Dietary" hint="Any that apply">
@@ -150,17 +154,24 @@ export function TagPicker({
             key={tag.id}
             label={tag.name}
             selected={tags.some((t) => t.id === tag.id)}
+            disabled={disabled}
             onPress={() => onToggleTag(tag)}
           />
         ))}
-        <TagChip label="More" variant="more" onPress={() => onMore('dietary')} />
+        <TagChip label="More" variant="more" disabled={disabled} onPress={() => onMore('dietary')} />
       </Section>
 
       <Section title="Your tags" hint="Just for you">
         {personalNames.map((n) => (
-          <TagChip key={personalKey(n)} label={n} selected={isChosen(n)} onPress={() => onTogglePersonal(n)} />
+          <TagChip
+            key={personalKey(n)}
+            label={n}
+            selected={isChosen(n)}
+            disabled={disabled}
+            onPress={() => onTogglePersonal(n)}
+          />
         ))}
-        {naming ? null : <TagChip label="Your own" variant="own" onPress={() => setNaming(true)} />}
+        {naming ? null : <TagChip label="Your own" variant="own" disabled={disabled} onPress={() => setNaming(true)} />}
       </Section>
 
       {naming ? (

@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { finishOnboarding } from '@finalmeal/api';
 import FirstPick from '../../app/(onboarding)/first-pick';
 
-const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
+const mockRouter = { push: jest.fn(), navigate: jest.fn(), replace: jest.fn(), back: jest.fn() };
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
   useFocusEffect: (cb: () => void) =>
@@ -49,7 +49,9 @@ describe('The hard part (first pick intro)', () => {
   it('Add my first pick opens the form and does not finish onboarding yet', async () => {
     await render(<FirstPick />);
     await fireEvent.press(add());
-    expect(mockRouter.push).toHaveBeenCalledWith('/add-first');
+    // navigate, not push: a quick double tap must not stack two forms.
+    expect(mockRouter.navigate).toHaveBeenCalledWith('/add-first');
+    expect(mockRouter.push).not.toHaveBeenCalled();
     expect(mockFinish).not.toHaveBeenCalled();
   });
 
