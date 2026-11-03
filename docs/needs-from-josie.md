@@ -33,6 +33,10 @@ A running list, newest needs added as they come up. Nothing here blocks today's 
 | 13 | Pricing for removing ads (or a subscription) | After Claude's running-cost model | Not built yet |
 | 14 | Optional: allow a startup hook so cloud sessions install the project automatically | Any time | Sessions run `pnpm install` themselves (fine as is) |
 | 15 | Copy for First landing when all five Final Meal spots are filled (it said "0 seats left") | Phase 3 wrap-up | Placeholder: "All five seats taken", and the button becomes "Add an Honorable Mention". Swap in your wording any time. |
+| 16 | When someone promotes a dish they already had ("Make it a Final Meal instead"), what happens to the photo, note and tags they just entered? | Phase 3 wrap-up | Tags are added; the new photo and note fill in only if the pick had none (nothing is overwritten) |
+| 17 | Should the collapsed "Add tags" row list the chosen tags (e.g. "Ramen · Vegan · Rainy day")? Today it always says "Optional · food type, dietary, your own" | Any time | Not built; Claude recommends showing them |
+| 18 | Copy for the daily limit on adding new spots (20 a day) | Any time | "You’ve added a lot of spots today. Try again tomorrow." |
+| 19 | You tab filters: the empty copy "No honorable mentions match this filter.", tab counts that follow the filter, and leaving out More filters, per-row Promote and the group chevron for now | Any time | Built as described; say if any should change |
 
 ## Done
 

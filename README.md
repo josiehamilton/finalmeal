@@ -44,18 +44,33 @@ Start the database and the apps first (`pnpm bootstrap` once, then `pnpm dev`). 
 
 Sign-in codes expire after 10 minutes, and you can ask for a new one every 30 seconds.
 
-### Device checklist (pending Mac)
+**Adding dishes**
 
-Phase 2 was built and tested in a cloud session, which has no simulators. These checks still need to be run on Josie's Mac (from a session there, or by hand). Run `pnpm db:reset && pnpm env:local` once per device run: before check 1 for the iPhone checks (1 to 3), and before check 4 for the Pixel checks (4 and 5). Do not reset in between: check 2 reuses the account made in check 1, and check 4 makes its own account for the Pixel (it repeats checks 1 and 2). Take a screenshot of every step. If the database is reset while the app is still signed in, the app signs itself out and returns to Welcome, so no reinstall is needed.
+1. Sign in as the sample member `josiehamilton@example.com` (code from the local inbox). She has four Final Meal dishes and 13 Honorable Mentions. A brand-new account goes through onboarding instead and adds its first pick there ("Now for the hard part"), landing on "Your Final Meal has begun."
+2. Tap **+**. Choose a restaurant (the list starts with popular spots in your home city; tap Change to search another city, or "Can’t find it? Add it" for a spot that isn’t listed: it must be a business the public can visit, with a street address or "No fixed address"). Type the dish: dishes other people picked there are suggested. Add tags, a note and a photo if you like, then save.
+3. With five Final Meal dishes, adding another asks which one to replace (Swap); the replaced dish becomes an Honorable Mention.
+4. Open any dish on You to edit it, move it up, demote or promote it, get directions, or remove it. Filter You by city or tag with the chips.
 
-1. **iPhone 17, full flow.** Start Expo for iOS. Go Welcome, then email `josie.test+ios@example.com`, then read the code in the local inbox (http://127.0.0.1:54324), then Name `Josie` `Tester`, then username `josie_ios`, then city `vanc` and choose Vancouver, BC, Canada, then photo "Choose from library" (use a simulator stock photo), then the loading screen, then the You tab.
-2. **iPhone 17, staying signed in.** Kill and relaunch Expo Go: the You tab opens signed in. Edit the bio and tap Save. Set Privacy to Private. Log out and confirm Welcome. Log back in with the same email and confirm the You tab.
-3. **iPhone 17, resuming sign-up.** Sign up a second email and stop after the code step (kill the app). Relaunch and confirm it lands on the Name step.
-4. **Pixel 10, full flow.** Start the `Pixel_10` emulator and open the app as in the Pixel steps above (stop `pnpm dev` first, or load the app into its running Expo server; never start a second server). Reset the database once, then repeat checks 1 and 2 with `josie.test+android@example.com` and username `josie_android`.
-5. **Pixel 10, backend unreachable.** Run `pnpm db:stop`. On the email step, tap Send code and confirm it shows `Can’t reach the kitchen right now.` within about 15 seconds and the button works again afterwards. Then run `pnpm db:start`.
-6. **Task 6 Step 4** of the Phase 2 plan (the simulator checks listed there) is also still to be run on the Mac.
+### Device checklist (Phase 3, pending an idle Mac)
 
-Record the results in the Phase 2 progress ledger and tell Claude about anything that looks wrong.
+The iPhone run on 2026-11-02 stopped early because the Mac was overloaded (each tap took minutes). Already passed on the iPhone 17: You with the Vancouver filter, the dish suggestion with "· 2 picks here", tags and photo on the Add form, and the duplicate offer ("Make it a Final Meal instead" moved the ramen to #5). Still to run, from a session on the Mac or by hand. Run `pnpm db:reset && pnpm env:local` first, keep one Expo server, and if Expo Go shows old screens, quit Expo Go and reopen the link (it can serve a cached copy).
+
+**iPhone 17**
+
+1. As `josiehamilton@example.com`, add Khao Soi at Kin Kao as Final Meal. It goes to Swap: replace #4. #4 becomes Honorable and Khao Soi is #4.
+2. On a dish: Move up, Directions, Edit the note, Remove (confirm). While Edit or Swap is saving, swiping back should do nothing.
+3. Add a dish at a new spot "Taco Truck" (No fixed address, Vancouver) and another at "Corner Café", `123 Main St`, Vancouver. Add a dish in Tokyo by switching the city.
+4. Promote from Swap, and check that a long dish name's strike-through line looks right.
+5. Sign up a new email through onboarding: The hard part, Your first pick, Lock it in, then First landing with "4 seats left".
+6. With five Final Meal dishes, First landing says "All five seats taken" and offers "Add an Honorable Mention".
+
+**Pixel 10**
+
+7. Repeat checks 1, 3 and 5.
+8. Photo failure: start saving a dish with a photo, then cut the network (`adb shell svc wifi disable` and `adb shell svc data disable`). The dish saves without the photo and the notice "Saved without the photo. Add it from the dish any time." shows (on You, or on First landing for a first pick). Turn the network back on with `enable`.
+9. Directions open the maps app.
+
+Take a screenshot of every step and tell Claude about anything that looks wrong.
 
 ## Everyday commands
 
