@@ -149,6 +149,32 @@ describe('PlaceSearch', () => {
     expect(mockSearch).toHaveBeenCalledWith({ fake: 'client' }, 'ramen', TOKYO, 12);
   });
 
+  it('keeps the previous city and says so when the new city cannot be read', async () => {
+    await render(<Harness />);
+    await wait(300);
+    mockGetCity.mockRejectedValue(new TypeError('Network request failed'));
+    mockPopular.mockClear();
+    await fireEvent.press(screen.getByRole('button', { name: 'In Vancouver, BC, Canada · Change' }));
+    await fireEvent.press(screen.getByText('pick Tokyo'));
+    await wait(0);
+    expect(screen.getByRole('button', { name: 'In Vancouver, BC, Canada · Change' })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'In Tokyo, Japan · Change' })).toBeNull();
+    expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+    await wait(300);
+    expect(mockPopular).not.toHaveBeenCalledWith({ fake: 'client' }, 'c9', 12);
+  });
+
+  it('keeps the previous city when the new city is not found', async () => {
+    await render(<Harness />);
+    await wait(300);
+    mockGetCity.mockResolvedValue(null);
+    await fireEvent.press(screen.getByRole('button', { name: 'In Vancouver, BC, Canada · Change' }));
+    await fireEvent.press(screen.getByText('pick Tokyo'));
+    await wait(0);
+    expect(screen.getByRole('button', { name: 'In Vancouver, BC, Canada · Change' })).toBeOnTheScreen();
+    expect(screen.getByText('Something went wrong. Try again.')).toBeOnTheScreen();
+  });
+
   it('changing the city with an empty field lists the new city’s popular spots', async () => {
     await render(<Harness />);
     await wait(300);

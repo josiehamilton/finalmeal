@@ -69,7 +69,10 @@ export function useSavePick() {
             const existing = findExistingPick(await getMyPicks(getSupabase()), draft);
             if (existing && existing.tier === draft.tier) {
               unsure.current = null;
-              return { status: 'saved', photoFailed: false };
+              return {
+                status: 'saved',
+                photoFailed: existing.photoUrl === null && draft.photoUri !== null,
+              };
             }
           } catch {
             // Without the re-read it is a plain refusal; the person can try again.

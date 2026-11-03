@@ -10,10 +10,18 @@ interface SlotRowProps {
   /** A radio row, as in Swap. Otherwise the row is a button (a link to the pick). */
   selectable?: boolean;
   selected?: boolean;
+  /** Faded because it does not match the active filter; read out to screen readers. */
+  dimmed?: boolean;
 }
 
 /** A Final Meal row: the slot numeral, a thumbnail, the dish and its restaurant and city. The selected row is struck through in ember glow. */
-export function SlotRow({ pick, onPress, selectable = false, selected = false }: SlotRowProps) {
+export function SlotRow({
+  pick,
+  onPress,
+  selectable = false,
+  selected = false,
+  dimmed = false,
+}: SlotRowProps) {
   // The line under the dish is the restaurant and its city, as on the Profile and Swap boards.
   const where = `${pick.place.name} · ${pick.place.city}`;
   const label = `${pick.slot ? `${pick.slot}. ` : ''}${pick.dish.name}, ${where}`;
@@ -21,6 +29,7 @@ export function SlotRow({ pick, onPress, selectable = false, selected = false }:
     <Pressable
       accessibilityRole={selectable ? 'radio' : 'button'}
       accessibilityLabel={label}
+      accessibilityHint={dimmed ? 'Doesn’t match the filter' : undefined}
       accessibilityState={selectable ? { checked: selected } : undefined}
       onPress={onPress}
       style={[styles.row, selected && styles.rowOn]}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { friendlyMessage, getCity, getPopularPlaces, searchPlaces } from '@finalmeal/api';
+import { ApiError, friendlyMessage, getCity, getPopularPlaces, searchPlaces } from '@finalmeal/api';
 import type { City, Place } from '@finalmeal/api';
 import { colors, radii } from '@finalmeal/ui-tokens';
 import { fontFamily } from '../lib/fonts';
@@ -93,8 +93,19 @@ export function PlaceSearch({ homeCity, city, onCityChange, onChoose, onAddNew }
 
   async function chooseCity(next: City | null) {
     if (!next) return;
+    // A city without a point would silently drop the ranking, so a failed lookup keeps the
+    // previous city and says so; the picker stays open to try again.
+    let point: NonNullable<SearchCity['point']>;
+    try {
+      const found = await getCity(getSupabase(), next.id);
+      if (!found) throw new ApiError('City not found', 'city_not_found');
+      point = { lat: found.lat, lng: found.lng };
+    } catch (e) {
+      setError(friendlyMessage(e));
+      return;
+    }
+    setError(null);
     setChanging(false);
-    const point = await pointOf(next.id);
     onCityChange({ id: next.id, label: next.label, point });
   }
 

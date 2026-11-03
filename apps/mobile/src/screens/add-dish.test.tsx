@@ -489,6 +489,28 @@ describe('Add a dish form', () => {
       expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
     });
 
+    it.each([
+      ['has no photo', null, 'true'],
+      ['already has its photo', 'https://x/p.jpg', 'false'],
+    ])(
+      'after a lost connection, a saved pick that %s decides whether the photo notice shows',
+      async (_n, photoUrl, expected) => {
+        jest.mocked(preparePickPhoto).mockResolvedValue(new ArrayBuffer(8));
+        mockAddPick
+          .mockRejectedValueOnce(new TypeError('Network request failed'))
+          .mockRejectedValueOnce(new ApiError('duplicate', 'duplicate_pick'));
+        await render(withNotice({ ...READY, photoUri: 'file:///a.jpg' }));
+        await settle();
+        await fireEvent.press(cta('Add to Final Meal'));
+        await settle();
+        mockGetPicks.mockResolvedValue([{ ...pickAt('final', 3), photoUrl }]);
+        await fireEvent.press(cta('Add to Final Meal'));
+        await settle();
+        expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+        expect(screen.getByTestId('notice')).toHaveTextContent(expected);
+      },
+    );
+
     it('still reports a duplicate that was there before any retry', async () => {
       mockAddPick.mockRejectedValue(new ApiError('duplicate', 'duplicate_pick'));
       mockGetPicks.mockResolvedValue([pickAt('final', 3)]);

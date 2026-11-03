@@ -103,7 +103,6 @@ export default function CustomPlace() {
         />
         <CityPicker
           initialLabel={start?.label}
-         
           onChange={(next) => setCity(next ? { id: next.id, label: next.label } : null)}
         />
         <Checkbox label="This spot is open to the public" checked={isPublic} onChange={setIsPublic} />

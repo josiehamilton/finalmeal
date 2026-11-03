@@ -20,15 +20,18 @@ interface FinalMealListProps {
 export function FinalMealList({ picks, dimmedIds, onOpen, onAdd }: FinalMealListProps) {
   return (
     <View style={styles.list}>
-      {picks.map((pick) => (
-        <View
-          key={pick.id}
-          testID={`final-row-${pick.id}`}
-          style={{ opacity: dimmedIds?.has(pick.id) ? DIMMED_OPACITY : 1 }}
-        >
-          <SlotRow pick={pick} onPress={() => onOpen(pick)} />
-        </View>
-      ))}
+      {picks.map((pick) => {
+        const dimmed = dimmedIds?.has(pick.id) ?? false;
+        return (
+          <View
+            key={pick.id}
+            testID={`final-row-${pick.id}`}
+            style={{ opacity: dimmed ? DIMMED_OPACITY : 1 }}
+          >
+            <SlotRow pick={pick} onPress={() => onOpen(pick)} dimmed={dimmed} />
+          </View>
+        );
+      })}
       <EmptySeats first={picks.length + 1} onAdd={onAdd} />
     </View>
   );

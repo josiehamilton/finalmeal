@@ -53,4 +53,14 @@ describe('FinalMealList', () => {
     expect(screen.getByTestId('final-row-f2')).toHaveStyle({ opacity: 0.35 });
     expect(screen.getByRole('button', { name: /^3\. Dish 3/ })).toBeOnTheScreen();
   });
+
+  it('tells a screen reader which dimmed rows do not match the filter', async () => {
+    await render(
+      <FinalMealList picks={makeFinals(2)} dimmedIds={new Set(['f2'])} onOpen={noop} onAdd={noop} />,
+    );
+    expect(screen.getByRole('button', { name: /^2\. Dish 2/ }).props.accessibilityHint).toBe(
+      'Doesn’t match the filter',
+    );
+    expect(screen.getByRole('button', { name: /^1\. Dish 1/ }).props.accessibilityHint).toBeUndefined();
+  });
 });
