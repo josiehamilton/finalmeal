@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(196);
+select plan(197);
 
 -- Uses the dev seed's Marutama place and its "Tonkotsu Ramen" dish. The seeded people are
 -- deleted here (their picks go with them) so nobody's existing finals get in the way; the seed
@@ -97,6 +97,12 @@ select has_function('public', 'remove_pick', array['uuid'], 'remove_pick exists'
 select has_function('public', 'update_pick', array['uuid', 'text', 'uuid[]', 'text[]', 'text'], 'update_pick exists');
 select has_function('public', 'move_final', array['uuid', 'integer'], 'move_final exists');
 select has_view('public', 'dish_stats', 'the dish_stats view exists');
+select ok(
+  not has_table_privilege('anon', 'public.dish_stats', 'insert, update, delete, truncate')
+  and not has_table_privilege('authenticated', 'public.dish_stats', 'insert, update, delete, truncate')
+  and has_table_privilege('anon', 'public.dish_stats', 'select')
+  and has_table_privilege('authenticated', 'public.dish_stats', 'select'),
+  'dish_stats is read-only for clients: select only');
 select is(
   (select array_agg(column_name::text order by ordinal_position) from information_schema.columns
    where table_schema = 'public' and table_name = 'dish_stats'),

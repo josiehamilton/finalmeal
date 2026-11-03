@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(73);
+select plan(76);
 
 -- Foursquare rows (a real extract may be loaded by the dev seed) would collide with the
 -- fixtures below; this is rolled back with the transaction, and no pick refers to an fsq place.
@@ -40,6 +40,11 @@ from generate_series(1, 5) g;
 insert into public.places (source, name, city, region, country, location) values
   ('custom', 'Zed Cafe Tokyo', 'Tokyo', 'Tokyo', 'JP',
    extensions.st_setsrid(extensions.st_makepoint(139.70, 35.66), 4326)::extensions.geography);
+-- Fifty-five places that all start with "Capfix", to check the 50-row cap.
+insert into public.places (source, name, city, region, country, location)
+select 'custom', 'Capfix Diner ' || g, 'Vancouver', 'BC', 'CA',
+  extensions.st_setsrid(extensions.st_makepoint(-123.12 + g * 0.0001, 49.28), 4326)::extensions.geography
+from generate_series(1, 55) g;
 -- A Vancouver sushi place, to rank against Sushi Itto from Tokyo.
 insert into public.places (source, name, city, region, country, location) values
   ('custom', 'Sushi Vancouver Test', 'Vancouver', 'BC', 'CA',
@@ -120,6 +125,13 @@ select is(
   'a blank query with no coordinates returns nothing');
 select throws_ok($$select * from public.search_places('x', 91, 0)$$, 'P0001', 'invalid_coordinates',
   'out-of-range coordinates are refused');
+select is(
+  (select count(*)::int from public.search_places('', 49.28, -123.12, 50)
+    where (place).name in ('Maru Closed Test', 'Maru Merged Test')), 0,
+  'an empty query leaves out closed and merged places');
+select is(
+  (select count(*)::int from public.search_places('capfix', 49.28, -123.12, 500)), 50,
+  'p_lim is capped at 50 rows');
 
 -- ---------------------------------------------------------------- real-world collisions
 -- With a Foursquare extract loaded, the canvas places share names and words with real ones.
@@ -214,6 +226,11 @@ select is(
      (select id from public.cities where name = 'Tokyo'), null, true) p),
   true, 'a spot with no fixed address is stored with the flag; a city with no region code uses its region name');
 select is(
+  (select (p).address is null and (p).no_fixed_address
+   from public.create_custom_place('Blank Address Truck',
+     (select id from public.cities where name = 'Tokyo'), '   ', true) p),
+  true, 'a blank address with the no-fixed-address flag is stored as null');
+select is(
   (select name from public.places where name like 'Ramen%Pop-up'), 'Ramen Pop-up',
   'inner whitespace in the name is collapsed');
 select is(
@@ -289,15 +306,15 @@ select throws_ok($$select public.create_custom_place('Nowhere Spot',
   '00000000-0000-4000-8000-0000000000ff', '1 Nowhere St')$$, 'P0001', 'city_not_found',
   'an unknown city raises city_not_found');
 
--- The 20-a-day limit: Josie has made 2 so far, so 18 more are fine and the 21st is refused.
+-- The 20-a-day limit: Josie has made 3 so far, so 17 more are fine and the 21st is refused.
 select is(
   (select count(*)::int from (
     select public.create_custom_place('Limit Spot ' || g,
-      (select id from public.cities where name = 'Tokyo'), g || ' Limit St') from generate_series(1, 18) g) s),
-  18, '20 custom places in a day are fine');
+      (select id from public.cities where name = 'Tokyo'), g || ' Limit St') from generate_series(1, 17) g) s),
+  17, '20 custom places in a day are fine');
 select throws_ok($$select public.create_custom_place('Limit Spot 21',
-  (select id from public.cities where name = 'Tokyo'), '21 Limit St')$$, 'P0001', 'rate_limited',
-  'the 21st raises rate_limited');
+  (select id from public.cities where name = 'Tokyo'), '21 Limit St')$$, 'P0001', 'custom_place_limit',
+  'the 21st raises custom_place_limit (not the generic rate_limited)');
 
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-8000-000000000002","role":"authenticated"}', true);

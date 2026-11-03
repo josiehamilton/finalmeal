@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(59);
+select plan(64);
 
 -- ---------------------------------------------------------------- structure
 select has_column('public', 'tags', 'aliases', 'tags.aliases exists');
@@ -204,6 +204,25 @@ insert into public.tags (kind, name, slug, owner_id)
 select is((select name from public.tags where slug = 'big-bowl'), 'Big bowl',
   'a direct insert has its whitespace tidied');
 
+-- A name that is blank once tidied has no slug: refused on the direct path too (create_personal_tag
+-- already refuses it). A name with no letters or digits keeps itself as its slug, so two
+-- different emoji tags stay two tags.
+select throws_ok($$insert into public.tags (kind, name, slug, owner_id)
+  values ('personal', '   ', 'x', '00000000-0000-0000-0000-00000000000a')$$,
+  'P0001', 'invalid_tag_name', 'a direct insert of a blank name is invalid_tag_name');
+select throws_ok($$update public.tags set name = '  ' where name = 'Big bowl'$$,
+  'P0001', 'invalid_tag_name', 'renaming a personal tag to a blank name is invalid_tag_name');
+select public.create_personal_tag('🍜');
+select public.create_personal_tag('🍕');
+select is(
+  (select count(distinct slug)::int from public.tags
+    where owner_id = '00000000-0000-0000-0000-00000000000a' and name in ('🍜', '🍕')),
+  2, 'two different emoji-only tags get two different slugs');
+
+-- The vocabulary upsert is not callable by clients.
+select throws_ok($$select public.apply_tag_vocabulary()$$, '42501', null,
+  'a signed-in person cannot run apply_tag_vocabulary');
+
 -- another user cannot see it
 reset role;
 set local role authenticated;
@@ -219,6 +238,11 @@ select is((select count(*)::int from public.search_tags('personal', '')), 0,
 select public.create_personal_tag('Rainy day');
 select is((select count(*)::int from public.search_tags('personal', 'rainy')), 1,
   'each person gets their own "Rainy day"');
+
+-- A signed-in session with no user id in its token is refused by the function itself.
+select set_config('request.jwt.claims', '{"role":"authenticated"}', true);
+select throws_ok($$select public.create_personal_tag('No Sub')$$, '42501', 'not_authenticated',
+  'create_personal_tag without a user id raises not_authenticated');
 
 select * from finish();
 rollback;
