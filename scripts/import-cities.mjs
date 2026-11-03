@@ -1,5 +1,8 @@
 // Imports the GeoNames "cities15000" data set (cities with 15,000+ people) into public.cities.
-// Usage: pnpm db:import-cities [-- --db-url postgresql://... ] [--cache-dir <dir>]
+// Usage: [DATABASE_URL=postgresql://...] pnpm db:import-cities [-- --cache-dir <dir>]
+// The target database comes from the DATABASE_URL environment variable (default: the local
+// Supabase database). There is no flag for it, so a password never lands in shell history or
+// the process list; it is never printed.
 // Idempotent: rows are upserted by geoname_id, so re-running (or running over the dev seed)
 // updates in place. Downloads are cached in a gitignored folder (default .cache/geonames).
 // City data © GeoNames (CC BY 4.0), https://www.geonames.org
@@ -59,10 +62,19 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--') continue;
-    if (arg === '--db-url') opts.dbUrl = argv[++i] ?? fail('--db-url needs a value');
-    else if (arg === '--cache-dir')
+    if (arg === '--cache-dir')
       opts.cacheDir = resolve(argv[++i] ?? fail('--cache-dir needs a value'));
-    else fail(`unknown argument ${arg}`);
+    // Never echo the argument: a refused --db-url=... would print the connection string.
+    else fail('unknown argument (the database comes from the DATABASE_URL environment variable)');
+  }
+  const dbUrl = (process.env.DATABASE_URL ?? '').trim();
+  if (dbUrl) {
+    try {
+      new URL(dbUrl);
+    } catch {
+      fail('DATABASE_URL is not a valid connection string');
+    }
+    opts.dbUrl = dbUrl;
   }
   return opts;
 }
