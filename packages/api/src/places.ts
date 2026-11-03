@@ -56,10 +56,13 @@ export function readPoint(location: unknown): { lat: number; lng: number } {
     const point = readWkbPoint(location);
     if (point) return point;
   } else if (typeof location === 'object' && location !== null && 'coordinates' in location) {
-    const [lng, lat] = (location as { coordinates: unknown }).coordinates as unknown[];
-    if (typeof lng === 'number' && typeof lat === 'number') return { lat, lng };
+    const coordinates = (location as { coordinates: unknown }).coordinates;
+    if (Array.isArray(coordinates)) {
+      const [lng, lat] = coordinates as unknown[];
+      if (typeof lng === 'number' && typeof lat === 'number') return { lat, lng };
+    }
   }
-  throw new ApiError('A place came back without a readable point', 'unknown');
+  throw new ApiError('A location came back without a readable point', 'unknown');
 }
 
 const WKB_POINT = 1;

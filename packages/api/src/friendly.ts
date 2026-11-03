@@ -19,6 +19,7 @@ const COPY = {
   invalid_slot: 'That spot in your five doesn’t exist.',
   address_required: 'Add the street address, or mark it as a food truck or pop-up.',
   invalid_tag_name: 'Tags can be up to 40 characters.',
+  custom_place_limit: 'You’ve added a lot of spots today. Try again tomorrow.',
   network: 'Can’t reach the kitchen right now.',
   unknown: 'Something went wrong. Try again.',
 } as const;

@@ -203,6 +203,22 @@ describe('an upload that finishes after the timeout', () => {
     expect(remove.mock.calls[0]?.[0]).toEqual([expect.stringMatching(/^u1\/pick-\d+\.jpg$/)]);
   });
 
+  it('is deleted again when updatePick gave up on it', async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    const upload = vi.fn().mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    const { client, remove } = stubClient({ upload, rpc });
+    await expect(
+      updatePick(client, 'pick-1', { photo: jpeg(100), photoTimeoutMs: 10 }),
+    ).rejects.toMatchObject({ code: 'timeout' });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+
+    finish({ data: { path: 'p' }, error: null });
+    await vi.waitFor(() => expect(remove).toHaveBeenCalledTimes(1));
+    expect(remove.mock.calls[0]?.[0]).toEqual([expect.stringMatching(/^u1\/pick-\d+\.jpg$/)]);
+  });
+
   it('leaves nothing to delete when it fails after the timeout', async () => {
     let finish: (value: unknown) => void = () => undefined;
     const upload = vi.fn().mockReturnValue(new Promise((resolve) => (finish = resolve)));

@@ -26,6 +26,7 @@ const COPY: Array<[string, string]> = [
   ['invalid_tag', 'Something went wrong. Try again.'],
   ['address_required', 'Add the street address, or mark it as a food truck or pop-up.'],
   ['invalid_tag_name', 'Tags can be up to 40 characters.'],
+  ['custom_place_limit', 'You’ve added a lot of spots today. Try again tomorrow.'],
 ];
 
 describe('friendlyMessage', () => {

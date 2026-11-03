@@ -92,6 +92,7 @@ describe('throwIfError', () => {
     'invalid_tag',
     'invalid_tag_name',
     'address_required',
+    'custom_place_limit',
   ])('maps the P0001 message %s to the same-named code', (message) => {
     expect(() => throwIfError({ message, code: 'P0001' })).toThrow(
       expect.objectContaining({ code: message }),

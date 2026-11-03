@@ -4,7 +4,7 @@ export const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,30}$/;
 export const DISPLAY_NAME_MAX = 60;
 export const BIO_MAX = 100;
 
-/** Same limits as the `dishes.name`, `places.name`, `picks.note`, `tags.name` and `places.address` checks. */
+/** Same limits as the database's `dishes.name`, `places.name`, `picks.note`, `tags.name` and `places.address` rules. */
 export const DISH_NAME_MAX = 80;
 export const PLACE_NAME_MAX = 80;
 export const PLACE_ADDRESS_MAX = 200;

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FinalMealClient } from './client';
-import { formatPlaceLabel, getPopularPlaces, searchPlaces, toPlace } from './places';
+import { ApiError } from './errors';
+import { formatPlaceLabel, getPopularPlaces, readPoint, searchPlaces, toPlace } from './places';
 
 const ROW = {
   id: 'p1',
@@ -62,6 +63,15 @@ describe('toPlace', () => {
     });
     expect(place.lng).toBeCloseTo(-123.1557, 4);
     expect(place.lat).toBeCloseTo(49.2682, 4);
+  });
+
+  it.each([
+    ['a GeoJSON point with null coordinates', { type: 'Point', coordinates: null }],
+    ['a GeoJSON point with a non-array coordinates value', { type: 'Point', coordinates: '1,2' }],
+    ['a GeoJSON point with too few coordinates', { type: 'Point', coordinates: [1] }],
+    ['a GeoJSON point with text coordinates', { type: 'Point', coordinates: ['1', '2'] }],
+  ])('refuses %s with an ApiError, not a TypeError', (_n, location) => {
+    expect(() => readPoint(location)).toThrow(ApiError);
   });
 
   it('reads a plain WKB point without an SRID, and a big-endian one', () => {

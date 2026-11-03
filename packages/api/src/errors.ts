@@ -23,6 +23,7 @@ export type FriendlyCode =
   | 'invalid_tag'
   | 'invalid_tag_name'
   | 'address_required'
+  | 'custom_place_limit'
   | 'timeout'
   | 'network'
   | 'unknown';
@@ -48,6 +49,7 @@ const FRIENDLY_CODES: ReadonlySet<string> = new Set<FriendlyCode>([
   'invalid_tag',
   'invalid_tag_name',
   'address_required',
+  'custom_place_limit',
   'timeout',
   'network',
   'unknown',
@@ -98,6 +100,7 @@ const DOMAIN_MESSAGES: ReadonlySet<string> = new Set([
   'invalid_tag',
   'invalid_tag_name',
   'address_required',
+  'custom_place_limit',
 ]);
 
 const RATE_LIMIT_CODES: ReadonlySet<string> = new Set([
