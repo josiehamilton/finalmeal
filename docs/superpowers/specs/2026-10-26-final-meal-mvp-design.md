@@ -136,8 +136,8 @@ Apple and Google sign-in skip steps 1–2 and land on Name. Their buttons stay h
    - Custom places must be public businesses anyone can visit, never a home, because Final Meal is about restaurant discovery. The app asks people to confirm this.
    - Custom places' addresses are public, and they appear on the map (addresses get map positions in Phase 5). Who added a spot stays private.
 2. **Dish field.** As you type, `suggest_dishes(place_id, text)` returns existing dishes at that place, ranked by similarity and pick count ("Tonkotsu Ramen · 14 picks here"). Choosing a suggestion links to it. Typing a new name creates a dish, and its `name_key` normalisation (lower case, accents removed, whitespace and punctuation collapsed, simple plural folding) prevents near-duplicates. If an unchosen name is a close fuzzy match (similarity ≥ 0.85) to an existing dish at the same place, it's linked and the person's wording is kept in `original_dish_name`.
-3. **Final Meal or Honorable.** Choosing Final Meal with five already filled opens the swap screen, and `swap_final(new, replaced_slot)` moves the replaced pick to Honorable and records `dethroned`, all in one transaction.
-4. **Optional parts:** photo (uploaded straight to storage, resized on read), note, and tags (expanding inline; "More" searches the full food-type and dietary lists; personal tags can be created inline).
+3. **Final Meal or Honorable.** Choosing Final Meal with five already filled opens the swap screen, and `add_pick(..., p_replace_slot)` (or `promote_pick(..., p_replace_slot)` for a dish already on the list as an Honorable) puts the new pick in the replaced slot, moves the replaced pick to Honorable and records `dethroned`, all in one transaction.
+4. **Optional parts:** photo (resized on the device to at most 1600 px and re-encoded as a JPEG, which also strips location metadata, then uploaded straight to storage), note, and tags (expanding inline; "More" searches the full food-type and dietary lists; personal tags can be created inline).
 5. `add_pick(...)` validates and writes everything in one transaction and returns the pick.
 
 ### 5.3 Share
