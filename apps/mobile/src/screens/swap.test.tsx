@@ -420,6 +420,57 @@ describe('Swap', () => {
       expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
     });
 
+    it('keeps what the Add form held when it hands a duplicate over in promote mode', async () => {
+      jest.mocked(preparePickPhoto).mockResolvedValue(new ArrayBuffer(8));
+      mockUpdate
+        .mockRejectedValueOnce(new ApiError('timed out', 'timeout'))
+        .mockResolvedValueOnce(makePick({ slot: 2 }));
+      function Notice() {
+        return <Text testID="notice">{String(usePhotoNotice())}</Text>;
+      }
+      await render(
+        <>
+          {withDraft(<Swap />, {
+            tags: [RAMEN],
+            personalTags: ['Date night'],
+            note: 'The broth.',
+            photoUri: 'file:///a.jpg',
+          })}
+          <Notice />
+        </>,
+      );
+      await settle();
+      await fireEvent.press(row('Dish 2'));
+      await fireEvent.press(screen.getByRole('button', { name: 'Replace Dish 2' }));
+      await settle();
+      expect(mockPromote).toHaveBeenCalledWith(CLIENT, 'h1', 2);
+      // The photo upload failed, so the rest is applied without it and the notice shows.
+      expect(mockUpdate).toHaveBeenCalledTimes(2);
+      expect(mockUpdate.mock.calls[0]![2]).toEqual({
+        tagIds: ['t1'],
+        personalTags: ['Date night'],
+        note: 'The broth.',
+        photo: expect.any(ArrayBuffer),
+      });
+      expect(mockUpdate.mock.calls[1]![2]).toEqual({
+        tagIds: ['t1'],
+        personalTags: ['Date night'],
+        note: 'The broth.',
+      });
+      expect(screen.getByTestId('notice')).toHaveTextContent('true');
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+    });
+
+    it('leaves the pick alone when the draft is empty (the pick-detail entry)', async () => {
+      await render(withDraft(<Swap />));
+      await settle();
+      await fireEvent.press(row('Dish 2'));
+      await fireEvent.press(screen.getByRole('button', { name: 'Replace Dish 2' }));
+      await settle();
+      expect(mockPromote).toHaveBeenCalledWith(CLIENT, 'h1', 2);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
     it('shows friendly copy when promoting fails', async () => {
       mockPromote.mockRejectedValue(new ApiError('gone', 'pick_not_found'));
       await render(withDraft(<Swap />));

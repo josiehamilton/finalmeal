@@ -43,7 +43,7 @@ export default function Swap() {
   const busy = saving || promoting;
   useBlockBack(busy);
   useBlockSwipeBack(busy);
-  // Swipe-down dismisses only when there is nothing to lose (promote mode starts with an empty draft).
+  // Swipe-down dismisses only when there is nothing to lose (from pick detail, promote mode has an empty draft; from Add's hand-off it may not).
   useModalSwipe(!busy && !draftHasContent(draft));
 
   const load = useCallback(async () => {
@@ -76,8 +76,12 @@ export default function Swap() {
     if (promote) {
       setPromoting(true);
       try {
-        await promotePick(getSupabase(), promote, slot);
-        announcePicksChanged();
+        // Reached from pick detail (an empty draft: the merge does nothing) or from Add's
+        // hand-off, where the draft may hold a photo, tags and a note that must not be dropped.
+        const { photoFailed } = promoted
+          ? await promoteWithDraft(promoted, draft, slot)
+          : (await promotePick(getSupabase(), promote, slot), { photoFailed: false });
+        announcePicksChanged({ photoFailed });
         router.dismissTo('/(app)/you');
       } catch (e) {
         setError(friendlyMessage(e));
