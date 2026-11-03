@@ -126,7 +126,7 @@ All tables use UUID primary keys and `created_at`/`updated_at` timestamps. Row-l
 5. Home city, chosen from a world cities list (GeoNames, cities over 15,000 people, CC BY 4.0) or from the phone's current location.
 6. Photo (optional).
 
-Apple and Google sign-in skip steps 1–2 and land on Name. Their buttons stay hidden until the developer accounts exist (Phase 8); until then sign-up is email code only. After step 6 comes the loading screen ("There can only be five."), then the first landing screen ("Your Final Meal has begun."); until adding dishes exists (Phase 3), the loading screen lands on the You tab instead. On mobile, the attestation check runs silently after sign-in.
+Apple and Google sign-in skip steps 1–2 and land on Name. Their buttons stay hidden until the developer accounts exist (Phase 8); until then sign-up is email code only. After step 6 comes the first-pick step ("Now for the hard part."): Add my first pick opens the Add form locked to Final Meal slot 1 (onboarding finishes once that pick is saved), or Skip for now finishes it. Then comes the loading screen ("There can only be five."), then the first landing screen in Feed ("Your Final Meal has begun.", or "Your table is set." if the first pick was skipped). On mobile, the attestation check runs silently after sign-in.
 
 ### 5.2 Add a dish (one screen)
 

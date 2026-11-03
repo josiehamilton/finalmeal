@@ -36,6 +36,8 @@ Each item names the phase that closes it.
 - **Phase 7:** `dish_stats` is a plain view that counts picks on every read. Make it a materialised view (refreshed on a schedule or by trigger) before dish pages get busy.
 - **Phase 7:** pick-photo storage has no per-person quota beyond the one-name rule (`<id>/pick-<unix-ms>.jpg`, 4 MiB each), like avatars; decide on a limit with the other abuse controls. Nothing yet limits how many dishes a new account can create, or how many tags a pick can carry (`add_pick` / `update_pick` take any number of personal tag names).
 - **Later:** a merged dish (`dishes.merged_into_id`) is refused by `add_pick` with `place_not_found` rather than followed to its target; follow the merge when dish merging is built.
+- **Phase 7 (polish):** onboarding resumes from what the profile already has (`routeFor`), which is an inference with gaps. A person who quit on the photo step with a city set resumes at the first-pick step, so the optional photo is skipped (it can still be added from Edit profile). A person who quit after the pick saved but before onboarding finished (the finish call failed, then the app was killed) sees the first-pick intro again, and adding the same dish gives `That dish is already on your list.`; Skip for now still works and First landing then shows the pick.
+- **Phase 4:** saving from the Add modal always ends on the You tab, including when it was opened from First landing. Revisit when Feed is real (e.g. dismiss back to the tab it was opened from).
 
 ## Phase 8: launch
 
