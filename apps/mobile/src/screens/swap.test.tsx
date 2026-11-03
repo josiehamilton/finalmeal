@@ -1,10 +1,11 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { ApiError, addPick, getMyPicks, promotePick } from '@finalmeal/api';
+import { Text } from 'react-native';
+import { ApiError, addPick, getMyPicks, promotePick, updatePick } from '@finalmeal/api';
 import Swap from '../../app/(app)/add/swap';
 import { preparePickPhoto } from '../lib/prepare-pick-photo';
-import { PLACE, withDraft } from '../test-support/add-dish';
+import { PLACE, RAMEN, withDraft } from '../test-support/add-dish';
 import { makeFinals, makePick } from '../test-support/picks';
-import { resetPickChanges } from '../state/pick-changes';
+import { resetPickChanges, usePhotoNotice } from '../state/pick-changes';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), dismissTo: jest.fn() };
 let mockParams: Record<string, string> = {};
@@ -24,6 +25,7 @@ jest.mock('@finalmeal/api', () => ({
   addPick: jest.fn(),
   getMyPicks: jest.fn(),
   promotePick: jest.fn(),
+  updatePick: jest.fn(),
 }));
 jest.mock('../lib/supabase', () => ({ getSupabase: () => ({ fake: 'client' }) }));
 jest.mock('../lib/prepare-pick-photo', () => ({ preparePickPhoto: jest.fn() }));
@@ -32,6 +34,7 @@ const CLIENT = { fake: 'client' };
 const mockAddPick = jest.mocked(addPick);
 const mockGetPicks = jest.mocked(getMyPicks);
 const mockPromote = jest.mocked(promotePick);
+const mockUpdate = jest.mocked(updatePick);
 
 const READY = { place: PLACE, dishName: 'Tonkotsu Ramen' };
 async function settle() {
@@ -47,6 +50,7 @@ describe('Swap', () => {
     mockGetPicks.mockResolvedValue(makeFinals(5));
     mockAddPick.mockResolvedValue({ pick: makePick({ slot: 4 }), photoFailed: false });
     mockPromote.mockResolvedValue(makePick({ slot: 4 }));
+    mockUpdate.mockResolvedValue(makePick({ slot: 4 }));
   });
 
   it('shows the canvas copy, the incoming dish and the five finals', async () => {
@@ -119,6 +123,72 @@ describe('Swap', () => {
     expect(mockRouter.dismissTo).toHaveBeenCalled();
   });
 
+  describe('the saved-without-photo notice', () => {
+    function Notice() {
+      return <Text testID="notice">{String(usePhotoNotice())}</Text>;
+    }
+    const withNotice = (draft: Parameters<typeof withDraft>[1]) => (
+      <>
+        {withDraft(<Swap />, draft)}
+        <Notice />
+      </>
+    );
+    const replaceDish1 = async () => {
+      await fireEvent.press(row('Dish 1'));
+      await fireEvent.press(screen.getByRole('button', { name: 'Replace Dish 1' }));
+      await settle();
+    };
+
+    it('is raised when the upload failed after the pick was saved', async () => {
+      mockAddPick.mockResolvedValue({ pick: makePick({ slot: 1 }), photoFailed: true });
+      jest.mocked(preparePickPhoto).mockResolvedValue(new ArrayBuffer(8));
+      await render(withNotice({ ...READY, photoUri: 'file:///a.jpg' }));
+      await settle();
+      expect(screen.getByTestId('notice')).toHaveTextContent('false');
+      await replaceDish1();
+      expect(screen.getByTestId('notice')).toHaveTextContent('true');
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+    });
+
+    it('is raised when the photo cannot be prepared', async () => {
+      jest.mocked(preparePickPhoto).mockRejectedValue(new Error('read failed'));
+      await render(withNotice({ ...READY, photoUri: 'file:///a.jpg' }));
+      await settle();
+      await replaceDish1();
+      expect(screen.getByTestId('notice')).toHaveTextContent('true');
+    });
+
+    it('is not raised when the photo went up', async () => {
+      await render(withNotice(READY));
+      await settle();
+      await replaceDish1();
+      expect(screen.getByTestId('notice')).toHaveTextContent('false');
+    });
+  });
+
+  it('counts a duplicate after a lost connection as saved, instead of showing an error', async () => {
+    mockAddPick
+      .mockRejectedValueOnce(new TypeError('Network request failed'))
+      .mockRejectedValueOnce(new ApiError('duplicate', 'duplicate_pick'));
+    await render(withDraft(<Swap />, READY));
+    await settle();
+    await fireEvent.press(row('Dish 4'));
+    await fireEvent.press(screen.getByRole('button', { name: 'Replace Dish 4' }));
+    await settle();
+    expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+    expect(mockRouter.dismissTo).not.toHaveBeenCalled();
+    // The first attempt did save: the list now holds the dish as a Final Meal pick.
+    mockGetPicks.mockResolvedValue([
+      ...makeFinals(4),
+      makePick({ id: 'n1', slot: 5, dish: { id: 'd1', name: 'Tonkotsu Ramen' } }),
+    ]);
+    await fireEvent.press(screen.getByRole('button', { name: 'Replace Dish 4' }));
+    await settle();
+    expect(mockAddPick).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('That dish is already on your list.')).toBeNull();
+    expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+  });
+
   it('shows friendly copy and stays when the swap fails', async () => {
     mockAddPick.mockRejectedValue(new TypeError('Network request failed'));
     await render(withDraft(<Swap />, READY));
@@ -177,6 +247,72 @@ describe('Swap', () => {
       await fireEvent.press(screen.getByRole('button', { name: 'Make it a Final Meal instead' }));
       await settle();
       expect(mockPromote).toHaveBeenCalledWith(CLIENT, 'h9', 4);
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+    });
+
+    it('keeps what was entered: merges tags, note and photo into the promoted pick', async () => {
+      jest.mocked(preparePickPhoto).mockResolvedValue(new ArrayBuffer(8));
+      await render(
+        withDraft(<Swap />, {
+          ...READY,
+          tags: [RAMEN],
+          personalTags: ['Date night'],
+          note: 'The broth.',
+          photoUri: 'file:///a.jpg',
+        }),
+      );
+      await settle();
+      await replaceDish4();
+      await fireEvent.press(screen.getByRole('button', { name: 'Make it a Final Meal instead' }));
+      await settle();
+      expect(mockPromote).toHaveBeenCalledWith(CLIENT, 'h9', 4);
+      expect(mockUpdate).toHaveBeenCalledWith(CLIENT, 'h9', {
+        tagIds: ['t1'],
+        personalTags: ['Date night'],
+        note: 'The broth.',
+        photo: expect.any(ArrayBuffer),
+      });
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+    });
+
+    it('never overwrites the existing pick’s note or photo', async () => {
+      mockGetPicks.mockResolvedValue([
+        ...makeFinals(5),
+        { ...honorable(), note: 'Mine', photoUrl: 'https://x/old.jpg' },
+      ]);
+      await render(
+        withDraft(<Swap />, { ...READY, tags: [RAMEN], note: 'New', photoUri: 'file:///a.jpg' }),
+      );
+      await settle();
+      await replaceDish4();
+      await fireEvent.press(screen.getByRole('button', { name: 'Make it a Final Meal instead' }));
+      await settle();
+      const patch = mockUpdate.mock.calls[0]![2];
+      expect(patch).toEqual({ tagIds: ['t1'], personalTags: [] });
+      // Only the refused add prepared the photo; the promote step does not prepare it again.
+      expect(preparePickPhoto).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the saved-without-photo notice when the photo upload fails', async () => {
+      jest.mocked(preparePickPhoto).mockResolvedValue(new ArrayBuffer(8));
+      mockUpdate
+        .mockRejectedValueOnce(new ApiError('timed out', 'timeout'))
+        .mockResolvedValueOnce(makePick({ slot: 4 }));
+      function Notice() {
+        return <Text testID="notice">{String(usePhotoNotice())}</Text>;
+      }
+      await render(
+        <>
+          {withDraft(<Swap />, { ...READY, tags: [RAMEN], photoUri: 'file:///a.jpg' })}
+          <Notice />
+        </>,
+      );
+      await settle();
+      await replaceDish4();
+      await fireEvent.press(screen.getByRole('button', { name: 'Make it a Final Meal instead' }));
+      await settle();
+      expect(screen.getByTestId('notice')).toHaveTextContent('true');
+      expect(mockUpdate).toHaveBeenCalledTimes(2);
       expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
     });
 
@@ -240,6 +376,13 @@ describe('Swap', () => {
           dish: { id: 'hd', name: 'Gyoza' },
         }),
       ]);
+    });
+
+    it('says the pick is gone when the honorable pick to promote is not on the list', async () => {
+      mockParams = { promote: 'missing' };
+      await render(withDraft(<Swap />));
+      await settle();
+      expect(screen.getByText('That pick isn’t there any more.')).toBeOnTheScreen();
     });
 
     it('shows the honorable pick as the incoming card', async () => {

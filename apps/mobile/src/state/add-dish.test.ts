@@ -113,22 +113,6 @@ describe('addDishReducer', () => {
     const city = { id: 'c2', label: 'Tokyo, Japan', point: { lat: 35.68, lng: 139.69 } };
     expect(addDishReducer(draft(), { type: 'setSearchCity', city }).searchCity).toBe(city);
   });
-
-  it('reset clears the dish but keeps the city', () => {
-    const city = { id: 'c2', label: 'Tokyo, Japan', point: null };
-    const full = draft({
-      place: PLACE,
-      dishName: 'x',
-      dishId: 'd',
-      tier: 'honorable',
-      note: 'n',
-      photoUri: 'u',
-      tags: [RAMEN],
-      personalTags: ['a'],
-      searchCity: city,
-    });
-    expect(addDishReducer(full, { type: 'reset' })).toEqual({ ...initialDraft, searchCity: city });
-  });
 });
 
 describe('ctaFor', () => {

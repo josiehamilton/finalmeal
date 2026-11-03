@@ -14,6 +14,7 @@ import { getSupabase } from '../../../src/lib/supabase';
 import { useBlockBack, useBlockSwipeBack, useModalSwipe } from '../../../src/lib/use-block-back';
 import { draftHasContent, findExistingPick, useAddDish } from '../../../src/state/add-dish';
 import { announcePicksChanged } from '../../../src/state/pick-changes';
+import { promoteWithDraft } from '../../../src/state/promote-with-draft';
 import { useSavePick } from '../../../src/state/save-pick';
 
 interface Incoming {
@@ -109,8 +110,9 @@ export default function Swap() {
     setError(null);
     setPromoting(true);
     try {
-      await promotePick(getSupabase(), promotable.id, slot);
-      announcePicksChanged();
+      // What was entered for this dish (photo, tags, note) is merged into the pick, never dropped.
+      const { photoFailed } = await promoteWithDraft(promotable, draft, slot);
+      announcePicksChanged({ photoFailed });
       router.dismissTo('/(app)/you');
     } catch (e) {
       setError(friendlyMessage(e));
@@ -119,7 +121,12 @@ export default function Swap() {
     }
   }
 
-  const problem = loadError ?? (picks && !incoming ? friendlyMessage(null) : null);
+  // A missing honorable pick to promote is "gone"; a missing draft is just unexpected.
+  const problem =
+    loadError ??
+    (picks && !incoming
+      ? friendlyMessage(promote ? new ApiError('Pick not found', 'pick_not_found') : null)
+      : null);
   return (
     <SafeAreaView style={styles.screen}>
       <ScreenHeader title="Your five are full" onBack={() => router.back()} backDisabled={busy} />

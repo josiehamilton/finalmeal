@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ApiError, friendlyMessage, getMyPicks, promotePick } from '@finalmeal/api';
+import { ApiError, friendlyMessage, getMyPicks } from '@finalmeal/api';
 import type { Pick } from '@finalmeal/api';
 import { colors } from '@finalmeal/ui-tokens';
 import { NOTE_MAX } from '@finalmeal/core';
@@ -21,6 +21,7 @@ import { getSupabase } from '../../../src/lib/supabase';
 import { useBlockBack, useModalSwipe } from '../../../src/lib/use-block-back';
 import { ctaFor, draftHasContent, findExistingPick, useAddDish } from '../../../src/state/add-dish';
 import { announcePicksChanged } from '../../../src/state/pick-changes';
+import { promoteWithDraft } from '../../../src/state/promote-with-draft';
 import { useSavePick } from '../../../src/state/save-pick';
 
 /** Add a dish: photo, dish, restaurant, which list, a note and optional tags, in one sheet. */
@@ -105,8 +106,9 @@ export default function AddDish() {
     setPromoting(true);
     setError(null);
     try {
-      await promotePick(getSupabase(), promotable.id);
-      announcePicksChanged();
+      // What was entered for this dish (photo, tags, note) is merged into the pick, never dropped.
+      const { photoFailed } = await promoteWithDraft(promotable, draft);
+      announcePicksChanged({ photoFailed });
       done();
     } catch (e) {
       if (e instanceof ApiError && e.code === 'final_full') {

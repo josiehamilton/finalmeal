@@ -10,6 +10,7 @@ import {
   promotePick,
   searchTags,
   suggestDishes,
+  updatePick,
 } from '@finalmeal/api';
 import type { Pick } from '@finalmeal/api';
 import AddDish from '../../app/(app)/add/index';
@@ -37,6 +38,7 @@ jest.mock('@finalmeal/api', () => ({
   getPopularPlaces: jest.fn().mockResolvedValue([]),
   searchTags: jest.fn(),
   suggestDishes: jest.fn(),
+  updatePick: jest.fn(),
 }));
 jest.mock('../lib/supabase', () => ({ getSupabase: () => ({ fake: 'client' }) }));
 jest.mock('../lib/pick-photo', () => ({ pickPhoto: jest.fn() }));
@@ -53,6 +55,7 @@ jest.mock('expo-location', () => mockLocation);
 const mockAddPick = jest.mocked(addPick);
 const mockGetPicks = jest.mocked(getMyPicks);
 const mockPromote = jest.mocked(promotePick);
+const mockUpdate = jest.mocked(updatePick);
 const mockSearchTags = jest.mocked(searchTags);
 const mockSuggest = jest.mocked(suggestDishes);
 const mockCreateTag = jest.mocked(createPersonalTag);
@@ -103,6 +106,7 @@ describe('Add a dish form', () => {
     mockSuggest.mockResolvedValue([]);
     mockAddPick.mockResolvedValue({ pick: pickAt('final', 3), photoFailed: false });
     mockPromote.mockResolvedValue(pickAt('final', 3));
+    mockUpdate.mockResolvedValue(pickAt('final', 3));
   });
 
   it('shows the form with the canvas copy', async () => {
@@ -327,6 +331,87 @@ describe('Add a dish form', () => {
       expect(mockRouter.push).toHaveBeenCalledWith({
         pathname: '/add/swap',
         params: { promote: 'pk9' },
+      });
+    });
+
+    describe('what the person entered is kept when they promote', () => {
+      function Notice() {
+        return <Text testID="notice">{String(usePhotoNotice())}</Text>;
+      }
+      const entered = {
+        ...READY,
+        tags: [RAMEN],
+        personalTags: ['Date night'],
+        note: 'The broth.',
+        photoUri: 'file:///a.jpg',
+      };
+      async function promoteFrom(existing: Pick, draft = entered) {
+        mockAddPick.mockRejectedValue(duplicate());
+        mockGetPicks.mockResolvedValue([existing]);
+        await render(
+          <>
+            {withDraft(<AddDish />, draft)}
+            <Notice />
+          </>,
+        );
+        await settle();
+        await fireEvent.press(cta('Add to Final Meal'));
+        await settle();
+        await fireEvent.press(screen.getByRole('button', { name: 'Make it a Final Meal instead' }));
+        await settle();
+      }
+
+      it('merges tags, the note and the photo into the pick after promoting it', async () => {
+        jest.mocked(preparePickPhoto).mockResolvedValue(new ArrayBuffer(8));
+        await promoteFrom({
+          ...pickAt('honorable', null, 'pk9'),
+          tags: [VEGAN, { id: 'tp1', kind: 'personal', name: 'Rainy day', slug: 'rainy-day', featured: false }],
+        });
+        expect(mockPromote).toHaveBeenCalledWith(CLIENT, 'pk9');
+        expect(mockUpdate).toHaveBeenCalledWith(CLIENT, 'pk9', {
+          tagIds: ['t2', 't1'],
+          personalTags: ['Rainy day', 'Date night'],
+          note: 'The broth.',
+          photo: expect.any(ArrayBuffer),
+        });
+        expect(screen.getByTestId('notice')).toHaveTextContent('false');
+        expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+      });
+
+      it('leaves an existing note and photo alone', async () => {
+        await promoteFrom({
+          ...pickAt('honorable', null, 'pk9'),
+          note: 'Mine',
+          photoUrl: 'https://x/old.jpg',
+        });
+        const patch = mockUpdate.mock.calls[0]![2];
+        expect(patch).not.toHaveProperty('note');
+        expect(patch).not.toHaveProperty('photo');
+        // Only the refused add prepared the photo; the promote step does not prepare it again.
+        expect(preparePickPhoto).toHaveBeenCalledTimes(1);
+      });
+
+      it('shows the saved-without-photo notice when the photo upload fails, and still keeps the rest', async () => {
+        jest.mocked(preparePickPhoto).mockResolvedValue(new ArrayBuffer(8));
+        mockUpdate
+          .mockRejectedValueOnce(new ApiError('timed out', 'timeout'))
+          .mockResolvedValueOnce(pickAt('final', 3));
+        await promoteFrom(pickAt('honorable', null, 'pk9'));
+        expect(screen.getByTestId('notice')).toHaveTextContent('true');
+        expect(mockUpdate).toHaveBeenCalledTimes(2);
+        expect(mockUpdate.mock.calls[1]![2]).toEqual({
+          tagIds: ['t1'],
+          personalTags: ['Date night'],
+          note: 'The broth.',
+        });
+        expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+      });
+
+      it('shows the notice when the photo cannot be prepared', async () => {
+        jest.mocked(preparePickPhoto).mockRejectedValue(new Error('resize failed'));
+        await promoteFrom(pickAt('honorable', null, 'pk9'));
+        expect(screen.getByTestId('notice')).toHaveTextContent('true');
+        expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
       });
     });
   });

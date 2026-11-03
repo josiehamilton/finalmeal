@@ -57,8 +57,7 @@ export type AddDishAction =
   | { type: 'selectPersonalTag'; name: string }
   | { type: 'setSearchCity'; city: SearchCity | null }
   /** Replaces parts of the draft wholesale (Edit loads a pick's note, photo and tags this way). */
-  | { type: 'hydrate'; draft: Partial<AddDishDraft> }
-  | { type: 'reset' };
+  | { type: 'hydrate'; draft: Partial<AddDishDraft> };
 
 /** "Rainy day" and " rainy  DAY " are the same personal tag. */
 export function personalKey(name: string): string {
@@ -110,8 +109,6 @@ export function addDishReducer(state: AddDishDraft, action: AddDishAction): AddD
       return { ...state, searchCity: action.city };
     case 'hydrate':
       return { ...state, ...action.draft };
-    case 'reset':
-      return { ...initialDraft, searchCity: state.searchCity };
   }
 }
 
