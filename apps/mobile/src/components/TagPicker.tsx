@@ -68,6 +68,11 @@ export function TagPicker({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Locking the picker closes a half-typed own tag: nothing may change once it is locked.
+  useEffect(() => {
+    if (disabled) setNaming(false);
+  }, [disabled]);
+
   useEffect(() => {
     let cancelled = false;
     const kinds: TagKind[] = ['food_type', 'dietary', 'personal'];
@@ -185,6 +190,7 @@ export function TagPicker({
               value={name}
               onChangeText={setName}
               maxLength={TAG_NAME_MAX}
+              editable={!disabled}
               autoFocus
               autoCapitalize="sentences"
               returnKeyType="done"
@@ -195,10 +201,10 @@ export function TagPicker({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Add tag"
-            accessibilityState={{ disabled: name.trim() === '' || busy }}
-            disabled={name.trim() === '' || busy}
+            accessibilityState={{ disabled: name.trim() === '' || busy || disabled }}
+            disabled={name.trim() === '' || busy || disabled}
             onPress={addOwn}
-            style={[styles.addTag, (name.trim() === '' || busy) && styles.addTagOff]}
+            style={[styles.addTag, (name.trim() === '' || busy || disabled) && styles.addTagOff]}
           >
             <Text style={styles.addTagText}>Add</Text>
           </Pressable>

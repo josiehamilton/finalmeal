@@ -88,43 +88,53 @@ export default function AddFirst() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <PhotoField
-            layout="banner"
-            uri={draft.photoUri}
-            disabled={locked}
-            onChange={(uri) => dispatch({ type: 'setPhoto', uri })}
-          />
-          <DishField
-            value={draft.dishName}
-            placeId={draft.place?.id ?? null}
-            disabled={locked}
-            onChangeText={(name) => dispatch({ type: 'setDishName', name })}
-            onChoose={(suggestion) => dispatch({ type: 'chooseSuggestion', suggestion })}
-          />
-          <RestaurantField
-            place={draft.place}
-            disabled={locked}
-            onPress={() => router.push('/add-first/place')}
-          />
-          <TagPicker
-            inline
-            disabled={locked}
-            tags={draft.tags}
-            personalTags={draft.personalTags}
-            onToggleTag={(tag) => dispatch({ type: 'toggleTag', tag })}
-            onTogglePersonal={(name) => dispatch({ type: 'togglePersonalTag', name })}
-            onSelectPersonal={(name) => dispatch({ type: 'selectPersonalTag', name })}
-            onMore={(kind) => router.push({ pathname: '/add-first/tags-search', params: { kind } })}
-          />
-          <TextField
-            label="Why this one? (optional)"
-            value={draft.note}
-            onChangeText={(note) => dispatch({ type: 'setNote', note })}
-            multiline
-            editable={!locked}
-            maxLength={NOTE_MAX}
-            counter={draft.note.length > 0 ? `${draft.note.length} / ${NOTE_MAX}` : undefined}
-          />
+          <View testID="first-pick-photo" style={locked ? styles.locked : undefined}>
+            <PhotoField
+              layout="banner"
+              uri={draft.photoUri}
+              disabled={locked}
+              onChange={(uri) => dispatch({ type: 'setPhoto', uri })}
+            />
+          </View>
+          <View testID="first-pick-dish" style={locked ? styles.locked : undefined}>
+            <DishField
+              value={draft.dishName}
+              placeId={draft.place?.id ?? null}
+              disabled={locked}
+              onChangeText={(name) => dispatch({ type: 'setDishName', name })}
+              onChoose={(suggestion) => dispatch({ type: 'chooseSuggestion', suggestion })}
+            />
+          </View>
+          <View testID="first-pick-restaurant" style={locked ? styles.locked : undefined}>
+            <RestaurantField
+              place={draft.place}
+              disabled={locked}
+              onPress={() => router.push('/add-first/place')}
+            />
+          </View>
+          <View testID="first-pick-tags" style={locked ? styles.locked : undefined}>
+            <TagPicker
+              inline
+              disabled={locked}
+              tags={draft.tags}
+              personalTags={draft.personalTags}
+              onToggleTag={(tag) => dispatch({ type: 'toggleTag', tag })}
+              onTogglePersonal={(name) => dispatch({ type: 'togglePersonalTag', name })}
+              onSelectPersonal={(name) => dispatch({ type: 'selectPersonalTag', name })}
+              onMore={(kind) => router.push({ pathname: '/add-first/tags-search', params: { kind } })}
+            />
+          </View>
+          <View testID="first-pick-note" style={locked ? styles.locked : undefined}>
+            <TextField
+              label="Why this one? (optional)"
+              value={draft.note}
+              onChangeText={(note) => dispatch({ type: 'setNote', note })}
+              multiline
+              editable={!locked}
+              maxLength={NOTE_MAX}
+              counter={draft.note.length > 0 ? `${draft.note.length} / ${NOTE_MAX}` : undefined}
+            />
+          </View>
         </ScrollView>
         <View style={styles.bottom}>
           {error ? (
@@ -148,6 +158,8 @@ export default function AddFirst() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.night },
   flex: { flex: 1 },
+  /** A field group that can no longer be changed (the pick is saved; a retry only finishes). */
+  locked: { opacity: 0.5 },
   count: { fontFamily: fontFamily.uiBold, fontSize: 13, color: colors.emberGlow },
   content: { gap: 18, paddingHorizontal: 24, paddingTop: 12, paddingBottom: 16 },
   bottom: { gap: 12, paddingHorizontal: 24, paddingTop: 8, paddingBottom: 8 },

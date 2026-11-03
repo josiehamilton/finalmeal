@@ -20,7 +20,9 @@ export function RestaurantField({ place, onPress, disabled = false }: Restaurant
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
-          place ? `Restaurant: ${place.name}, ${place.label}. Change` : 'Restaurant: Choose a restaurant'
+          place
+            ? `Restaurant: ${place.name}, ${place.label}${disabled ? '' : '. Change'}`
+            : 'Restaurant: Choose a restaurant'
         }
         accessibilityState={{ disabled }}
         disabled={disabled}
@@ -38,7 +40,7 @@ export function RestaurantField({ place, onPress, disabled = false }: Restaurant
                 {place.label}
               </Text>
             </View>
-            <Text style={styles.change}>Change</Text>
+            {disabled ? null : <Text style={styles.change}>Change</Text>}
           </>
         ) : (
           <>

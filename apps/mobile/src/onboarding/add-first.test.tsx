@@ -33,6 +33,13 @@ const CLIENT = { fake: 'client' };
 const READY = { place: PLACE, dishName: 'Pork Gyro' };
 const lockIt = () => screen.getByRole('button', { name: 'Lock it in' });
 const settle = () => act(async () => {});
+const GROUPS = [
+  'first-pick-photo',
+  'first-pick-dish',
+  'first-pick-restaurant',
+  'first-pick-tags',
+  'first-pick-note',
+];
 
 describe('Your first pick', () => {
   beforeEach(() => {
@@ -148,6 +155,8 @@ describe('Your first pick', () => {
     expect(screen.getByRole('button', { name: 'Add a photo (optional)' })).toBeEnabled();
     expect(screen.getAllByRole('button', { name: 'Ramen' })[0]).toBeEnabled();
     expect(screen.getByRole('button', { name: /Restaurant/ })).toBeEnabled();
+    expect(screen.getByText('Change')).toBeOnTheScreen();
+    for (const group of GROUPS) expect(screen.getByTestId(group)).not.toHaveStyle({ opacity: 0.5 });
 
     await fireEvent.press(lockIt());
     await settle();
@@ -160,6 +169,9 @@ describe('Your first pick', () => {
     for (const more of screen.getAllByRole('button', { name: 'More' })) expect(more).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Your own' })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Restaurant/ })).toBeDisabled();
+    // A locked field looks locked: half-faded groups, and no "Change" on the Restaurant row.
+    expect(screen.queryByText('Change')).toBeNull();
+    for (const group of GROUPS) expect(screen.getByTestId(group)).toHaveStyle({ opacity: 0.5 });
     // Lock it in stays available to finish.
     expect(lockIt()).toBeEnabled();
   });
