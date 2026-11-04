@@ -94,7 +94,7 @@ All tables use UUID primary keys and `created_at`/`updated_at` timestamps. Row-l
 | `tags` | `kind` (`food_type`/`dietary`/`personal`), `name`, `slug`, `owner_id` (personal only), `is_featured` | food_type/dietary are global and admin-managed; personal tags are visible only to their owner |
 | `pick_tags` | `pick_id`, `tag_id` | personal tags only on the owner's picks |
 | `follows` | `follower_id`, `followee_id`, `status` (`active`/`requested`) | private accounts get `requested` until approved; written only through `follow_user`, `unfollow_user` and `respond_follow_request` (no direct client writes), and a row is readable only by the two people in it |
-| `saves` | `user_id`, `dish_id` | "save to try" |
+| `saves` | `user_id`, `dish_id`, `via_pick_id` (the pick it was saved from, null if that pick is gone or was the person's own), `via_user_id` (that pick's owner) | "save to try"; written only through `save_dish` / `unsave_dish`, readable only by its owner; saving through someone's pick writes a `saved_pick` activity; the save outlives the pick |
 | `blocks` | `blocker_id`, `blocked_id` | blocked users never see each other |
 | `shared_lists` | `owner_id`, `slug` (unique), `title`, `note`, `filter` (JSON: `scope` = `final_five`/`everything`/`custom`, `cities[]`, `food_type_tag_ids[]`, `dietary_tag_ids[]`, `personal_tag_ids[]`, `tiers[]`), `is_active` | evaluated live on every view; `filter` is validated by a shared schema in `packages/core` |
 | `activities` | `actor_id`, `type` (`added_final`, `added_honorable`, `dethroned`, `promoted`, `followed`, `follow_requested`, `follow_accepted`, `saved_pick`, `saved_from_list`), `pick_id`, `other_pick_id`, `list_id`, `target_user_id` | feeds the Following feed and notifications; respects privacy and blocks |
@@ -153,8 +153,9 @@ Apple and Google sign-in skip steps 1–2 and land on Name. Their buttons stay h
 
 ### 5.4 Feed, Discover, profile
 
-- **Following feed:** activities from people you follow (active follows only), newest first, paginated.
-- **Nearby feed:** recent picks from trusted public accounts within 25 km of your home location, ranked by recency and dish counts.
+- **Following feed:** `added_final`, `added_honorable`, `promoted` and `dethroned` activities from people you follow (active follows only, never across a block), newest first, keyset-paged. A swap (a new Final that replaces another) shows once, as the `dethroned` card.
+- **Nearby feed:** picks (not activities) from trusted, public, non-blocked accounts at places within 25 km of your home city's point (never the phone's location), ranked by `epoch(created_at) + 86400 × ln(1 + list_count)`, so each e-fold of the dish's list count (how many trusted people have it) is worth one day of recency. Offset paging, at most 200 rows in total. Without a home city it is empty and the app prompts for one.
+- **Pick detail:** any pick the viewer may see (a private account's picks only for the owner and active followers): the pick, its dish and place, global tags (personal tags only for the owner), how many Final Meals and lists have the dish, up to four public trusted people with it as a Final Meal, and whether the viewer saved the dish. "Who picked here" on a place counts every other trusted account, private ones included, and names only the public ones.
 - **Discover:** map pins come from a bounding-box query (`picks_in_view`) that returns places with their best tier (a skull pin if any Final Meal, otherwise a bone dot). Private members' picks appear without a name or profile link. Search covers dishes, places, people and active shared lists. Filters cover pick type, distance, food type and dietary.
 - **Profile:** Final Meal / Honorable / Map tabs come first, with a slim filter row under them (chips for cities, food types and tags) and "Share these" when a filter is active. The Final Meal tab lists the five individually; Honorable and the map group by restaurant.
 

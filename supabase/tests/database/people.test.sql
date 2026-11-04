@@ -212,7 +212,8 @@ select is((select count(*)::int from public.list_followers('00000000-0000-4000-8
 -- ================================================================ search_people
 select is((select string_agg(username, ',') from public.search_people('ar')), 'arimitchell',
   'search_people(ar) finds arimitchell (and not Bea Arden, who blocked Josie)');
-select is((select string_agg(username, ',' order by username) from public.search_people('pri')), 'priya_s',
+-- The seed's own private Priya (priyashah) matches too, next to the fixture's priya_s.
+select is((select string_agg(username, ',' order by username) from public.search_people('pri')), 'priya_s,priyashah',
   'private accounts are included');
 select is((select string_agg(username, ',') from public.search_people('lind')), 'vera_l',
   'matches the start of a display-name word (Lindqvist)');

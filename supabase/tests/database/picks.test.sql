@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(197);
+select plan(199);
 
 -- Uses the dev seed's Marutama place and its "Tonkotsu Ramen" dish. The seeded people are
 -- deleted here (their picks go with them) so nobody's existing finals get in the way; the seed
@@ -79,6 +79,21 @@ as $$
   select id from public.picks where user_id = p_uid and original_dish_name = p_name;
 $$;
 
+-- The error detail of add_pick on a dish the caller already has (the duplicate case below).
+create function public.test_dup_detail(p_name text, p_tier public.pick_tier)
+returns text
+language plpgsql
+as $$
+declare
+  v_detail text;
+begin
+  perform public.add_pick('10000000-0000-0000-0000-0000000000a1', null, p_name, p_tier);
+  return 'no error';
+exception when others then
+  get stacked diagnostics v_detail = pg_exception_detail;
+  return v_detail;
+end;
+$$;
 create function public.test_login(p_uid uuid)
 returns void
 language sql
@@ -322,6 +337,15 @@ $$, 'P0001', 'duplicate_pick', 'adding a dish already on the list as a final rai
 select throws_ok($$
   select public.add_pick('10000000-0000-0000-0000-0000000000a1', null, 'dish  6!', 'final')
 $$, 'P0001', 'duplicate_pick', 'adding a dish already an honorable (typed differently) raises duplicate_pick');
+-- The error detail names the pick that is already there (known gap M5)
+select is(
+  public.test_dup_detail('Dish 7', 'honorable')::jsonb,
+  jsonb_build_object('pick_id', public.test_pick_id('00000000-0000-0000-0000-00000000000a', 'Dish 7'), 'tier', 'final'),
+  'duplicate_pick detail names the existing pick and its tier (a final)');
+select is(
+  public.test_dup_detail('dish  6!', 'final')::jsonb,
+  jsonb_build_object('pick_id', public.test_pick_id('00000000-0000-0000-0000-00000000000a', 'Dish 6'), 'tier', 'honorable'),
+  'duplicate_pick detail names the existing pick and its tier (an honorable, typed differently)');
 select is((select count(*)::int from public.picks where user_id = '00000000-0000-0000-0000-00000000000a'),
   6, 'duplicates created no second pick');
 select public.test_slots_ok('00000000-0000-0000-0000-00000000000a', 'refused duplicates');

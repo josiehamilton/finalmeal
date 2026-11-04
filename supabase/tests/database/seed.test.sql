@@ -1,13 +1,13 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(27);
+select plan(34);
 
 -- Counts
-select is((select count(*)::int from public.profiles), 6, '6 profiles');
+select is((select count(*)::int from public.profiles), 7, '7 profiles (Priya joined)');
 select is((select count(*)::int from public.places where source = 'custom'), 14, '14 canvas places');
-select is((select count(*)::int from public.dishes), 17, '17 dishes');
-select is((select count(*)::int from public.picks), 28, '28 picks');
+select is((select count(*)::int from public.dishes), 22, '22 dishes (five new for the feeds)');
+select is((select count(*)::int from public.picks), 34, '34 picks (the other people''s lists are fuller)');
 
 -- Saves match the saved_pick activity
 select is(
@@ -15,6 +15,25 @@ select is(
     where s.user_id = '00000000-0000-4000-8000-000000000002' and d.name = 'Pork Gyro'),
   1,
   'mike has saved josie''s Pork Gyro dish, matching his saved_pick activity'
+);
+select is(
+  (select s.via_pick_id from public.saves s join public.dishes d on d.id = s.dish_id
+    where s.user_id = '00000000-0000-4000-8000-000000000002' and d.name = 'Pork Gyro'),
+  (select p.id from public.picks p join public.dishes d on d.id = p.dish_id
+    where p.user_id = '00000000-0000-4000-8000-000000000001' and d.name = 'Pork Gyro'),
+  'mike''s save came through josie''s Pork Gyro pick'
+);
+select is(
+  (select count(*)::int from public.saves where user_id = '00000000-0000-4000-8000-000000000001'),
+  4,
+  'josie has 4 saves'
+);
+select is(
+  (select count(*)::int from public.saves s
+    join public.activities a on a.actor_id = s.user_id and a.type = 'saved_pick' and a.pick_id = s.via_pick_id
+    where s.user_id = '00000000-0000-4000-8000-000000000001'),
+  4,
+  'each of josie''s saves has its saved_pick activity'
 );
 
 -- Josie's picks
@@ -92,6 +111,12 @@ select is(
 
 -- Social
 select is((select count(*)::int from public.follows where status = 'active'), 8, '8 active follows');
+select is(
+  (select count(*)::int from public.follows
+    where status = 'requested' and followee_id = '00000000-0000-4000-8000-000000000007'),
+  2,
+  'priya has 2 pending follow requests (josie and sam)'
+);
 select is((select count(*)::int from public.shared_lists), 2, '2 shared lists');
 select is(
   (select filter->'cities' from public.shared_lists where slug = 'josies-vancouver'),
@@ -103,12 +128,26 @@ select is(
   (select id::text from public.tags where kind = 'food_type' and slug = 'sushi'),
   'josies-sushi filters on the Sushi tag id'
 );
-select is((select count(*)::int from public.activities), 4, '4 activities');
+-- 34 added_* (one per pick) + 1 dethroned + 1 followed + 1 saved_from_list + 5 saved_pick (Mike's
+-- and Josie's four) + 2 follow_requested
+select is((select count(*)::int from public.activities), 44, '44 activities');
 select is(
   (select count(*)::int from public.notifications
     where user_id = '00000000-0000-4000-8000-000000000001'),
   4,
   '4 notifications for josie (the activities fan out to them)'
+);
+select is(
+  (select count(*)::int from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000001' and read_at is null),
+  2,
+  'two of josie''s notifications are unread (Ari''s dethroning and Alli''s follow)'
+);
+select is(
+  (select count(*)::int from public.notifications
+    where user_id = '00000000-0000-4000-8000-000000000007'),
+  2,
+  '2 notifications for priya (the follow requests)'
 );
 select is(
   (select other_pick_id is not null from public.activities where type = 'dethroned'),
@@ -119,8 +158,10 @@ select is(
 -- People
 select is((select trust_level::text from public.profiles where username = 'samokafor'), 'new',
   'sam is a new user');
-select is((select count(*)::int from public.profiles where trust_level = 'trusted'), 5,
-  'the other five are trusted');
+select is((select count(*)::int from public.profiles where trust_level = 'trusted'), 6,
+  'the other six are trusted');
+select is((select visibility::text from public.profiles where username = 'priyashah'), 'private',
+  'priya is private');
 
 select * from finish();
 rollback;

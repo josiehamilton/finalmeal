@@ -38,18 +38,22 @@ from (values
 
 -- ---------------------------------------------------------------- people
 -- Fixed ids so later phases and tests can refer to people:
--- josie ...0001, mike ...0002, ari ...0003, alli ...0004, dev ...0005, sam ...0006
+-- josie ...0001, mike ...0002, ari ...0003, alli ...0004, dev ...0005, sam ...0006, priya ...0007
+-- (Priya is the one private account).
 create temp table seed_people (
   id uuid, username text, display_name text, bio text,
-  home_geoname_id integer, trust public.trust_level
+  home_geoname_id integer, trust public.trust_level,
+  vis public.profile_visibility not null default 'public'
 ) on commit drop;
-insert into seed_people values
+insert into seed_people (id, username, display_name, bio, home_geoname_id, trust) values
   ('00000000-0000-4000-8000-000000000001', 'josiehamilton', 'Josie Hamilton', 'Chasing the perfect meal.', 6173331, 'trusted'),
   ('00000000-0000-4000-8000-000000000002', 'mikebrennan',   'Mike Brennan',   'Tokyo → NYC. Always hungry.', 5128581, 'trusted'),
   ('00000000-0000-4000-8000-000000000003', 'arimitchell',   'Ari Mitchell',   'Professional eater. Amateur chef.', 6173331, 'trusted'),
   ('00000000-0000-4000-8000-000000000004', 'allimercer',    'Alli Mercer',    'Spice level: nuclear.', 6141256, 'trusted'),
   ('00000000-0000-4000-8000-000000000005', 'devpatel',      'Dev Patel',      null, 6173331, 'trusted'),
-  ('00000000-0000-4000-8000-000000000006', 'samokafor',     'Sam Okafor',     null, 6173331, 'new');
+  ('00000000-0000-4000-8000-000000000006', 'samokafor',     'Sam Okafor',     null, 6173331, 'new'),
+  ('00000000-0000-4000-8000-000000000007', 'priyashah',      'Priya Shah',     'Dumplings are a personality.', 6173331, 'trusted');
+update seed_people set vis = 'private' where username = 'priyashah';
 
 insert into auth.users (
   instance_id, id, aud, role, email, email_confirmed_at,
@@ -72,12 +76,13 @@ from seed_people;
 
 -- Home city label comes from public.city_label (name, then region_code for US/CA/AU or
 -- region_name, then country). Seeded people are already onboarded.
-insert into public.profiles (id, username, display_name, bio, home_city_id, home_place_text, home_location, trust_level, onboarded_at)
+insert into public.profiles (id, username, display_name, bio, home_city_id, home_place_text, home_location, trust_level, visibility, onboarded_at)
 select
   sp.id, sp.username, sp.display_name, sp.bio, c.id,
   public.city_label(c),
   c.location,
   sp.trust,
+  sp.vis,
   now()
 from seed_people sp
 join public.cities c on c.geoname_id = sp.home_geoname_id;
@@ -125,7 +130,12 @@ from (values
   ('Vegan Dan Dan Noodles', 'Lotus Noodle Bar'),
   ('Cardamom Bun',          'Hearth Bakery'),
   ('Omakase',               'Sushi Dai'),
-  ('Toro Hand Roll',        'Nami')
+  ('Toro Hand Roll',        'Nami'),
+  ('Chicken Karaage',       'Marutama'),
+  ('Pad See Ew',            'Kin Kao'),
+  ('Butter Chicken',        'Spicy Time'),
+  ('Spicy Tuna Roll',       'Nami'),
+  ('Xiao Long Bao',         'Lotus Noodle Bar')
 ) as v(dish, place)
 join public.places p on p.name = v.place;
 
@@ -141,7 +151,9 @@ from (values ('Late night'), ('Spicy'), ('Splurge'), ('Rainy day')) as v(name);
 -- ---------------------------------------------------------------- picks
 -- tier/slot per person; original_dish_name is the dish name. `mins` is how many minutes ago the
 -- pick was made: each person's picks get distinct times so lists that sort by newest first are
--- the same after every reset. Josie's honorables run newest to oldest in the order the ProfileHM
+-- the same after every reset. The other people's times are spread over about three days so the
+-- Following feed (people Josie follows) and Nearby (Vancouver-area picks) read like a real week:
+-- Ari's swap two minutes ago, Ari's gyro two hours ago, Dev's ramen just under three. Josie's honorables run newest to oldest in the order the ProfileHM
 -- board groups them: Marutama (Tonkotsu Ramen, Pork Gyoza), Kin Kao (Khao Soi, Crispy Rice
 -- Salad), Miku, Lotus Noodle Bar, Hearth Bakery, then the rest.
 insert into public.picks (user_id, dish_id, tier, slot, note, original_dish_name, created_at)
@@ -165,17 +177,23 @@ from (values
   ('josiehamilton', 'Toro Hand Roll',        'honorable', null, null, 10),
   ('josiehamilton', 'Pork Gyoza',            'honorable', null, null, 2),
   ('josiehamilton', 'Crispy Rice Salad',     'honorable', null, null, 4),
-  ('mikebrennan',   'Smash Burger',          'final',     1,    null, 105),
-  ('mikebrennan',   'Wagyu Beef Don',        'final',     2,    'God tier. I still dream about it.', 106),
-  ('arimitchell',   'Pork Gyro',             'final',     1,    'Delicious. I’d fly back for it.', 107),
-  ('arimitchell',   'Smash Burger',          'final',     2,    null, 108),
-  ('arimitchell',   'Tacos Al Pastor',       'honorable', null, null, 109),
-  ('allimercer',    'Plain Biryani',         'final',     1,    'The spice level was absolutely perfect.', 110),
-  ('allimercer',    'Khao Soi',              'final',     2,    null, 111),
-  ('allimercer',    'Tacos Al Pastor',       'final',     3,    null, 112),
-  ('devpatel',      'Tonkotsu Ramen',        'final',     1,    'The broth is a religious experience.', 113),
-  ('devpatel',      'Khao Soi',              'honorable', null, 'Not quite top five, but I’d cross town for it.', 114),
-  ('samokafor',     'Omakase',               'honorable', null, null, 115)
+  ('mikebrennan',   'Smash Burger',          'final',     1,    null, 4300),
+  ('mikebrennan',   'Wagyu Beef Don',        'final',     2,    'God tier. I still dream about it.', 300),
+  ('mikebrennan',   'Spicy Tuna Roll',       'honorable', null, null, 2900),
+  ('arimitchell',   'Pork Gyro',             'final',     1,    'Delicious. I’d fly back for it.', 120),
+  ('arimitchell',   'Smash Burger',          'final',     2,    null, 2),
+  ('arimitchell',   'Tacos Al Pastor',       'honorable', null, null, 5000),
+  ('arimitchell',   'Chicken Karaage',       'honorable', null, 'Crunchiest in the city.', 180),
+  ('allimercer',    'Plain Biryani',         'final',     1,    'The spice level was absolutely perfect.', 1000),
+  ('allimercer',    'Khao Soi',              'final',     2,    null, 1100),
+  ('allimercer',    'Tacos Al Pastor',       'final',     3,    null, 1200),
+  ('allimercer',    'Butter Chicken',        'honorable', null, 'Order it hot. Then hotter.', 1500),
+  ('devpatel',      'Tonkotsu Ramen',        'final',     1,    'The broth is a religious experience.', 170),
+  ('devpatel',      'Pad See Ew',            'final',     2,    null, 600),
+  ('devpatel',      'Khao Soi',              'honorable', null, 'Not quite top five, but I’d cross town for it.', 2000),
+  ('samokafor',     'Omakase',               'honorable', null, null, 900),
+  ('priyashah',     'Xiao Long Bao',         'final',     1,    'Worth the burnt tongue.', 240),
+  ('priyashah',     'Cardamom Bun',          'honorable', null, null, 4000)
 ) as v(username, dish, tier, slot, note, mins)
 join seed_people pe on pe.username = v.username
 join public.dishes d on d.name = v.dish;
@@ -236,6 +254,13 @@ from (values
 join seed_people f on f.username = v.follower
 join seed_people e on e.username = v.followee;
 
+-- Priya is private: Josie and Sam have asked and are waiting for her to approve.
+insert into public.follows (follower_id, followee_id, status)
+select f.id, e.id, 'requested'
+from (values ('josiehamilton', 'priyashah'), ('samokafor', 'priyashah')) as v(follower, followee)
+join seed_people f on f.username = v.follower
+join seed_people e on e.username = v.followee;
+
 -- ---------------------------------------------------------------- shared lists
 insert into public.shared_lists (owner_id, slug, title, note, filter) values
   ('00000000-0000-4000-8000-000000000001', 'josies-vancouver', 'Josie’s Vancouver', 'Kin Kao first. Trust me.',
@@ -250,34 +275,67 @@ select
     'tiers', jsonb_build_array('final', 'honorable')
   );
 
+-- ---------------------------------------------------------------- saves
+-- Josie saves four dishes through other people's picks (minutes ago: 30, 60, 90, 120); Mike's
+-- save came through Josie's Pork Gyro. Each save has its saved_pick activity below.
+insert into public.saves (user_id, dish_id, via_pick_id, via_user_id, created_at)
+select u.id, k.dish_id, k.id, k.user_id, now() - v.mins * interval '1 minute'
+from (values
+  ('josiehamilton', 'arimitchell', 'Chicken Karaage',  30),
+  ('josiehamilton', 'devpatel',    'Pad See Ew',       60),
+  ('josiehamilton', 'allimercer',  'Butter Chicken',   90),
+  ('josiehamilton', 'mikebrennan', 'Spicy Tuna Roll', 120),
+  ('mikebrennan',   'josiehamilton', 'Pork Gyro',      60)
+) as v(saver, owner, dish, mins)
+join seed_people u on u.username = v.saver
+join seed_people o on o.username = v.owner
+join public.dishes d on d.name = v.dish
+join public.picks k on k.dish_id = d.id and k.user_id = o.id;
+
 -- ---------------------------------------------------------------- activities and notifications
-insert into public.activities (actor_id, type, pick_id, other_pick_id, list_id, target_user_id)
-select
-  '00000000-0000-4000-8000-000000000003', 'dethroned',
-  (select p.id from public.picks p join public.dishes d on d.id = p.dish_id
-    where p.user_id = '00000000-0000-4000-8000-000000000003' and d.name = 'Smash Burger'),
-  (select p.id from public.picks p join public.dishes d on d.id = p.dish_id
-    where p.user_id = '00000000-0000-4000-8000-000000000003' and d.name = 'Tacos Al Pastor'),
-  null, null;
+-- Every created_at is set explicitly. One added_* per pick at the pick's time (Ari's Tacos Al
+-- Pastor is added_final: it was a Final Meal until the Smash Burger dethroned it).
+insert into public.activities (actor_id, type, pick_id, created_at)
+select k.user_id,
+  case when k.tier = 'final' or (k.user_id = '00000000-0000-4000-8000-000000000003' and d.name = 'Tacos Al Pastor')
+       then 'added_final' else 'added_honorable' end::public.activity_type,
+  k.id, k.created_at
+from public.picks k
+join public.dishes d on d.id = k.dish_id;
 
-insert into public.activities (actor_id, type, target_user_id) values
-  ('00000000-0000-4000-8000-000000000004', 'followed', '00000000-0000-4000-8000-000000000001');
+-- Ari's swap: same pick and same time as Ari's Smash Burger added_final, so the feed shows it once.
+insert into public.activities (actor_id, type, pick_id, other_pick_id, created_at)
+select '00000000-0000-4000-8000-000000000003', 'dethroned', n.id, o.id, n.created_at
+from (select p.id, p.created_at from public.picks p join public.dishes d on d.id = p.dish_id
+       where p.user_id = '00000000-0000-4000-8000-000000000003' and d.name = 'Smash Burger') n,
+     (select p.id from public.picks p join public.dishes d on d.id = p.dish_id
+       where p.user_id = '00000000-0000-4000-8000-000000000003' and d.name = 'Tacos Al Pastor') o;
 
-insert into public.activities (actor_id, type, pick_id)
-select '00000000-0000-4000-8000-000000000002', 'saved_pick', p.id
-from public.picks p join public.dishes d on d.id = p.dish_id
-where p.user_id = '00000000-0000-4000-8000-000000000001' and d.name = 'Pork Gyro';
+insert into public.activities (actor_id, type, target_user_id, created_at) values
+  ('00000000-0000-4000-8000-000000000004', 'followed', '00000000-0000-4000-8000-000000000001',
+   now() - interval '14 minutes'),
+  ('00000000-0000-4000-8000-000000000001', 'follow_requested', '00000000-0000-4000-8000-000000000007',
+   now() - interval '30 minutes'),
+  ('00000000-0000-4000-8000-000000000006', 'follow_requested', '00000000-0000-4000-8000-000000000007',
+   now() - interval '50 minutes');
 
--- Mike's save behind that activity.
-insert into public.saves (user_id, dish_id)
-select '00000000-0000-4000-8000-000000000002', d.id
-from public.dishes d
-where d.name = 'Pork Gyro';
+-- Saved picks: Mike saved Josie's Pork Gyro; Josie's four saves, at the times of the saves.
+insert into public.activities (actor_id, type, pick_id, created_at)
+select s.user_id, 'saved_pick', s.via_pick_id, s.created_at
+from public.saves s
+where s.via_pick_id is not null;
 
-insert into public.activities (actor_id, type, list_id)
-select '00000000-0000-4000-8000-000000000002', 'saved_from_list', id
+insert into public.activities (actor_id, type, list_id, created_at)
+select '00000000-0000-4000-8000-000000000002', 'saved_from_list', id, now() - interval '2880 minutes'
 from public.shared_lists where slug = 'josies-vancouver';
 
 -- Notifications are not inserted here: the activities above fan out to them by themselves (the
--- activities_fan_out trigger runs as each statement commits). Josie gets four: Ari's swap (she
--- follows Ari), Alli's follow, and Mike's save of her gyro and of her list.
+-- activities_fan_out trigger is deferred to commit), so run it now. Josie gets four: Ari's swap
+-- (she follows Ari), Alli's follow, and Mike's save of her gyro and of her list. The seed adds
+-- no push tokens, so nothing is queued in push_outbox.
+set constraints all immediate;
+set constraints all deferred;
+
+-- Everything older than 30 minutes is read, so Josie's Activity opens with two unread (Ari's
+-- dethroning and Alli's follow), as on the board.
+update public.notifications set read_at = now() where created_at < now() - interval '30 minutes';

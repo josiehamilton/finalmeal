@@ -108,7 +108,13 @@ describe('tags, places and dishes (local Supabase)', () => {
 
   it('lists the most-picked spots in a city, and only that city', async () => {
     const vancouver = await getPopularPlaces(client, cityId, 12);
-    expect(vancouver.slice(0, 3).map((p) => p.name)).toEqual(['Kin Kao', 'Marutama', 'Skewers']);
+    // Seed: Kin Kao 5, Marutama 4, then Skewers, Hearth Bakery and Lotus Noodle Bar at 2 each
+    // (the nearest to the city's point, Hearth Bakery, comes third).
+    expect(vancouver.slice(0, 3).map((p) => p.name)).toEqual([
+      'Kin Kao',
+      'Marutama',
+      'Hearth Bakery',
+    ]);
     expect(vancouver.every((p) => p.country === 'CA' && p.city !== 'Saskatoon')).toBe(true);
     expect(vancouver.some((p) => p.name === 'Sushi Itto')).toBe(false);
     expect(vancouver[0]!.lat).toBeCloseTo(49.262, 2);

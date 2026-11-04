@@ -4,8 +4,9 @@ create extension if not exists pgtap with schema extensions;
 select plan(16);
 
 -- Uses the dev seed: the Vancouver and Tokyo cities, and the canvas places with their picks.
--- Seed picks per place: Kin Kao 4, Marutama 3, Skewers 2, Hearth Bakery / Lotus Noodle Bar /
--- Miku 1; Tokyo has Sushi Itto 3 and Sushi Dai 2. A real Foursquare extract (0 picks) may also
+-- Seed picks per place (trusted accounts): Kin Kao 5, Marutama 4, then Skewers, Hearth Bakery and
+-- Lotus Noodle Bar 2 each (the nearest to the city's point, Hearth Bakery, ranks third), Miku 1;
+-- Tokyo has Sushi Itto 3 and Sushi Dai 2. A real Foursquare extract (0 picks) may also
 -- be loaded, so the fixtures below are rolled back with the transaction and fsq rows are cleared.
 delete from public.places where source = 'fsq';
 
@@ -25,7 +26,7 @@ insert into public.places (source, name, city, region, country, location) values
 update public.places set closed_at = '2026-01-01' where name = 'Closed Popular Test';
 
 -- Six brand-new (untrusted) accounts all pick a dish at the 0-pick spot: that is more picks than
--- Kin Kao's 4, so if they counted the spot would jump to the top. They must not move anything.
+-- Kin Kao's 5, so if they counted the spot would jump to the top. They must not move anything.
 insert into auth.users (id)
 select ('00000000-0000-0000-0000-0000000000' || lpad(g::text, 2, '0'))::uuid from generate_series(1, 6) g;
 insert into public.profiles (id, username, display_name, trust_level)
@@ -48,19 +49,19 @@ set local role anon;
 select is(
   (select array_agg((t.place).name order by t.ordinality)
    from public.popular_places((select id from vancouver), 3) with ordinality as t),
-  array['Kin Kao', 'Marutama', 'Skewers'],
-  'Vancouver: the most-picked first (Kin Kao 4, Marutama 3, Skewers 2)');
+  array['Kin Kao', 'Marutama', 'Hearth Bakery'],
+  'Vancouver: the most-picked first (Kin Kao 5, Marutama 4, then a three-way tie at 2 broken by distance)');
 
 select is(
   (select t.pick_count from public.popular_places((select id from vancouver), 12) as t where (t.place).name = 'Marutama'),
-  3::bigint, 'pick_count counts the picks at the place');
+  4::bigint, 'pick_count counts the picks at the place');
 
 select ok(
   (select t.ordinality from public.popular_places((select id from vancouver), 50) with ordinality as t
    where (t.place).name = 'Marutama')
   < (select t.ordinality from public.popular_places((select id from vancouver), 50) with ordinality as t
      where (t.place).name = 'Zero Picks Vancouver'),
-  'Marutama (3 picks) ranks above a 0-pick spot');
+  'Marutama (4 picks) ranks above a 0-pick spot');
 
 select is(
   (select count(*) from public.popular_places((select id from vancouver), 50)
@@ -86,7 +87,7 @@ select is(
 select is(
   (select array_agg((t.place).name order by t.ordinality)
    from public.popular_places((select id from vancouver), 3) with ordinality as t),
-  array['Kin Kao', 'Marutama', 'Skewers'],
+  array['Kin Kao', 'Marutama', 'Hearth Bakery'],
   'picks by untrusted accounts do not move the ranking');
 select is(
   (select t.pick_count from public.popular_places((select id from vancouver), 50) as t
