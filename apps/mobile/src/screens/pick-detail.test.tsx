@@ -5,6 +5,7 @@ import {
   ApiError,
   demotePick,
   getMyPicks,
+  getPickDetail,
   moveFinal,
   promotePick,
   removePick,
@@ -12,6 +13,7 @@ import {
 import PickDetail from '../../app/(app)/pick/[id]';
 import { RAMEN, VEGAN } from '../test-support/add-dish';
 import { makeFinals, makePick } from '../test-support/picks';
+import { makePickDetail } from '../test-support/saves';
 import { announcePicksChanged, resetPickChanges } from '../state/pick-changes';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), dismissTo: jest.fn() };
@@ -25,6 +27,7 @@ jest.mock('expo-linking', () => ({ openURL: jest.fn().mockResolvedValue(true) })
 jest.mock('@finalmeal/api', () => ({
   ...jest.requireActual('@finalmeal/api'),
   getMyPicks: jest.fn(),
+  getPickDetail: jest.fn(),
   moveFinal: jest.fn(),
   promotePick: jest.fn(),
   demotePick: jest.fn(),
@@ -34,6 +37,7 @@ jest.mock('../lib/supabase', () => ({ getSupabase: () => ({ fake: 'client' }) })
 
 const CLIENT = { fake: 'client' };
 const mockGetPicks = jest.mocked(getMyPicks);
+const mockDetail = jest.mocked(getPickDetail);
 const mockMove = jest.mocked(moveFinal);
 const mockPromote = jest.mocked(promotePick);
 const mockDemote = jest.mocked(demotePick);
@@ -59,6 +63,10 @@ describe('Pick detail', () => {
       tags: [RAMEN, VEGAN],
     });
     mockGetPicks.mockResolvedValue(finals);
+    // The detail of whichever pick is opened: one of your own, on 23 Final Meals.
+    mockDetail.mockImplementation(async (_client, id) =>
+      makePickDetail({ pick: makePick({ id }), isMine: true, finalCount: 23 }),
+    );
   });
 
   it('shows the own pick: badge, dish, place, tags and the note in quotes', async () => {
@@ -73,11 +81,57 @@ describe('Pick detail', () => {
     expect(screen.getByRole('button', { name: 'Directions' })).toBeOnTheScreen();
   });
 
-  it('hides Save to try and the Final Meals count (Phase 4)', async () => {
+  it('shows who else has it as a Final Meal, but no Save to try', async () => {
     await render(<PickDetail />);
     await settle();
+    expect(mockDetail).toHaveBeenCalledWith(CLIENT, 'f2');
+    expect(screen.getByText('On 23 Final Meals')).toBeOnTheScreen();
     expect(screen.queryByText('Save to try')).toBeNull();
-    expect(screen.queryByText(/On \d+ Final Meals/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+  });
+
+  it('hides the pickers row when nobody else has it as a Final Meal', async () => {
+    mockDetail.mockResolvedValue(makePickDetail({ pick: makePick({ id: 'f2' }), isMine: true, finalCount: 0, pickers: [] }));
+    await render(<PickDetail />);
+    await settle();
+    expect(screen.queryByText(/On \d+ Final Meal/)).toBeNull();
+  });
+
+  describe('someone else’s pick', () => {
+    beforeEach(() => {
+      mockParams = { id: 'pk-mike' };
+      mockDetail.mockResolvedValue(makePickDetail());
+    });
+
+    it('shows their pick with Save to try, and loads none of your own picks', async () => {
+      await render(<PickDetail />);
+      await settle();
+      expect(mockDetail).toHaveBeenCalledWith(CLIENT, 'pk-mike');
+      expect(mockGetPicks).not.toHaveBeenCalled();
+      expect(screen.getByText('Wagyu Beef Don')).toBeOnTheScreen();
+      expect(screen.getByText('@mikebrennan · #2 on their Final Meal')).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: 'Save to try' })).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
+    });
+
+    it('says the pick is gone when it is missing or not allowed', async () => {
+      mockDetail.mockResolvedValue(null);
+      await render(<PickDetail />);
+      await settle();
+      expect(screen.getByText('That pick isn’t there any more.')).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+      expect(mockRouter.back).toHaveBeenCalled();
+    });
+
+    it('says what went wrong when it cannot load, and retries', async () => {
+      mockDetail.mockRejectedValueOnce(new TypeError('Network request failed'));
+      await render(<PickDetail />);
+      await settle();
+      expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+      await settle();
+      expect(screen.getByText('Wagyu Beef Don')).toBeOnTheScreen();
+    });
   });
 
   it('shows the photo, or the placeholder tile when there is none', async () => {
@@ -271,12 +325,13 @@ describe('Pick detail', () => {
 
   it('says the pick is gone when it is not in the list', async () => {
     mockParams = { id: 'someone-elses' };
+    mockDetail.mockResolvedValue(null);
     await render(<PickDetail />);
     await settle();
     expect(screen.getByText('That pick isn’t there any more.')).toBeOnTheScreen();
   });
 
-  it('says what went wrong when it cannot load, and retries', async () => {
+  it('says what went wrong when your picks cannot load, and retries', async () => {
     mockGetPicks.mockRejectedValueOnce(new TypeError('Network request failed'));
     await render(<PickDetail />);
     await settle();

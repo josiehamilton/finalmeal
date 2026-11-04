@@ -1,6 +1,6 @@
 import { createContext, createElement, useContext, useMemo, useReducer } from 'react';
 import type { ReactNode } from 'react';
-import type { Pick, Place, Tag } from '@finalmeal/api';
+import type { Place, Tag } from '@finalmeal/api';
 import { FINAL_MEAL_SIZE, NOTE_MAX } from '@finalmeal/core';
 
 /** The city the restaurant search is anchored to. Its point only ranks results; it is never the person's location. */
@@ -182,34 +182,4 @@ export function useAddDish(): AddDishContextValue {
   const value = useContext(AddDishContext);
   if (!value) throw new Error('useAddDish must be used inside <AddDishProvider>.');
   return value;
-}
-
-/** Lower-case, accent-free words with plural "s" dropped and any "(...)" aside removed: close to what the server matches on. */
-function dishKey(name: string): string {
-  return name
-    .replace(/\([^)]*\)/g, ' ')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter((w) => w !== '')
-    .map((w) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w))
-    .join(' ');
-}
-
-/**
- * The person's existing pick for the dish in the draft (what a `duplicate_pick` refusal means),
- * found at the same place by the chosen suggestion or by the dish name as typed. Null if none matches.
- */
-export function findExistingPick(picks: readonly Pick[], draft: AddDishDraft): Pick | null {
-  if (!draft.place) return null;
-  const typed = dishKey(draft.dishName);
-  return (
-    picks.find(
-      (p) =>
-        p.place.id === draft.place?.id &&
-        ((draft.dishId !== null && p.dish.id === draft.dishId) ||
-          (typed !== '' && (dishKey(p.dish.name) === typed || dishKey(p.originalDishName) === typed))),
-    ) ?? null
-  );
 }

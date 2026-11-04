@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ApiError, friendlyMessage, getMyPicks } from '@finalmeal/api';
+import { ApiError, friendlyMessage, getMyPicks, getPick } from '@finalmeal/api';
 import type { Pick } from '@finalmeal/api';
 import { colors } from '@finalmeal/ui-tokens';
 import { NOTE_MAX } from '@finalmeal/core';
@@ -20,7 +20,7 @@ import { fontFamily } from '../../../src/lib/fonts';
 import { getSupabase } from '../../../src/lib/supabase';
 import { useBlockBack, useModalSwipe } from '../../../src/lib/use-block-back';
 import { closeAddFlow, swapHref } from '../../../src/state/add-flow-base';
-import { ctaFor, draftHasContent, findExistingPick, useAddDish } from '../../../src/state/add-dish';
+import { ctaFor, draftHasContent, useAddDish } from '../../../src/state/add-dish';
 import { announcePicksChanged } from '../../../src/state/pick-changes';
 import { promoteWithDraft } from '../../../src/state/promote-with-draft';
 import { useSavePick } from '../../../src/state/save-pick';
@@ -94,9 +94,15 @@ export default function AddDish() {
       return;
     }
     setError(friendlyMessage(e));
-    if (e instanceof ApiError && e.code === 'duplicate_pick' && draft.tier === 'final') {
+    // The server names the pick the dish matched (even a fuzzy match). An honorable one can be promoted.
+    if (
+      e instanceof ApiError &&
+      e.code === 'duplicate_pick' &&
+      draft.tier === 'final' &&
+      e.existingPick?.tier === 'honorable'
+    ) {
       try {
-        const existing = findExistingPick(await getMyPicks(getSupabase()), draft);
+        const existing = await getPick(getSupabase(), e.existingPick.id);
         if (existing?.tier === 'honorable') setPromotable(existing);
       } catch {
         // The refusal is already on screen; without the lookup there is just no shortcut.

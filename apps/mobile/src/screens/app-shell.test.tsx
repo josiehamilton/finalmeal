@@ -28,6 +28,7 @@ let mockSignedIn = true;
 jest.mock('@finalmeal/api', () => ({
   ...jest.requireActual('@finalmeal/api'),
   getMyPicks: jest.fn().mockResolvedValue([]),
+  getMySaves: jest.fn().mockResolvedValue([]),
   searchTags: jest.fn().mockResolvedValue([]),
   suggestDishes: jest.fn().mockResolvedValue([]),
   getFollowingFeed: jest.fn().mockResolvedValue({ items: [], next: null }),

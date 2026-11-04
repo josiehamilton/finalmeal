@@ -1,8 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
-import { ApiError, addPick, friendlyCode, getMyPicks } from '@finalmeal/api';
+import { ApiError, addPick, friendlyCode, getPick } from '@finalmeal/api';
 import { preparePickPhoto } from '../lib/prepare-pick-photo';
 import { getSupabase } from '../lib/supabase';
-import { findExistingPick } from './add-dish';
 import type { AddDishDraft } from './add-dish';
 
 export type SaveOutcome =
@@ -23,8 +22,8 @@ function attemptKey(draft: AddDishDraft): string {
  * - Only one save runs at a time (`busy`, and a ref for taps in the same frame), so a retry never
  *   double-adds.
  * - After a lost connection or a timeout the pick may have been saved. If the next attempt for the
- *   same dish is refused as a duplicate, the list is re-read and an existing pick of that tier
- *   counts as the save having worked.
+ *   same dish is refused as a duplicate and the server's existing pick has the same tier, that pick
+ *   is re-read by id and counts as the save having worked.
  *
  * `save` resolves to null when a save is already running. After a successful save `busy` stays true
  * (the screen is closing); after a failure it goes back to false.
@@ -64,10 +63,15 @@ export function useSavePick() {
         unsure.current = null;
         return { status: 'saved', photoFailed: photoFailed || result.photoFailed };
       } catch (e) {
-        if (e instanceof ApiError && e.code === 'duplicate_pick' && unsure.current === key) {
+        if (
+          e instanceof ApiError &&
+          e.code === 'duplicate_pick' &&
+          unsure.current === key &&
+          e.existingPick?.tier === draft.tier
+        ) {
           try {
-            const existing = findExistingPick(await getMyPicks(getSupabase()), draft);
-            if (existing && existing.tier === draft.tier) {
+            const existing = await getPick(getSupabase(), e.existingPick.id);
+            if (existing) {
               unsure.current = null;
               return {
                 status: 'saved',

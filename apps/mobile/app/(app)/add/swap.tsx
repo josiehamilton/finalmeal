@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ApiError, friendlyMessage, getMyPicks, promotePick } from '@finalmeal/api';
+import { ApiError, friendlyMessage, getMyPicks, getPick, promotePick } from '@finalmeal/api';
 import type { Pick } from '@finalmeal/api';
 import { colors } from '@finalmeal/ui-tokens';
 import { Icon } from '../../../src/components/Icon';
@@ -13,7 +13,7 @@ import { fontFamily } from '../../../src/lib/fonts';
 import { getSupabase } from '../../../src/lib/supabase';
 import { useBlockBack, useBlockSwipeBack, useModalSwipe } from '../../../src/lib/use-block-back';
 import { closeAddFlow } from '../../../src/state/add-flow-base';
-import { draftHasContent, findExistingPick, useAddDish } from '../../../src/state/add-dish';
+import { draftHasContent, useAddDish } from '../../../src/state/add-dish';
 import { announcePicksChanged } from '../../../src/state/pick-changes';
 import { promoteWithDraft } from '../../../src/state/promote-with-draft';
 import { useSavePick } from '../../../src/state/save-pick';
@@ -98,9 +98,9 @@ export default function Swap() {
     } else {
       setError(friendlyMessage(outcome.error));
       const e = outcome.error;
-      if (e instanceof ApiError && e.code === 'duplicate_pick') {
+      if (e instanceof ApiError && e.code === 'duplicate_pick' && e.existingPick?.tier === 'honorable') {
         try {
-          const existing = findExistingPick(await getMyPicks(getSupabase()), draft);
+          const existing = await getPick(getSupabase(), e.existingPick.id);
           if (existing?.tier === 'honorable') setPromotable(existing);
         } catch {
           // The refusal is already on screen; without the lookup there is just no shortcut.

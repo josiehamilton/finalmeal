@@ -7,15 +7,18 @@ import {
   demotePick,
   friendlyMessage,
   getMyPicks,
+  getPickDetail,
   moveFinal,
   promotePick,
   removePick,
 } from '@finalmeal/api';
-import type { Pick } from '@finalmeal/api';
+import type { Pick, PickDetail as PickDetailData } from '@finalmeal/api';
 import { FINAL_MEAL_SIZE } from '@finalmeal/core';
 import { colors, radii } from '@finalmeal/ui-tokens';
 import { Icon } from '../../../src/components/Icon';
+import { OtherPickView } from '../../../src/components/OtherPickView';
 import { PickActions } from '../../../src/components/PickActions';
+import { PickersRow } from '../../../src/components/PickersRow';
 import { PrimaryButton } from '../../../src/components/PrimaryButton';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
 import { SkullMark } from '../../../src/components/SkullMark';
@@ -40,12 +43,14 @@ function applyUpdated(picks: Pick[], updated: Pick): Pick[] {
   });
 }
 
-/** One of your own picks. (Viewing other people's picks arrives in Phase 4.) */
+/** Any pick: one of your own (with its actions) or someone else's (Save to try). */
 export default function PickDetail() {
   const router = useRouter();
   // Swap closes back to this pick once the promotion is done.
   const pathname = usePathname();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [detail, setDetail] = useState<PickDetailData | null | undefined>(undefined);
+  /** Your own picks, loaded only when this pick is yours; the actions work on them. */
   const [picks, setPicks] = useState<Pick[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -54,14 +59,28 @@ export default function PickDetail() {
   const load = useCallback(async () => {
     setLoadError(null);
     try {
-      setPicks(await getMyPicks(getSupabase()));
+      const found = await getPickDetail(getSupabase(), id);
+      // Only your own picks need the whole list (finals, slots) for their actions.
+      const mine = found?.isMine ? await getMyPicks(getSupabase()) : null;
+      setDetail(found);
+      setPicks(mine);
     } catch (e) {
       setLoadError(friendlyMessage(e));
     }
-  }, []);
+  }, [id]);
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** After a change made here that moves the counts (promote, demote), refresh them quietly. */
+  const refreshDetail = useCallback(async () => {
+    try {
+      const found = await getPickDetail(getSupabase(), id);
+      if (found) setDetail(found);
+    } catch {
+      // The counts stay as they were; nothing else depends on them.
+    }
+  }, [id]);
 
   // Reload when picks change elsewhere (a saved edit); changes made here are applied in place.
   const version = usePicksVersion();
@@ -106,6 +125,7 @@ export default function PickDetail() {
         const updated = await promotePick(getSupabase(), target.id);
         setPicks((current) => (current ? applyUpdated(current, updated) : current));
         announce();
+        void refreshDetail();
       } catch (e) {
         if (e instanceof ApiError && e.code === 'final_full') {
           goToSwap(target.id);
@@ -121,6 +141,7 @@ export default function PickDetail() {
       const updated = await demotePick(getSupabase(), target.id);
       setPicks((current) => (current ? applyUpdated(current, updated) : current));
       announce();
+      void refreshDetail();
     });
   }
 
@@ -145,9 +166,12 @@ export default function PickDetail() {
     openDirections(target.place).catch(() => setActionError(friendlyMessage(null)));
   }
 
-  if (!pick) {
+  if (detail && !detail.isMine) return <OtherPickView detail={detail} />;
+
+  if (!pick || !detail) {
     const problem =
-      loadError ?? (picks ? friendlyMessage(new ApiError('Pick not found', 'pick_not_found')) : null);
+      loadError ??
+      (detail !== undefined ? friendlyMessage(new ApiError('Pick not found', 'pick_not_found')) : null);
     return (
       <SafeAreaView style={styles.screen}>
         <ScreenHeader title="" onBack={() => router.back()} />
@@ -219,6 +243,8 @@ export default function PickDetail() {
               <Text style={styles.noteText}>{`“${pick.note}”`}</Text>
             </View>
           ) : null}
+
+          <PickersRow pickers={detail.pickers} finalCount={detail.finalCount} />
 
           {actionError ? (
             <Text style={styles.error} accessibilityRole="alert">

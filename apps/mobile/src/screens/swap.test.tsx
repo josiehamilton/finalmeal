@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Text } from 'react-native';
-import { ApiError, addPick, getMyPicks, promotePick, updatePick } from '@finalmeal/api';
+import { ApiError, addPick, getMyPicks, getPick, promotePick, updatePick } from '@finalmeal/api';
 import Swap from '../../app/(app)/add/swap';
 import { preparePickPhoto } from '../lib/prepare-pick-photo';
 import { PLACE, RAMEN, withDraft } from '../test-support/add-dish';
@@ -24,6 +24,7 @@ jest.mock('@finalmeal/api', () => ({
   ...jest.requireActual('@finalmeal/api'),
   addPick: jest.fn(),
   getMyPicks: jest.fn(),
+  getPick: jest.fn(),
   promotePick: jest.fn(),
   updatePick: jest.fn(),
 }));
@@ -33,6 +34,7 @@ jest.mock('../lib/prepare-pick-photo', () => ({ preparePickPhoto: jest.fn() }));
 const CLIENT = { fake: 'client' };
 const mockAddPick = jest.mocked(addPick);
 const mockGetPicks = jest.mocked(getMyPicks);
+const mockGetPick = jest.mocked(getPick);
 const mockPromote = jest.mocked(promotePick);
 const mockUpdate = jest.mocked(updatePick);
 
@@ -196,7 +198,7 @@ describe('Swap', () => {
   it('counts a duplicate after a lost connection as saved, instead of showing an error', async () => {
     mockAddPick
       .mockRejectedValueOnce(new TypeError('Network request failed'))
-      .mockRejectedValueOnce(new ApiError('duplicate', 'duplicate_pick'));
+      .mockRejectedValueOnce(new ApiError('duplicate', 'duplicate_pick', { id: 'n1', tier: 'final' }));
     await render(withDraft(<Swap />, READY));
     await settle();
     await fireEvent.press(row('Dish 4'));
@@ -205,10 +207,7 @@ describe('Swap', () => {
     expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
     expect(mockRouter.dismissTo).not.toHaveBeenCalled();
     // The first attempt did save: the list now holds the dish as a Final Meal pick.
-    mockGetPicks.mockResolvedValue([
-      ...makeFinals(4),
-      makePick({ id: 'n1', slot: 5, dish: { id: 'd1', name: 'Tonkotsu Ramen' } }),
-    ]);
+    mockGetPick.mockResolvedValue(makePick({ id: 'n1', slot: 5, dish: { id: 'd1', name: 'Tonkotsu Ramen' } }));
     await fireEvent.press(screen.getByRole('button', { name: 'Replace Dish 4' }));
     await settle();
     expect(mockAddPick).toHaveBeenCalledTimes(2);
@@ -262,19 +261,31 @@ describe('Swap', () => {
     };
 
     beforeEach(() => {
-      mockAddPick.mockRejectedValue(new ApiError('duplicate', 'duplicate_pick'));
+      mockAddPick.mockRejectedValue(new ApiError('duplicate', 'duplicate_pick', { id: 'h9', tier: 'honorable' }));
+      mockGetPick.mockResolvedValue(honorable());
       mockGetPicks.mockResolvedValue([...makeFinals(5), honorable()]);
     });
 
     it('offers Make it a Final Meal instead, and promotes into the chosen slot', async () => {
-      await render(withDraft(<Swap />, READY));
+      // Typed as the server's fuzzy match would see it, not as the list holds it.
+      await render(withDraft(<Swap />, { ...READY, dishName: 'Tonkotsu Ramen (extra chashu)' }));
       await settle();
       await replaceDish4();
       expect(screen.getByText('That dish is already on your list.')).toBeOnTheScreen();
       await fireEvent.press(screen.getByRole('button', { name: 'Make it a Final Meal instead' }));
       await settle();
+      expect(mockGetPick).toHaveBeenCalledWith(CLIENT, 'h9');
       expect(mockPromote).toHaveBeenCalledWith(CLIENT, 'h9', 4);
       expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
+    });
+
+    it('offers nothing when the refusal names a Final Meal pick', async () => {
+      mockAddPick.mockRejectedValue(new ApiError('duplicate', 'duplicate_pick', { id: 'f1', tier: 'final' }));
+      await render(withDraft(<Swap />, READY));
+      await settle();
+      await replaceDish4();
+      expect(screen.getByText('That dish is already on your list.')).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'Make it a Final Meal instead' })).toBeNull();
     });
 
     it('keeps what was entered: merges tags, note and photo into the promoted pick', async () => {
@@ -303,10 +314,9 @@ describe('Swap', () => {
     });
 
     it('never overwrites the existing pick’s note or photo', async () => {
-      mockGetPicks.mockResolvedValue([
-        ...makeFinals(5),
-        { ...honorable(), note: 'Mine', photoUrl: 'https://x/old.jpg' },
-      ]);
+      const existing = { ...honorable(), note: 'Mine', photoUrl: 'https://x/old.jpg' };
+      mockGetPick.mockResolvedValue(existing);
+      mockGetPicks.mockResolvedValue([...makeFinals(5), existing]);
       await render(
         withDraft(<Swap />, { ...READY, tags: [RAMEN], note: 'New', photoUri: 'file:///a.jpg' }),
       );
@@ -359,17 +369,6 @@ describe('Swap', () => {
       await settle();
       expect(screen.getByText('That pick isn’t there any more.')).toBeOnTheScreen();
       expect(mockRouter.dismissTo).not.toHaveBeenCalled();
-    });
-
-    it('does not offer it when the dish is already a Final Meal', async () => {
-      const finals = makeFinals(5);
-      finals[2] = makePick({ ...finals[2]!, dish: { id: 'd1', name: 'Tonkotsu Ramen' } });
-      mockGetPicks.mockResolvedValue(finals);
-      await render(withDraft(<Swap />, READY));
-      await settle();
-      await replaceDish4();
-      expect(screen.getByText('That dish is already on your list.')).toBeOnTheScreen();
-      expect(screen.queryByRole('button', { name: 'Make it a Final Meal instead' })).toBeNull();
     });
 
     it('promotes into whichever slot is chosen after the refusal', async () => {

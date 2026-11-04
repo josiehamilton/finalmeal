@@ -1,9 +1,8 @@
-import type { Pick, Place, Tag } from '@finalmeal/api';
+import type { Place, Tag } from '@finalmeal/api';
 import {
   addDishReducer,
   ctaFor,
   draftHasContent,
-  findExistingPick,
   initialDraft,
   suggestionLabel,
   tierSubCopy,
@@ -171,50 +170,6 @@ describe('copy helpers', () => {
     expect(tierSubCopy(3)).toBe('3 of 5 used.');
     expect(tierSubCopy(5)).toBe('5 of 5 used. You’ll choose one to replace.');
     expect(tierSubCopy(null)).toBeNull();
-  });
-});
-
-describe('findExistingPick', () => {
-  const pick = (over: Partial<Pick> = {}): Pick => ({
-    id: 'pk1',
-    tier: 'honorable',
-    slot: null,
-    dish: { id: 'd1', name: 'Tonkotsu Ramen' },
-    originalDishName: 'tonkotsu ramen',
-    place: PLACE,
-    note: null,
-    photoUrl: null,
-    tags: [],
-    createdAt: '2026-10-27T00:00:00Z',
-    ...over,
-  });
-
-  it('finds the pick for the chosen suggestion', () => {
-    const d = draft({ place: PLACE, dishName: 'whatever', dishId: 'd1' });
-    expect(findExistingPick([pick()], d)?.id).toBe('pk1');
-  });
-
-  it.each(['tonkotsu ramen', 'Tonkotsu  Ramen!', 'Tonkotsu Ramen (extra chashu)', 'Tonkotsu Ramens'])(
-    'finds the pick when the same dish is typed as %j',
-    (typed) => {
-      expect(findExistingPick([pick()], draft({ place: PLACE, dishName: typed }))?.id).toBe('pk1');
-    },
-  );
-
-  it('matches the wording the person originally used', () => {
-    const p = pick({ dish: { id: 'd1', name: 'Ramen, Tonkotsu' }, originalDishName: 'Pork Noodle Soup' });
-    expect(findExistingPick([p], draft({ place: PLACE, dishName: 'pork noodle soup' }))?.id).toBe('pk1');
-  });
-
-  it('ignores picks at other places and other dishes', () => {
-    const elsewhere = pick({ place: { ...PLACE, id: 'p2' } });
-    const other = pick({ dish: { id: 'd2', name: 'Gyoza' }, originalDishName: 'Gyoza' });
-    expect(findExistingPick([elsewhere, other], draft({ place: PLACE, dishName: 'Tonkotsu Ramen' }))).toBeNull();
-  });
-
-  it('finds nothing without a place or a name', () => {
-    expect(findExistingPick([pick()], draft({ dishName: 'Tonkotsu Ramen' }))).toBeNull();
-    expect(findExistingPick([pick()], draft({ place: PLACE, dishName: ' ' }))).toBeNull();
   });
 });
 
