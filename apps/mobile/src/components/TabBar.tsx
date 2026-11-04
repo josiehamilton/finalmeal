@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Tabs } from 'expo-router';
 import { colors } from '@finalmeal/ui-tokens';
 import { fontFamily } from '../lib/fonts';
+import { clearJustOnboarded } from '../state/landing';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 
@@ -31,7 +32,11 @@ export function TabBar({ state, emitter, navigateToTab, onAdd }: TabBarProps & T
     const route = state.routes.find((r) => r.name === name);
     if (!route) return;
     const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-    if (current !== name && !event.defaultPrevented) navigateToTab(route.key);
+    if (current !== name && !event.defaultPrevented) {
+      // Leaving the Feed tab ends First landing; the next visit shows the real feed.
+      clearJustOnboarded();
+      navigateToTab(route.key);
+    }
   }
 
   return (

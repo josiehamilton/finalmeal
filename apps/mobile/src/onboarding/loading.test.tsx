@@ -2,6 +2,7 @@ import { act, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { colors } from '@finalmeal/ui-tokens';
 import Loading from '../../app/(onboarding)/loading';
+import * as landing from '../state/landing';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
 const mockRefresh = jest.fn();
@@ -32,6 +33,28 @@ describe('Loading screen', () => {
     await render(<Loading />);
     expect(screen.getByText('There can only be five.')).toBeOnTheScreen();
     expect(screen.getByText('Setting your table…')).toBeOnTheScreen();
+  });
+
+  it('marks the person as just onboarded before it goes to the Feed tab', async () => {
+    const mark = jest.spyOn(landing, 'markJustOnboarded');
+    await render(<Loading />);
+    await tick(1200);
+    expect(mark).toHaveBeenCalledTimes(1);
+    expect(mark.mock.invocationCallOrder[0]!).toBeLessThan(
+      mockRouter.replace.mock.invocationCallOrder[0]!,
+    );
+    mark.mockRestore();
+    landing.clearJustOnboarded();
+  });
+
+  it('does not mark anyone when it is left before the wait is over', async () => {
+    const mark = jest.spyOn(landing, 'markJustOnboarded');
+    const view = await render(<Loading />);
+    await tick(600);
+    await view.unmount();
+    await tick(1200);
+    expect(mark).not.toHaveBeenCalled();
+    mark.mockRestore();
   });
 
   it('goes to the Feed tab (First landing) after 1200 ms, having refreshed the profile', async () => {

@@ -1,6 +1,6 @@
-import { Text } from 'react-native';
+import { Pressable, Text } from 'react-native';
 import { act } from '@testing-library/react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams, useRouter } from 'expo-router';
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 import AppLayout from '../../app/(app)/_layout';
 import TabsLayout from '../../app/(app)/(tabs)/_layout';
@@ -14,6 +14,8 @@ import Privacy from '../../app/(app)/settings/privacy';
 import HomeCity from '../../app/(app)/settings/home-city';
 import AddLayout from '../../app/(app)/add/_layout';
 import AddDish from '../../app/(app)/add/index';
+import { closeAddFlow } from '../state/add-flow-base';
+import { clearJustOnboarded, markJustOnboarded } from '../state/landing';
 
 function Welcome() {
   return <Text>WELCOME</Text>;
@@ -28,6 +30,12 @@ jest.mock('@finalmeal/api', () => ({
   getMyPicks: jest.fn().mockResolvedValue([]),
   searchTags: jest.fn().mockResolvedValue([]),
   suggestDishes: jest.fn().mockResolvedValue([]),
+  getFollowingFeed: jest.fn().mockResolvedValue({ items: [], next: null }),
+  getNearbyFeed: jest.fn().mockResolvedValue({ items: [], nextOffset: null }),
+  getPlacePickers: jest.fn().mockResolvedValue({ otherCount: 0, people: [] }),
+  getSuggestedPeople: jest.fn().mockResolvedValue([]),
+  getUnreadCount: jest.fn().mockResolvedValue(0),
+  subscribeToMyNotifications: jest.fn(() => () => {}),
 }));
 jest.mock('../providers/SessionProvider', () => ({
   useSession: () => ({
@@ -38,6 +46,17 @@ jest.mock('../providers/SessionProvider', () => ({
     refreshProfile: jest.fn().mockResolvedValue(null),
   }),
 }));
+
+/** Stands in for the Add form: saving is "Finish", which closes the way the real form does. */
+function FakeAdd() {
+  const addRouter = useRouter();
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Finish" onPress={() => closeAddFlow(addRouter, from)}>
+      <Text>{`FAKE ADD from ${from ?? 'nowhere'}`}</Text>
+    </Pressable>
+  );
+}
 
 const routes = () => ({
   index: () => null,
@@ -59,6 +78,7 @@ const routes = () => ({
 describe('app shell navigation', () => {
   beforeEach(() => {
     mockSignedIn = true;
+    clearJustOnboarded();
   });
 
   it('opens on You, with the tab bar', async () => {
@@ -71,7 +91,8 @@ describe('app shell navigation', () => {
     await renderRouter(routes(), { initialUrl: '/(app)/you' });
     await screen.findByText('@josiehamilton');
     await fireEvent.press(screen.getByRole('button', { name: 'Feed' }));
-    expect(await screen.findByText('Your table is set.')).toBeOnTheScreen();
+    expect(await screen.findByText('Nothing new yet.')).toBeOnTheScreen();
+    expect(screen.getByRole('tab', { name: 'Following' })).toBeSelected();
     await fireEvent.press(screen.getByRole('button', { name: 'You' }));
     expect(await screen.findByText('@josiehamilton')).toBeOnTheScreen();
   });
@@ -136,6 +157,69 @@ describe('app shell navigation', () => {
     expect(await screen.findByLabelText('Username')).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByText('@josiehamilton')).toBeOnTheScreen();
+  });
+
+  describe('First landing', () => {
+    it('shows First landing on Feed right after onboarding, and the feed after a tab switch', async () => {
+      markJustOnboarded();
+      await renderRouter(routes(), { initialUrl: '/(app)/feed' });
+      expect(await screen.findByText('Your table is set.')).toBeOnTheScreen();
+      expect(screen.queryByRole('tab', { name: 'Following' })).toBeNull();
+      await fireEvent.press(screen.getByRole('button', { name: 'Saved' }));
+      await fireEvent.press(await screen.findByRole('button', { name: 'Feed' }));
+      expect(await screen.findByRole('tab', { name: 'Following' })).toBeSelected();
+      expect(screen.queryByText('Your table is set.')).toBeNull();
+    });
+
+    it('stays on First landing when Add is opened and closed', async () => {
+      markJustOnboarded();
+      await renderRouter(routes(), { initialUrl: '/(app)/feed' });
+      await screen.findByText('Your table is set.');
+      await fireEvent.press(screen.getByRole('button', { name: 'Add a dish' }));
+      await screen.findByPlaceholderText('e.g. Smash Burger');
+      await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+      expect(await screen.findByText('Your table is set.')).toBeOnTheScreen();
+    });
+  });
+
+  describe('Add returns to where it opened', () => {
+    const withFakeAdd = () => ({ ...routes(), '(app)/add/index': FakeAdd });
+
+    it('from First landing’s button, back to First landing', async () => {
+      markJustOnboarded();
+      await renderRouter(withFakeAdd(), { initialUrl: '/(app)/feed' });
+      await fireEvent.press(await screen.findByRole('button', { name: 'Add your first dish' }));
+      expect(await screen.findByText('FAKE ADD from /feed')).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('button', { name: 'Finish' }));
+      expect(await screen.findByText('Your table is set.')).toBeOnTheScreen();
+      expect(screen.queryByText(/FAKE ADD/)).toBeNull();
+    });
+
+    it('from the tab bar on the Feed tab, back to the feed', async () => {
+      await renderRouter(withFakeAdd(), { initialUrl: '/(app)/feed' });
+      await screen.findByText('Nothing new yet.');
+      await fireEvent.press(screen.getByRole('button', { name: 'Add a dish' }));
+      expect(await screen.findByText('FAKE ADD from /feed')).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('button', { name: 'Finish' }));
+      expect(await screen.findByText('Nothing new yet.')).toBeOnTheScreen();
+    });
+
+    it('from You’s empty seat, back to You', async () => {
+      await renderRouter(withFakeAdd(), { initialUrl: '/(app)/you' });
+      await fireEvent.press(await screen.findByRole('button', { name: 'Add a dish, seat 1' }));
+      expect(await screen.findByText('FAKE ADD from /you')).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('button', { name: 'Finish' }));
+      expect(await screen.findByText('@josiehamilton')).toBeOnTheScreen();
+    });
+
+    it('goes to You when it was opened with no from', async () => {
+      await renderRouter(withFakeAdd(), { initialUrl: '/(app)/feed' });
+      await screen.findByText('Nothing new yet.');
+      await act(async () => router.navigate('/add'));
+      expect(await screen.findByText('FAKE ADD from nowhere')).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('button', { name: 'Finish' }));
+      expect(await screen.findByText('@josiehamilton')).toBeOnTheScreen();
+    });
   });
 
   it('sends a signed-out person to Welcome', async () => {

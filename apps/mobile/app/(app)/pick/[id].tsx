@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +23,7 @@ import { TagChips } from '../../../src/components/TagChips';
 import { openDirections } from '../../../src/lib/directions';
 import { fontFamily } from '../../../src/lib/fonts';
 import { getSupabase } from '../../../src/lib/supabase';
+import { swapHref } from '../../../src/state/add-flow-base';
 import { announcePicksChanged, getPicksVersion, usePicksVersion } from '../../../src/state/pick-changes';
 
 const HERO_HEIGHT = 400;
@@ -42,6 +43,8 @@ function applyUpdated(picks: Pick[], updated: Pick): Pick[] {
 /** One of your own picks. (Viewing other people's picks arrives in Phase 4.) */
 export default function PickDetail() {
   const router = useRouter();
+  // Swap closes back to this pick once the promotion is done.
+  const pathname = usePathname();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [picks, setPicks] = useState<Pick[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -90,7 +93,7 @@ export default function PickDetail() {
   }
 
   function goToSwap(pickId: string) {
-    router.push({ pathname: '/add/swap', params: { promote: pickId } });
+    router.push(swapHref(pathname, pickId));
   }
 
   function promote(target: Pick) {

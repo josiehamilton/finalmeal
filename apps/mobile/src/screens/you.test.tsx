@@ -7,7 +7,7 @@ import { makeFinals, makePick } from '../test-support/picks';
 import { announcePicksChanged, resetPickChanges } from '../state/pick-changes';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), navigate: jest.fn() };
-jest.mock('expo-router', () => ({ useRouter: () => mockRouter }));
+jest.mock('expo-router', () => ({ useRouter: () => mockRouter, usePathname: () => '/you' }));
 jest.mock('@finalmeal/api', () => ({
   ...jest.requireActual('@finalmeal/api'),
   getMyPicks: jest.fn(),
@@ -259,14 +259,20 @@ describe('You tab', () => {
       await screen.findByText('Dish 2');
       expect(screen.getAllByText('Add a dish')).toHaveLength(3);
       await fireEvent.press(screen.getAllByRole('button', { name: /^Add a dish/ })[0]!);
-      expect(mockRouter.navigate).toHaveBeenCalledWith({ pathname: '/add', params: { tier: 'final' } });
+      expect(mockRouter.navigate).toHaveBeenCalledWith({
+        pathname: '/add',
+        params: { tier: 'final', from: '/you' },
+      });
     });
 
     it('opens the add modal from the last seat too', async () => {
       mockGetPicks.mockResolvedValue(makeFinals(4));
       await render(<You />);
       await fireEvent.press(await screen.findByRole('button', { name: 'One seat left. Choose wisely.' }));
-      expect(mockRouter.navigate).toHaveBeenCalledWith({ pathname: '/add', params: { tier: 'final' } });
+      expect(mockRouter.navigate).toHaveBeenCalledWith({
+        pathname: '/add',
+        params: { tier: 'final', from: '/you' },
+      });
     });
 
     it('shows the filter chips as soon as there is one pick', async () => {

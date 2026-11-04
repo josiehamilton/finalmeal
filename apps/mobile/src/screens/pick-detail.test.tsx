@@ -19,6 +19,7 @@ let mockParams: Record<string, string> = { id: 'f2' };
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
   useLocalSearchParams: () => mockParams,
+  usePathname: () => '/pick/f2',
 }));
 jest.mock('expo-linking', () => ({ openURL: jest.fn().mockResolvedValue(true) }));
 jest.mock('@finalmeal/api', () => ({
@@ -241,7 +242,7 @@ describe('Pick detail', () => {
       await menu('Make it a Final Meal');
       expect(mockRouter.push).toHaveBeenCalledWith({
         pathname: '/add/swap',
-        params: { promote: 'h1' },
+        params: { promote: 'h1', from: '/pick/f2' },
       });
       expect(mockPromote).not.toHaveBeenCalled();
     });
@@ -255,7 +256,7 @@ describe('Pick detail', () => {
       await settle();
       expect(mockRouter.push).toHaveBeenCalledWith({
         pathname: '/add/swap',
-        params: { promote: 'h1' },
+        params: { promote: 'h1', from: '/pick/f2' },
       });
     });
   });

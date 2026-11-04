@@ -1,19 +1,28 @@
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { friendlyMessage, getMyPicks } from '@finalmeal/api';
-import type { Pick } from '@finalmeal/api';
-import { FINAL_MEAL_SIZE } from '@finalmeal/core';
+import { friendlyMessage, getMyPicks, getNearbyFeed, getPlacePickers } from '@finalmeal/api';
+import type { FeedItem, Pick } from '@finalmeal/api';
+import { FINAL_MEAL_SIZE, othersAtPlaceLabel } from '@finalmeal/core';
 import { colors } from '@finalmeal/ui-tokens';
+import { cityName } from '../lib/city-name';
 import { fontFamily } from '../lib/fonts';
 import { getSupabase } from '../lib/supabase';
 import { useSession } from '../providers/SessionProvider';
 import { usePicksVersion } from '../state/pick-changes';
+import { Avatar } from './Avatar';
+import { FeedCard } from './FeedCard';
+import { FeedHeader } from './FeedHeader';
 import { Icon } from './Icon';
 import { PhotoNotice } from './PhotoNotice';
 import { PrimaryButton } from './PrimaryButton';
 import { SkullMark } from './SkullMark';
+
+const NEARBY_COUNT = 3;
+const PICKER_AVATARS = 3;
+/** The Nearby cards are shorter here than in the feed, as on the First landing board. */
+const NEARBY_PHOTO_HEIGHT = 150;
 
 const SEATS = Array.from({ length: FINAL_MEAL_SIZE }, (_, i) => i + 1);
 
@@ -25,14 +34,18 @@ export function seatsLeftLabel(chosen: number): string {
 
 /**
  * First landing: where a new person arrives after onboarding. The wordmark, a welcome, their
- * slot-1 dish as a hero card, how many seats are left, and a way to add the next dish. The Feed
- * tab shows it until Phase 4 builds the real feed; the "others in <city>" line and the
- * "Nearby in <city>" section from the board arrive with that phase.
+ * slot-1 dish as a hero card with who else in the city has that spot on their list, how many
+ * seats are left, a way to add the next dish, and the first Nearby picks. The Feed tab shows it
+ * right after onboarding, until the person switches tabs.
  */
 export function FirstLanding() {
   const router = useRouter();
+  // Add returns here when it closes.
+  const pathname = usePathname();
   const { profile } = useSession();
   const [picks, setPicks] = useState<Pick[] | null>(null);
+  const [pickers, setPickers] = useState<Awaited<ReturnType<typeof getPlacePickers>> | null>(null);
+  const [nearby, setNearby] = useState<FeedItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const loadId = useRef(0);
   const picksVersion = usePicksVersion();
@@ -61,23 +74,58 @@ export function FirstLanding() {
     [picks],
   );
   const hero = finals[0] ?? null;
+  const heroPlaceId = hero?.place.id ?? null;
+  const homeCityId = profile?.homeCity?.id ?? null;
+  const homeCityName = profile?.homeCity ? cityName(profile.homeCity.label) : null;
   const full = finals.length >= FINAL_MEAL_SIZE;
   const firstName = profile?.displayName.trim().split(/\s+/)[0] ?? '';
+
+  // Who else has the hero's spot on their list. Nice to have: if it fails, the line just is not there.
+  useEffect(() => {
+    setPickers(null);
+    if (!heroPlaceId) return;
+    let cancelled = false;
+    getPlacePickers(getSupabase(), heroPlaceId).then(
+      (found) => {
+        if (!cancelled) setPickers(found);
+      },
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [heroPlaceId]);
+
+  // The first Nearby picks around the home city (never the phone's position). Without a home city
+  // or any picks the section is not shown.
+  useEffect(() => {
+    setNearby([]);
+    if (!homeCityId) return;
+    let cancelled = false;
+    getNearbyFeed(getSupabase(), 0, NEARBY_COUNT).then(
+      (page) => {
+        if (!cancelled) setNearby(page.items.slice(0, NEARBY_COUNT));
+      },
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [homeCityId]);
+
+  const othersLine = hero && pickers
+    ? othersAtPlaceLabel(pickers.otherCount, hero.place.city, hero.place.name)
+    : null;
 
   function addDish() {
     // navigate, not push: a quick double tap must not stack two Add modals. With all five seats
     // taken, the next dish can only be an Honorable Mention.
-    router.navigate({ pathname: '/add', params: { tier: full ? 'honorable' : 'final' } });
+    router.navigate({ pathname: '/add', params: { tier: full ? 'honorable' : 'final', from: pathname } });
   }
 
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
-      <View style={styles.header}>
-        <SkullMark size={22} color={colors.ember} />
-        <Text style={styles.wordmark} accessibilityRole="header">
-          Final Meal
-        </Text>
-      </View>
+      <FeedHeader />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.heading}>
           <Text style={styles.welcome}>{firstName ? `Welcome, ${firstName}` : 'Welcome'}</Text>
@@ -130,6 +178,27 @@ export function FirstLanding() {
                     </Text>
                   </View>
                   {hero.note ? <Text style={styles.note}>{`“${hero.note}”`}</Text> : null}
+                  {othersLine && pickers ? (
+                    <View style={styles.others}>
+                      <View style={styles.avatars}>
+                        {pickers.people.slice(0, PICKER_AVATARS).map((person, i) => (
+                          <View
+                            key={person.id}
+                            testID="landing-picker"
+                            style={[styles.avatarRing, i > 0 && styles.avatarOverlap]}
+                          >
+                            <Avatar
+                              uri={person.avatarUrl}
+                              name={person.displayName}
+                              size={22}
+                              accessibilityLabel={`${person.displayName}’s photo`}
+                            />
+                          </View>
+                        ))}
+                      </View>
+                      <Text style={styles.othersText}>{othersLine}</Text>
+                    </View>
+                  ) : null}
                   <View style={styles.rule} />
                 </View>
               </>
@@ -166,6 +235,16 @@ export function FirstLanding() {
             </View>
           </View>
         )}
+        {picks !== null && homeCityName && nearby.length > 0 ? (
+          <>
+            <Text style={styles.nearbyTitle} accessibilityRole="header">
+              {`Nearby in ${homeCityName}`}
+            </Text>
+            {nearby.map((item) => (
+              <FeedCard key={item.key} item={item} photoHeight={NEARBY_PHOTO_HEIGHT} />
+            ))}
+          </>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -173,19 +252,6 @@ export function FirstLanding() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.night },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    height: 60,
-    paddingHorizontal: 16,
-  },
-  wordmark: {
-    fontFamily: fontFamily.wordmark,
-    fontSize: 28,
-    letterSpacing: -0.01 * 28,
-    color: colors.bone,
-  },
   content: { gap: 16, paddingHorizontal: 12, paddingTop: 8, paddingBottom: 32 },
   heading: { gap: 4, paddingHorizontal: 6 },
   welcome: {
@@ -246,6 +312,11 @@ const styles = StyleSheet.create({
   where: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   whereText: { flex: 1, fontFamily: fontFamily.ui, fontSize: 13, color: colors.smoke },
   note: { fontFamily: fontFamily.serifItalic, fontSize: 16, color: colors.bone },
+  others: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  avatars: { flexDirection: 'row' },
+  avatarRing: { borderWidth: 2, borderColor: colors.ash, borderRadius: 999 },
+  avatarOverlap: { marginLeft: -8 },
+  othersText: { flex: 1, fontFamily: fontFamily.ui, fontSize: 12, color: colors.smoke },
   rule: { height: 1, backgroundColor: colors.line, marginVertical: 4 },
   seatsRow: {
     flexDirection: 'row',
@@ -269,4 +340,11 @@ const styles = StyleSheet.create({
   seatNumberOn: { color: colors.emberGlow },
   seatsLeft: { flex: 1, fontFamily: fontFamily.ui, fontSize: 13, color: colors.smoke },
   cta: { padding: 16 },
+  nearbyTitle: {
+    paddingHorizontal: 6,
+    paddingTop: 6,
+    fontFamily: fontFamily.display,
+    fontSize: 24,
+    color: colors.bone,
+  },
 });

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -49,6 +49,7 @@ function filterFor(chip: ChipOption | null): PickFilter {
 
 export default function You() {
   const router = useRouter();
+  const pathname = usePathname();
   const { profile, loading, error: sessionError, refreshProfile } = useSession();
   const [tab, setTab] = useState<ProfileTab>('final');
   const [refreshing, setRefreshing] = useState(false);
@@ -132,7 +133,7 @@ export default function You() {
     router.push(`/pick/${pick.id}`);
   }
   function addFinal() {
-    router.navigate({ pathname: '/add', params: { tier: 'final' } });
+    router.navigate({ pathname: '/add', params: { tier: 'final', from: pathname } });
   }
 
   if (!profile) {

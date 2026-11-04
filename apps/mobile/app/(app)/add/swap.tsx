@@ -12,6 +12,7 @@ import { SlotRow } from '../../../src/components/SlotRow';
 import { fontFamily } from '../../../src/lib/fonts';
 import { getSupabase } from '../../../src/lib/supabase';
 import { useBlockBack, useBlockSwipeBack, useModalSwipe } from '../../../src/lib/use-block-back';
+import { closeAddFlow } from '../../../src/state/add-flow-base';
 import { draftHasContent, findExistingPick, useAddDish } from '../../../src/state/add-dish';
 import { announcePicksChanged } from '../../../src/state/pick-changes';
 import { promoteWithDraft } from '../../../src/state/promote-with-draft';
@@ -30,7 +31,7 @@ interface Incoming {
  */
 export default function Swap() {
   const router = useRouter();
-  const { promote } = useLocalSearchParams<{ promote?: string }>();
+  const { promote, from } = useLocalSearchParams<{ promote?: string; from?: string }>();
   const { draft } = useAddDish();
   const { busy: saving, save } = useSavePick();
   const [promoting, setPromoting] = useState(false);
@@ -82,7 +83,7 @@ export default function Swap() {
           ? await promoteWithDraft(promoted, draft, slot)
           : (await promotePick(getSupabase(), promote, slot), { photoFailed: false });
         announcePicksChanged({ photoFailed });
-        router.dismissTo('/(app)/you');
+        closeAddFlow(router, from);
       } catch (e) {
         setError(friendlyMessage(e));
         setPromoting(false);
@@ -93,7 +94,7 @@ export default function Swap() {
     if (!outcome) return;
     if (outcome.status === 'saved') {
       announcePicksChanged({ photoFailed: outcome.photoFailed });
-      router.dismissTo('/(app)/you');
+      closeAddFlow(router, from);
     } else {
       setError(friendlyMessage(outcome.error));
       const e = outcome.error;
@@ -117,7 +118,7 @@ export default function Swap() {
       // What was entered for this dish (photo, tags, note) is merged into the pick, never dropped.
       const { photoFailed } = await promoteWithDraft(promotable, draft, slot);
       announcePicksChanged({ photoFailed });
-      router.dismissTo('/(app)/you');
+      closeAddFlow(router, from);
     } catch (e) {
       setError(friendlyMessage(e));
       setPromotable(null);

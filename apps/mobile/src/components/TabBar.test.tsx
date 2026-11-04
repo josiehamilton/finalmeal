@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react-native';
 import { TabBar } from './TabBar';
 import type { TabBarProps } from './TabBar';
+import { clearJustOnboarded, markJustOnboarded, useJustOnboarded } from '../state/landing';
 
 const ROUTES = ['feed', 'discover', 'saved', 'you'].map((name) => ({
   key: `${name}-key`,
@@ -68,5 +69,34 @@ describe('TabBar', () => {
     await render(blocked.ui);
     await fireEvent.press(screen.getByRole('button', { name: 'Discover' }));
     expect(blocked.navigateToTab).not.toHaveBeenCalled();
+  });
+
+  describe('the First landing flag', () => {
+    beforeEach(() => act(() => clearJustOnboarded()));
+
+    it('clears when the person switches to another tab', async () => {
+      const flag = await renderHook(() => useJustOnboarded());
+      await act(async () => markJustOnboarded());
+      await render(setup(0).ui);
+      await fireEvent.press(screen.getByRole('button', { name: 'Discover' }));
+      expect(flag.result.current).toBe(false);
+    });
+
+    it('stays on while the Add button is used, or the current tab is pressed again', async () => {
+      const flag = await renderHook(() => useJustOnboarded());
+      await act(async () => markJustOnboarded());
+      await render(setup(0).ui);
+      await fireEvent.press(screen.getByRole('button', { name: 'Add a dish' }));
+      await fireEvent.press(screen.getByRole('button', { name: 'Feed' }));
+      expect(flag.result.current).toBe(true);
+    });
+
+    it('stays on when a tab press is prevented', async () => {
+      const flag = await renderHook(() => useJustOnboarded());
+      await act(async () => markJustOnboarded());
+      await render(setup(0, true).ui);
+      await fireEvent.press(screen.getByRole('button', { name: 'Saved' }));
+      expect(flag.result.current).toBe(true);
+    });
   });
 });

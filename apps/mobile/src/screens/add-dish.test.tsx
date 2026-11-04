@@ -22,8 +22,10 @@ import { resetPickChanges, usePhotoNotice } from '../state/pick-changes';
 
 const mockModalSetOptions = jest.fn();
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), dismissTo: jest.fn() };
+let mockParams: Record<string, string> = {};
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
+  useLocalSearchParams: () => mockParams,
   useNavigation: () => ({ getParent: () => ({ setOptions: mockModalSetOptions }) }),
   useFocusEffect: (cb: () => void | (() => void)) => jest.requireActual('react').useEffect(cb, [cb]),
 }));
@@ -95,6 +97,7 @@ describe('Add a dish form', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetPickChanges();
+    mockParams = {};
     mockGetPicks.mockResolvedValue(finals(2));
     mockSearchTags.mockImplementation(async (_c, kind) =>
       kind === 'food_type'
@@ -520,6 +523,66 @@ describe('Add a dish form', () => {
       await settle();
       expect(screen.getByText('That dish is already on your list.')).toBeOnTheScreen();
       expect(mockRouter.dismissTo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('where Add was opened from', () => {
+    it('returns to it after a save', async () => {
+      mockParams = { from: '/feed' };
+      await render(withDraft(<AddDish />, READY));
+      await settle();
+      await fireEvent.press(cta('Add to Final Meal'));
+      await settle();
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/feed');
+    });
+
+    it('returns to it after making an honorable pick a Final Meal', async () => {
+      mockParams = { from: '/feed' };
+      mockAddPick.mockRejectedValue(new ApiError('duplicate', 'duplicate_pick'));
+      mockGetPicks.mockResolvedValue([
+        ...finals(2),
+        { ...pickAt('final', 3), id: 'pk9', tier: 'honorable', slot: null, dish: { id: 'd1', name: 'Tonkotsu Ramen' } },
+      ]);
+      await render(withDraft(<AddDish />, READY));
+      await settle();
+      await fireEvent.press(cta('Add to Final Meal'));
+      await settle();
+      await fireEvent.press(screen.getByRole('button', { name: 'Make it a Final Meal instead' }));
+      await settle();
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/feed');
+    });
+
+    it('hands it on to Swap when the five are full', async () => {
+      mockParams = { from: '/feed' };
+      mockAddPick.mockRejectedValue(new ApiError('full', 'final_full'));
+      await render(withDraft(<AddDish />, READY));
+      await settle();
+      await fireEvent.press(cta('Add to Final Meal'));
+      await settle();
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        pathname: '/add/swap',
+        params: { from: '/feed' },
+      });
+    });
+
+    it('hands it on to Swap from the swap button too', async () => {
+      mockParams = { from: '/you' };
+      mockGetPicks.mockResolvedValue(finals(5));
+      await render(withDraft(<AddDish />, READY));
+      await settle();
+      await fireEvent.press(cta('Choose one to replace'));
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        pathname: '/add/swap',
+        params: { from: '/you' },
+      });
+    });
+
+    it('still returns to You when it did not say', async () => {
+      await render(withDraft(<AddDish />, READY));
+      await settle();
+      await fireEvent.press(cta('Add to Final Meal'));
+      await settle();
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
     });
   });
 

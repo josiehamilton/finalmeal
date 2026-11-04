@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +19,7 @@ import { TierChooser } from '../../../src/components/TierChooser';
 import { fontFamily } from '../../../src/lib/fonts';
 import { getSupabase } from '../../../src/lib/supabase';
 import { useBlockBack, useModalSwipe } from '../../../src/lib/use-block-back';
+import { closeAddFlow, swapHref } from '../../../src/state/add-flow-base';
 import { ctaFor, draftHasContent, findExistingPick, useAddDish } from '../../../src/state/add-dish';
 import { announcePicksChanged } from '../../../src/state/pick-changes';
 import { promoteWithDraft } from '../../../src/state/promote-with-draft';
@@ -27,6 +28,8 @@ import { useSavePick } from '../../../src/state/save-pick';
 /** Add a dish: photo, dish, restaurant, which list, a note and optional tags, in one sheet. */
 export default function AddDish() {
   const router = useRouter();
+  // Where Add was opened from; a save lands back there.
+  const { from } = useLocalSearchParams<{ from?: string }>();
   const { draft, dispatch } = useAddDish();
   const [finalCount, setFinalCount] = useState<number | null>(null);
   const [tagsOpen, setTagsOpen] = useState(false);
@@ -66,13 +69,13 @@ export default function AddDish() {
   const place = draft.place;
 
   function done() {
-    router.dismissTo('/(app)/you');
+    closeAddFlow(router, from);
   }
 
   async function submit() {
     if (cta.disabled || busy) return;
     if (cta.mode === 'swap') {
-      router.push('/add/swap');
+      router.push(swapHref(from));
       return;
     }
     setError(null);
@@ -87,7 +90,7 @@ export default function AddDish() {
     const e = outcome.error;
     if (e instanceof ApiError && e.code === 'final_full') {
       setFinalCount(5);
-      router.push('/add/swap');
+      router.push(swapHref(from));
       return;
     }
     setError(friendlyMessage(e));
@@ -115,7 +118,7 @@ export default function AddDish() {
         // The five are full: choose which Final Meal dish this one replaces.
         setFinalCount(5);
         setPromoting(false);
-        router.push({ pathname: '/add/swap', params: { promote: promotable.id } });
+        router.push(swapHref(from, promotable.id));
         return;
       }
       setError(friendlyMessage(e));

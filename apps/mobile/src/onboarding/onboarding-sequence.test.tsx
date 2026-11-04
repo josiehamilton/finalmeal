@@ -15,6 +15,7 @@ import Loading from '../../app/(onboarding)/loading';
 import AddFirstLayout from '../../app/(onboarding)/add-first/_layout';
 import AddFirst from '../../app/(onboarding)/add-first/index';
 import AddFirstPlace from '../../app/(onboarding)/add-first/place';
+import { clearJustOnboarded } from '../state/landing';
 import { resetPickChanges } from '../state/pick-changes';
 import { makeFinals } from '../test-support/picks';
 import { PLACE } from '../test-support/add-dish';
@@ -31,6 +32,10 @@ jest.mock('@finalmeal/api', () => ({
   searchPlaces: jest.fn().mockResolvedValue([]),
   searchTags: jest.fn().mockResolvedValue([]),
   suggestDishes: jest.fn().mockResolvedValue([]),
+  getPlacePickers: jest.fn().mockResolvedValue({ otherCount: 0, people: [] }),
+  getNearbyFeed: jest.fn().mockResolvedValue({ items: [], nextOffset: null }),
+  getUnreadCount: jest.fn().mockResolvedValue(0),
+  subscribeToMyNotifications: jest.fn(() => () => {}),
 }));
 jest.mock('../providers/SessionProvider', () => ({
   useSession: () => ({
@@ -76,6 +81,7 @@ describe('onboarding from the photo step to First landing', () => {
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
     jest.clearAllMocks();
     resetPickChanges();
+    clearJustOnboarded();
     jest.mocked(finishOnboarding).mockResolvedValue({} as never);
     jest.mocked(getMyPicks).mockResolvedValue([]);
     jest.mocked(getCity).mockResolvedValue(null);

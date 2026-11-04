@@ -53,6 +53,33 @@ describe('Swap', () => {
     mockUpdate.mockResolvedValue(makePick({ slot: 4 }));
   });
 
+  describe('where Add was opened from', () => {
+    it('returns to it after replacing a dish', async () => {
+      mockParams = { from: '/feed' };
+      await render(withDraft(<Swap />, READY));
+      await settle();
+      await fireEvent.press(row('Dish 4'));
+      await fireEvent.press(screen.getByRole('button', { name: 'Replace Dish 4' }));
+      await settle();
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/feed');
+    });
+
+    it('returns to the pick it was promoted from', async () => {
+      mockParams = { promote: 'h9', from: '/pick/h9' };
+      mockGetPicks.mockResolvedValue([
+        ...makeFinals(5),
+        makePick({ id: 'h9', tier: 'honorable', slot: null, dish: { id: 'dh9', name: 'Honorable Soup' } }),
+      ]);
+      await render(withDraft(<Swap />));
+      await settle();
+      await fireEvent.press(row('Dish 4'));
+      await fireEvent.press(screen.getByRole('button', { name: 'Replace Dish 4' }));
+      await settle();
+      expect(mockPromote).toHaveBeenCalledWith(CLIENT, 'h9', 4);
+      expect(mockRouter.dismissTo).toHaveBeenCalledWith('/pick/h9');
+    });
+  });
+
   it('shows the canvas copy, the incoming dish and the five finals', async () => {
     await render(withDraft(<Swap />, READY));
     await settle();

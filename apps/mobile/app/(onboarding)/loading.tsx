@@ -7,10 +7,11 @@ import { SkullMark } from '../../src/components/SkullMark';
 import { fontFamily } from '../../src/lib/fonts';
 import { useBlockBack } from '../../src/lib/use-block-back';
 import { useSession } from '../../src/providers/SessionProvider';
+import { markJustOnboarded } from '../../src/state/landing';
 
 const MIN_VISIBLE_MS = 1200;
 
-/** Shown for at least 1.2 s after onboarding finishes, then hands over to the app: the Feed tab, which shows First landing until the real feed arrives. */
+/** Shown for at least 1.2 s after onboarding finishes, then hands over to the app: the Feed tab, which shows First landing until the person switches tabs. */
 export default function LoadingStep() {
   const router = useRouter();
   const { refreshProfile } = useSession();
@@ -35,7 +36,10 @@ export default function LoadingStep() {
       timer = setTimeout(resolve, MIN_VISIBLE_MS);
     });
     Promise.all([loaded, minimum]).then(() => {
-      if (!cancelled) router.replace('/(app)/feed');
+      if (cancelled) return;
+      // The Feed tab shows First landing until the person switches tabs.
+      markJustOnboarded();
+      router.replace('/(app)/feed');
     });
     return () => {
       cancelled = true;
