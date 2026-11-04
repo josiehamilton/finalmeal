@@ -3,6 +3,7 @@ import { Pressable, Text } from 'react-native';
 import { getMyProfile } from '@finalmeal/api';
 import type { FinalMealClient, MyProfile } from '@finalmeal/api';
 import { SessionProvider, useSession } from './SessionProvider';
+import { clearJustOnboarded, markJustOnboarded, useJustOnboarded } from '../state/landing';
 import type { SessionState } from './SessionProvider';
 
 jest.mock('@finalmeal/api', () => ({
@@ -155,6 +156,27 @@ describe('SessionProvider', () => {
     expect(state()).toEqual({ session: false, profile: null, loading: false, error: null });
     await view.unmount();
     expect(unsubscribe).toHaveBeenCalled();
+  });
+
+  it('ends First landing when the session ends, so the next person does not see it', async () => {
+    const { client, emit } = fakeClient(SESSION);
+    mockGetMyProfile.mockResolvedValue(PROFILE);
+    let flag = false;
+    function Flag() {
+      flag = useJustOnboarded();
+      return null;
+    }
+    await render(
+      <SessionProvider client={client}>
+        <Probe />
+        <Flag />
+      </SessionProvider>,
+    );
+    await act(async () => markJustOnboarded());
+    expect(flag).toBe(true);
+    await act(async () => emit('SIGNED_OUT', null));
+    expect(flag).toBe(false);
+    clearJustOnboarded();
   });
 
   it('refreshProfile finds the profile in the same tick as a sign-in', async () => {

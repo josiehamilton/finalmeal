@@ -102,7 +102,7 @@ export function FeedCard({ item, photoHeight = PHOTO_HEIGHT }: FeedCardProps) {
         <View style={[styles.badge, !isFinal && styles.badgeHonorable]}>
           {isFinal ? <SkullMark size={12} color={colors.white} /> : null}
           <Text style={[styles.badgeText, !isFinal && styles.badgeTextHonorable]}>
-            {isFinal ? `Final Meal · #${pick.slot ?? 1}` : 'Honorable'}
+            {isFinal ? (pick.slot ? `Final Meal · #${pick.slot}` : 'Final Meal') : 'Honorable'}
           </Text>
         </View>
       </Pressable>

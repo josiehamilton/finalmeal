@@ -75,6 +75,14 @@ describe('FeedCard', () => {
     expect(screen.getByTestId('feed-photo-placeholder')).toBeOnTheScreen();
   });
 
+  it('leaves the number off rather than inventing one for a Final Meal pick with no slot', async () => {
+    await render(
+      <FeedCard item={makeFeedItem({ pick: makePick({ tier: 'final', slot: null }) })} />,
+    );
+    expect(screen.getByText('Final Meal')).toBeOnTheScreen();
+    expect(screen.queryByText(/#/)).toBeNull();
+  });
+
   it('shows the photo when there is one', async () => {
     await render(
       <FeedCard

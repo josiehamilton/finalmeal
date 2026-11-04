@@ -146,6 +146,73 @@ describe('FeedList', () => {
       expect(screen.getByTestId('feed-list').props.data).toHaveLength(21);
     });
 
+    it('does not retry a failed next page by itself while the list sits at its end', async () => {
+      const next = { before: '2026-11-03T10:20:30.123456+00:00', beforeKey: 'k20' };
+      mockFollowing.mockResolvedValueOnce({ items: makeFeedItems(20), next });
+      mockFollowing.mockRejectedValue(new TypeError('Network request failed'));
+      await show('following');
+      await endReached();
+      await act(async () => {});
+      expect(mockFollowing).toHaveBeenCalledTimes(2);
+      // The footer changing re-fires onEndReached; nothing may be asked until Try again.
+      await endReached();
+      await endReached();
+      await act(async () => {});
+      expect(mockFollowing).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+      mockFollowing.mockResolvedValue({ items: makeFeedItems(1, 21), next: null });
+      await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+      await act(async () => {});
+      expect(mockFollowing).toHaveBeenCalledTimes(3);
+      expect(screen.getByTestId('feed-list').props.data).toHaveLength(21);
+    });
+
+    it('lets a pull to refresh clear a failed next page, and pages again afterwards', async () => {
+      const next = { before: '2026-11-03T10:20:30.123456+00:00', beforeKey: 'k20' };
+      mockFollowing.mockResolvedValueOnce({ items: makeFeedItems(20), next });
+      mockFollowing.mockRejectedValueOnce(new TypeError('Network request failed'));
+      await show('following');
+      await endReached();
+      await act(async () => {});
+      mockFollowing.mockResolvedValueOnce({ items: makeFeedItems(20), next });
+      mockFollowing.mockResolvedValueOnce({ items: makeFeedItems(1, 21), next: null });
+      await act(async () => {
+        await screen.getByTestId('feed-list').props.refreshControl.props.onRefresh();
+      });
+      await endReached();
+      await act(async () => {});
+      expect(mockFollowing).toHaveBeenCalledTimes(4);
+      expect(screen.getByTestId('feed-list').props.data).toHaveLength(21);
+    });
+
+    it('does not page from the old cursor while a refresh is loading', async () => {
+      const next = { before: '2026-11-03T10:20:30.123456+00:00', beforeKey: 'k20' };
+      mockFollowing.mockResolvedValueOnce({ items: makeFeedItems(20), next });
+      await show('following');
+      let finish: (v: { items: ReturnType<typeof makeFeedItems>; next: null }) => void = () => {};
+      mockFollowing.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+      await act(async () => {
+        void screen.getByTestId('feed-list').props.refreshControl.props.onRefresh();
+      });
+      await endReached();
+      expect(mockFollowing).toHaveBeenCalledTimes(2);
+      await act(async () => finish({ items: makeFeedItems(2), next: null }));
+      expect(screen.getByTestId('feed-list').props.data).toHaveLength(2);
+    });
+
+    it('offers Try again when a refresh of an empty feed fails', async () => {
+      await show('following');
+      expect(screen.getByText('Nothing new yet.')).toBeOnTheScreen();
+      mockFollowing.mockRejectedValueOnce(new TypeError('Network request failed'));
+      await act(async () => mockFocus.current());
+      expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+      expect(screen.queryByText('Nothing new yet.')).toBeNull();
+      mockFollowing.mockResolvedValue({ items: [makeFeedItem()], next: null });
+      await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+      await act(async () => {});
+      expect(screen.getByText('@arimitchell')).toBeOnTheScreen();
+    });
+
     it('shows the friendly copy and Try again when the feed cannot load', async () => {
       mockFollowing.mockRejectedValueOnce(new TypeError('Network request failed'));
       await show('following');

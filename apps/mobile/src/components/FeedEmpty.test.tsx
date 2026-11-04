@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { getSuggestedPeople } from '@finalmeal/api';
 import { FeedEmpty } from './FeedEmpty';
 import { makeSuggested } from '../test-support/people';
+import { resetFollowStore, setFollowState } from '../state/follow-store';
 
 const mockRouter = { push: jest.fn(), navigate: jest.fn() };
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter }));
@@ -42,6 +43,7 @@ async function show(
 describe('FeedEmpty', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetFollowStore();
     mockSuggested.mockResolvedValue(SUGGESTED);
   });
 
@@ -96,6 +98,14 @@ describe('FeedEmpty', () => {
       // Without a number one dish the row says the @handle instead.
       expect(screen.getByText('@newbie')).toBeOnTheScreen();
       expect(screen.getAllByRole('button', { name: 'Follow' })).toHaveLength(3);
+    });
+
+    it('seeds the shared follow state from the suggestions it fetched', async () => {
+      // An older answer in the store (say, from a profile visited earlier) gives way to the fresh fetch.
+      setFollowState('u2', 'active');
+      await show('following-nobody');
+      expect(screen.getAllByRole('button', { name: 'Follow' })).toHaveLength(3);
+      expect(screen.queryByRole('button', { name: 'Following' })).toBeNull();
     });
 
     it('says Popular on Final Meal without a home city', async () => {

@@ -68,6 +68,9 @@ export function FeedList({ mode }: FeedListProps) {
   const nextRef = useRef<Next>(null);
   const loadId = useRef(0);
   const moreInFlight = useRef(false);
+  // While a next page has failed, scrolling must not ask again: the footer changing re-fires
+  // onEndReached, which would loop. Only Try again, or a reload, clears it.
+  const moreErrorRef = useRef(false);
   const focusedBefore = useRef(false);
   const refreshProfileRef = useRef(refreshProfile);
   refreshProfileRef.current = refreshProfile;
@@ -77,6 +80,9 @@ export function FeedList({ mode }: FeedListProps) {
     async (pulled = false) => {
       const id = ++loadId.current;
       moreInFlight.current = false;
+      moreErrorRef.current = false;
+      // The old cursor belongs to the old list: nothing may page from it while this loads.
+      nextRef.current = null;
       setLoadingMore(false);
       setMoreError(null);
       setError(null);
@@ -99,29 +105,37 @@ export function FeedList({ mode }: FeedListProps) {
     [mode],
   );
 
-  const loadMore = useCallback(async () => {
-    if (moreInFlight.current || nextRef.current === null || itemsRef.current === null) return;
-    moreInFlight.current = true;
-    const id = loadId.current;
-    setLoadingMore(true);
-    setMoreError(null);
-    try {
-      const page = await fetchPage(mode, nextRef.current);
-      if (id !== loadId.current) return;
-      // Nearby's ranking moves between requests, so a later page can repeat a card.
-      const merged = appendUniqueByKey(itemsRef.current ?? [], page.items);
-      itemsRef.current = merged;
-      nextRef.current = page.next;
-      setItems(merged);
-    } catch (e) {
-      if (id === loadId.current) setMoreError(friendlyMessage(e));
-    } finally {
-      if (id === loadId.current) {
-        moreInFlight.current = false;
-        setLoadingMore(false);
+  const loadMore = useCallback(
+    async (retry = false) => {
+      if (moreInFlight.current || nextRef.current === null || itemsRef.current === null) return;
+      if (moreErrorRef.current && !retry) return;
+      moreInFlight.current = true;
+      moreErrorRef.current = false;
+      const id = loadId.current;
+      setLoadingMore(true);
+      setMoreError(null);
+      try {
+        const page = await fetchPage(mode, nextRef.current);
+        if (id !== loadId.current) return;
+        // Nearby's ranking moves between requests, so a later page can repeat a card.
+        const merged = appendUniqueByKey(itemsRef.current ?? [], page.items);
+        itemsRef.current = merged;
+        nextRef.current = page.next;
+        setItems(merged);
+      } catch (e) {
+        if (id === loadId.current) {
+          moreErrorRef.current = true;
+          setMoreError(friendlyMessage(e));
+        }
+      } finally {
+        if (id === loadId.current) {
+          moreInFlight.current = false;
+          setLoadingMore(false);
+        }
       }
-    }
-  }, [mode]);
+    },
+    [mode],
+  );
 
   // The first load, and again when the home city changes (Nearby is relative to it).
   useEffect(() => {
@@ -155,7 +169,8 @@ export function FeedList({ mode }: FeedListProps) {
         ? 'following-nobody'
         : 'following-none';
 
-  const failed = items === null && error !== null;
+  // A failed first load, or a failed refresh of an empty feed: say why and offer Try again.
+  const failed = error !== null && (items === null || items.length === 0);
   const list = items ?? [];
 
   return (
@@ -211,7 +226,7 @@ export function FeedList({ mode }: FeedListProps) {
             <Text style={styles.problem} accessibilityRole="alert">
               {moreError}
             </Text>
-            <PrimaryButton label="Try again" onPress={() => void loadMore()} />
+            <PrimaryButton label="Try again" onPress={() => void loadMore(true)} />
           </View>
         ) : loadingMore ? (
           <ActivityIndicator testID="feed-more" color={colors.emberGlow} style={styles.spinner} />

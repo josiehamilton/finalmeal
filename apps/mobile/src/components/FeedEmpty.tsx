@@ -7,6 +7,7 @@ import { PLACEHOLDER_LINK_DOMAIN } from '@finalmeal/core';
 import { colors, typeScale } from '@finalmeal/ui-tokens';
 import { fontFamily } from '../lib/fonts';
 import { getSupabase } from '../lib/supabase';
+import { syncFollowStates } from '../state/follow-store';
 import { PersonRow } from './PersonRow';
 import { PrimaryButton } from './PrimaryButton';
 import { SkullMark } from './SkullMark';
@@ -57,7 +58,10 @@ export function FeedEmpty({ variant, cityName }: FeedEmptyProps) {
     let cancelled = false;
     getSuggestedPeople(getSupabase(), POPULAR_COUNT).then(
       (people) => {
-        if (!cancelled) setPopular(people);
+        if (cancelled) return;
+        // Fresh answers: the Follow buttons here and everywhere else agree with the server.
+        syncFollowStates(people);
+        setPopular(people);
       },
       () => {},
     );

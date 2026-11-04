@@ -11,6 +11,7 @@ import type { ReactNode } from 'react';
 import { checkSession, friendlyMessage, getMyProfile, signOut, throwIfError } from '@finalmeal/api';
 import type { FinalMealClient, MyProfile } from '@finalmeal/api';
 import { getSupabase } from '../lib/supabase';
+import { clearJustOnboarded } from '../state/landing';
 
 export type Session = NonNullable<
   Awaited<ReturnType<FinalMealClient['auth']['getSession']>>['data']['session']
@@ -98,6 +99,8 @@ export function SessionProvider({ client, children }: SessionProviderProps) {
   useEffect(() => {
     if (userId === undefined) return;
     if (userId === null) {
+      // Whoever signs in next must not be greeted with the last person's First landing.
+      clearJustOnboarded();
       requestRef.current++;
       setResult(null);
       return;
