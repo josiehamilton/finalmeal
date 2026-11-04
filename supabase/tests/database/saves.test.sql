@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(58);
+select plan(63);
 
 -- Saves ("save to try"): written only through save_dish / unsave_dish, read through
 -- get_my_saves. Uses the dev seed: Josie has four saves (Chicken Karaage via Ari, Pad See Ew via
@@ -53,6 +53,17 @@ security definer
 as $$
   select count(*)::int from public.activities a
   where a.actor_id = public.test_user(p_actor) and a.type = 'saved_pick' and a.pick_id = p_pick;
+$$;
+
+create function public.test_saved_pick_pushes(p_owner text, p_actor text, p_pick uuid)
+returns integer
+language sql
+security definer
+as $$
+  select count(*)::int from public.push_outbox o
+  join public.activities a on a.id = o.activity_id
+  where o.user_id = public.test_user(p_owner) and a.actor_id = public.test_user(p_actor)
+    and a.type = 'saved_pick' and a.pick_id = p_pick;
 $$;
 
 create function public.test_saved_pick_notes(p_owner text, p_actor text, p_pick uuid)
@@ -187,6 +198,34 @@ select is(public.test_saved_pick_notes('arimitchell', 'allimercer', public.test_
 select lives_ok($$ select public.unsave_dish(public.test_dish('Pork Gyro')) $$,
   'unsaving what is not saved does nothing');
 
+-- Save, unsave, save again: the owner is told in-app each time but pushed once per 24 hours per
+-- pick (unsaving deletes the queued push with its activity, so the throttle has its own memory).
+reset role;
+insert into public.push_tokens (user_id, expo_token, platform)
+values (public.test_user('arimitchell'), 'ExponentPushToken[ari-saves]', 'ios');
+set local role authenticated;
+select public.test_login(public.test_user('allimercer'));
+select public.save_dish(public.test_dish('Pork Gyro'), public.test_pick('arimitchell', 'Pork Gyro'));
+set constraints all immediate;
+set constraints all deferred;
+select is(public.test_saved_pick_pushes('arimitchell', 'allimercer', public.test_pick('arimitchell', 'Pork Gyro')), 1,
+  'the first save queues a push to the pick''s owner');
+select public.unsave_dish(public.test_dish('Pork Gyro'));
+select public.save_dish(public.test_dish('Pork Gyro'), public.test_pick('arimitchell', 'Pork Gyro'));
+set constraints all immediate;
+set constraints all deferred;
+select is(public.test_saved_pick_pushes('arimitchell', 'allimercer', public.test_pick('arimitchell', 'Pork Gyro')), 0,
+  'saving again within 24 hours queues no second push');
+select is(public.test_saved_pick_notes('arimitchell', 'allimercer', public.test_pick('arimitchell', 'Pork Gyro')), 1,
+  'but the in-app notification is still there');
+select public.unsave_dish(public.test_dish('Pork Gyro'));
+select public.save_dish(public.test_dish('Smash Burger'), public.test_pick('arimitchell', 'Smash Burger'));
+set constraints all immediate;
+set constraints all deferred;
+select is(public.test_saved_pick_pushes('arimitchell', 'allimercer', public.test_pick('arimitchell', 'Smash Burger')), 1,
+  'a save of a different pick is not throttled');
+select public.unsave_dish(public.test_dish('Smash Burger'));
+
 -- A via pick that does not count is treated as no via pick
 select public.save_dish(public.test_dish('Pork Gyro'), public.test_pick('allimercer', 'Khao Soi'));
 select is((select via_pick_id from public.saves where dish_id = public.test_dish('Pork Gyro')), null,
@@ -227,6 +266,8 @@ select throws_ok($$ select public.save_dish(public.test_dish('Omakase')) $$,
 select set_config('request.jwt.claims', '{}', true);
 select throws_ok($$ select public.save_dish(public.test_dish('Banh Mi')) $$,
   '42501', 'not_authenticated', 'no signed-in person: not_authenticated');
+select throws_ok($$ select public.unsave_dish(public.test_dish('Banh Mi')) $$,
+  '42501', 'not_authenticated', 'unsave without a signed-in person: not_authenticated');
 
 -- ---------------------------------------------------------------- when the pick goes away
 select public.test_login(public.test_user('arimitchell'));

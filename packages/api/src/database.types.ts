@@ -809,6 +809,40 @@ export type Database = {
           },
         ];
       };
+      save_push_log: {
+        Row: {
+          actor_id: string;
+          last_pushed_at: string;
+          pick_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          actor_id: string;
+          last_pushed_at: string;
+          pick_id: string;
+        };
+        Update: {
+          actor_id?: string;
+          last_pushed_at?: string;
+          pick_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'save_push_log_actor_id_fkey';
+            columns: ['actor_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'save_push_log_pick_id_fkey';
+            columns: ['pick_id'];
+            isOneToOne: false;
+            referencedRelation: 'picks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       saves: {
         Row: {
           created_at: string;

@@ -187,7 +187,7 @@ Migrations: `20261026234036_core_tables.sql` and `20261026234037_social_tables.s
 
 - Core: `profiles`, `places`, `dishes`, `picks`, `tags`, `pick_tags`
 - Reference data: `cities` (see Cities below) and the global rows of `tags` (see Tags below)
-- Social and operations: `follows`, `saves`, `blocks`, `shared_lists`, `activities`, `notifications`, `push_tokens`, `notification_preferences`, `push_outbox`, `follow_push_log`, `device_attestations`, `reports`
+- Social and operations: `follows`, `saves`, `blocks`, `shared_lists`, `activities`, `notifications`, `push_tokens`, `notification_preferences`, `push_outbox`, `follow_push_log`, `save_push_log`, `device_attestations`, `reports`
 
 ### Row-level security
 
@@ -205,7 +205,7 @@ Migration: `20261027000454_rls_baseline.sql`; tests: `supabase/tests/database/rl
 | `blocks` | none | all operations, own rows only |
 | `push_tokens` | none | read own; no direct writes (use `register_push_token` / `unregister_push_token`; see Notifications and push) |
 | `notification_preferences` | none | read own; update only the four `push_*` columns on own (no insert or delete) |
-| `push_outbox`, `follow_push_log` | none | none (all privileges revoked; only `service_role` and the security-definer functions touch them) |
+| `push_outbox`, `follow_push_log`, `save_push_log` | none | none (all privileges revoked; only `service_role` and the security-definer functions touch them) |
 | `device_attestations` | none | read own |
 | `shared_lists` | read active lists | read active lists and own inactive ones; insert, update, delete own |
 | `activities` | none | read only the ones you wrote (`activities_select_own`); no direct writes |
@@ -319,16 +319,19 @@ Migrations: `20261103110000_notifications.sql` and `20261103110100_notifications
 - **Notifications** have no direct client writes (`INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` revoked; `notifications_update_own` dropped), so `activity_id` cannot be rewritten; `read_at` changes through `mark_notifications_read`. Index `notifications_activity (activity_id)`. The table is in the `supabase_realtime` publication (the app can refresh live; row-level security still applies). Because the seed's activities fan out by themselves, `seed.sql` no longer inserts notifications; Josie has four.
 - **Preferences.** `notification_preferences`: select own; update own, limited to the four `push_*` columns by a column grant; no insert or delete (a trigger on `profiles` creates the row).
 - **Push tokens.** `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` revoked from clients; `push_tokens_own` replaced by `push_tokens_select_own`. Written by `register_push_token` / `unregister_push_token`.
-- **Push queue.** `push_outbox` and `follow_push_log` have row-level security on, no policies and every privilege revoked from `anon` and `authenticated`. Status goes `pending`, `sending` (claimed), then `sent` or `failed`; a push that is no longer wanted when it is claimed (a block since, or the preference switched off since) becomes `skipped` with `attempts` 0 and is never sent.
+- **Push queue.** `push_outbox` and `follow_push_log` have row-level security on, no policies and every privilege revoked from `anon` and `authenticated`. Status goes `pending`, `sending` (claimed), then `sent` or `failed`; a push that is no longer wanted when it is claimed (a block since, the preference switched off since, or a swap push from an account the recipient can no longer see) becomes `skipped` with `attempts` 0 and is never sent.
 - **Error codes** (message of a `P0001` exception): `invalid_push_token` (also for a bad platform or a token over 512 characters; maps to the `unknown` copy in the apps, which never trigger it), `invalid_push_status` (service role only).
 
 ### Saves and feeds
 
-Migration: `20261103120000_feeds_and_saves.sql`; tests: `supabase/tests/database/saves.test.sql`, `supabase/tests/database/feed.test.sql`, the duplicate-detail cases in `picks.test.sql` and the changed counts in `seed.test.sql`, `popular_places.test.sql`, `people.test.sql` and `packages/api/src/picks.integration.test.ts` (each explained where it changed).
+Migrations: `20261103120000_feeds_and_saves.sql` and `20261103130000_feeds_review_fixes.sql` (index `activities_other_pick`; `save_push_log` and a redefined `_fan_out_activity`; `_push_still_wanted` with the private-account rule; same signatures); tests: `supabase/tests/database/saves.test.sql`, `supabase/tests/database/feed.test.sql`, the duplicate-detail cases in `picks.test.sql` and the changed counts in `seed.test.sql`, `popular_places.test.sql`, `people.test.sql` and `packages/api/src/picks.integration.test.ts` (each explained where it changed).
 
 - **Saves are written only through functions.** New columns `via_pick_id` (references `picks`, `on delete set null`) and `via_user_id` (references `profiles`, `on delete set null`): the pick a save came through and its owner. `INSERT`, `UPDATE`, `DELETE` and `TRUNCATE` are revoked from `anon` and `authenticated`; `saves_own` (all operations) is replaced by `saves_select_own`. Removing a pick keeps the save (its `via_pick_id` becomes null) and deletes the `saved_pick` activity about it by cascade, with the owner's notification. Indexes: `saves_user_created (user_id, created_at desc)`, `saves_via_pick`, and `activities_pick (pick_id)` (the swap check and pick-delete cascades).
 - **Feeds.** `following_feed` reads activities, `nearby_feed` reads picks; both return the same card row (see Functions and triggers) and apply the privacy rules themselves: a private account's picks only to the owner and active followers, blocks both ways, Nearby only trusted public accounts, global tags only on cards. They page first and join the card details for the page only. `nearby_feed` and `place_pickers` use the caller's chosen home city and counts from `dish_stats` (a plain view until Phase 7; see `docs/known-gaps.md`).
 - **Duplicate detail (known gap M5).** `add_pick` is redefined with the same signature and body; `duplicate_pick` now carries `{"pick_id", "tier"}` of the existing pick as JSON in the error's `DETAIL`. Grants are restated.
+- **Cursors.** `following_feed`'s `(p_before, p_before_key)` is the last row's `(at, item_key)` and must be passed back verbatim: `created_at = p_before` is an exact microsecond comparison, so a client that rounds `at` to a JavaScript `Date` (milliseconds) would skip rows inside the same millisecond. `nearby_feed` pages by offset over a live ranking, so a new pick or a changed list count between page loads can repeat or shift an item; the client de-duplicates by `item_key` when it appends a page.
+- **Save pushes.** Save, unsave, save again notifies the pick's owner in-app each time but pushes at most once per 24 hours per (saver, pick): `save_push_log (actor_id, pick_id, last_pushed_at)`, written only when a push would be queued, like `follow_push_log` (unsaving deletes the activity and its `push_outbox` row, so the log is the memory). The sender's claim (`_push_still_wanted`) also drops a queued swap push (`dethroned`, `added_final`, `promoted`) when the recipient can no longer see the actor, the same rule `get_my_notifications` applies.
+- **Blocks and counts (ruling).** `pickers` and `place_pickers` leave out blocked people entirely, including from the count; Phase 5's Discover counts should do the same.
 - **Error codes** (message of a `P0001` exception): `dish_not_found` (from `save_dish`); `not_authenticated` (`42501`) and `profile_not_found` as elsewhere.
 
 ### Storage buckets

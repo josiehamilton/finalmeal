@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(169);
+select plan(173);
 
 -- Activity fan-out, in-app notifications, preferences, push tokens and the push queue.
 -- The fan-out is a deferred constraint trigger, so it runs at commit; in this transaction each
@@ -686,6 +686,28 @@ select ok(exists (select 1 from public.push_outbox o join public.activities a on
     where o.status = 'skipped' and o.user_id = '00000000-0000-0000-0000-00000000000c' and a.type in ('added_final', 'promoted')),
   'a push whose preference was switched off after queueing is skipped');
 select is((select count(*)::int from public.claim_push_batch(1000)), 0, 'and then there is nothing left to claim');
+select ok(exists (select 1 from public.push_outbox o join public.activities a on a.id = o.activity_id
+    where o.status = 'skipped' and o.user_id = '00000000-0000-0000-0000-00000000000c'
+      and a.type = 'dethroned' and a.actor_id = '00000000-0000-0000-0000-00000000000e'),
+  'a swap push from a private account is skipped once the recipient can no longer see them');
+
+-- Stale pushes at the front of the queue are passed over and the batch still fills: three
+-- unwanted pushes (D blocked A) are the oldest, three wanted ones (to B) come after.
+insert into public.push_outbox (user_id, activity_id, title, body, created_at)
+select '00000000-0000-0000-0000-00000000000d', (select id from public.activities where actor_id = '00000000-0000-0000-0000-00000000000a' limit 1),
+       'Final Meal', 'stale ' || n, now() - interval '2 days' + n * interval '1 minute'
+from generate_series(1, 3) n;
+insert into public.push_outbox (user_id, activity_id, title, body, created_at)
+select '00000000-0000-0000-0000-00000000000b', (select id from public.activities where actor_id = '00000000-0000-0000-0000-00000000000a' limit 1),
+       'Final Meal', 'live ' || n, now() - interval '1 day' + n * interval '1 minute'
+from generate_series(1, 3) n;
+create temp table front_claim on commit drop as select * from public.claim_push_batch(2);
+select is((select array_agg(body order by body) from front_claim), array['live 1', 'live 2'],
+  'the batch skips three stale rows at the head of the queue and still fills with the two oldest wanted ones');
+select is((select count(*)::int from public.push_outbox where status = 'skipped' and body like 'stale %'), 3,
+  'the stale rows were skipped');
+select is((select count(*)::int from public.push_outbox where status = 'pending' and body like 'live %'), 1,
+  'the third wanted row is still pending for the next batch');
 select throws_ok($$select public.finish_push_batch('{}', 'pending', 'log')$$, 'P0001', 'invalid_push_status',
   'finish_push_batch only accepts sent or failed');
 

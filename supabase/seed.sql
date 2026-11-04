@@ -43,17 +43,16 @@ from (values
 create temp table seed_people (
   id uuid, username text, display_name text, bio text,
   home_geoname_id integer, trust public.trust_level,
-  vis public.profile_visibility not null default 'public'
+  vis public.profile_visibility not null
 ) on commit drop;
-insert into seed_people (id, username, display_name, bio, home_geoname_id, trust) values
-  ('00000000-0000-4000-8000-000000000001', 'josiehamilton', 'Josie Hamilton', 'Chasing the perfect meal.', 6173331, 'trusted'),
-  ('00000000-0000-4000-8000-000000000002', 'mikebrennan',   'Mike Brennan',   'Tokyo → NYC. Always hungry.', 5128581, 'trusted'),
-  ('00000000-0000-4000-8000-000000000003', 'arimitchell',   'Ari Mitchell',   'Professional eater. Amateur chef.', 6173331, 'trusted'),
-  ('00000000-0000-4000-8000-000000000004', 'allimercer',    'Alli Mercer',    'Spice level: nuclear.', 6141256, 'trusted'),
-  ('00000000-0000-4000-8000-000000000005', 'devpatel',      'Dev Patel',      null, 6173331, 'trusted'),
-  ('00000000-0000-4000-8000-000000000006', 'samokafor',     'Sam Okafor',     null, 6173331, 'new'),
-  ('00000000-0000-4000-8000-000000000007', 'priyashah',      'Priya Shah',     'Dumplings are a personality.', 6173331, 'trusted');
-update seed_people set vis = 'private' where username = 'priyashah';
+insert into seed_people (id, username, display_name, bio, home_geoname_id, trust, vis) values
+  ('00000000-0000-4000-8000-000000000001', 'josiehamilton', 'Josie Hamilton', 'Chasing the perfect meal.', 6173331, 'trusted', 'public'),
+  ('00000000-0000-4000-8000-000000000002', 'mikebrennan',   'Mike Brennan',   'Tokyo → NYC. Always hungry.', 5128581, 'trusted', 'public'),
+  ('00000000-0000-4000-8000-000000000003', 'arimitchell',   'Ari Mitchell',   'Professional eater. Amateur chef.', 6173331, 'trusted', 'public'),
+  ('00000000-0000-4000-8000-000000000004', 'allimercer',    'Alli Mercer',    'Spice level: nuclear.', 6141256, 'trusted', 'public'),
+  ('00000000-0000-4000-8000-000000000005', 'devpatel',      'Dev Patel',      null, 6173331, 'trusted', 'public'),
+  ('00000000-0000-4000-8000-000000000006', 'samokafor',     'Sam Okafor',     null, 6173331, 'new', 'public'),
+  ('00000000-0000-4000-8000-000000000007', 'priyashah',      'Priya Shah',     'Dumplings are a personality.', 6173331, 'trusted', 'private');
 
 insert into auth.users (
   instance_id, id, aud, role, email, email_confirmed_at,
@@ -153,8 +152,8 @@ from (values ('Late night'), ('Spicy'), ('Splurge'), ('Rainy day')) as v(name);
 -- pick was made: each person's picks get distinct times so lists that sort by newest first are
 -- the same after every reset. The other people's times are spread over about three days so the
 -- Following feed (people Josie follows) and Nearby (Vancouver-area picks) read like a real week:
--- Ari's swap two minutes ago, Ari's gyro two hours ago, Dev's ramen just under three. Josie's honorables run newest to oldest in the order the ProfileHM
--- board groups them: Marutama (Tonkotsu Ramen, Pork Gyoza), Kin Kao (Khao Soi, Crispy Rice
+-- Ari's swap two minutes ago, Ari's gyro two hours ago, Dev's ramen just under three. Josie's
+-- honorables run newest to oldest in the order the ProfileHM board groups them: Marutama (Tonkotsu Ramen, Pork Gyoza), Kin Kao (Khao Soi, Crispy Rice
 -- Salad), Miku, Lotus Noodle Bar, Hearth Bakery, then the rest.
 insert into public.picks (user_id, dish_id, tier, slot, note, original_dish_name, created_at)
 select pe.id, d.id, v.tier::public.pick_tier, v.slot::smallint, v.note, d.name,
@@ -334,7 +333,6 @@ from public.shared_lists where slug = 'josies-vancouver';
 -- (she follows Ari), Alli's follow, and Mike's save of her gyro and of her list. The seed adds
 -- no push tokens, so nothing is queued in push_outbox.
 set constraints all immediate;
-set constraints all deferred;
 
 -- Everything older than 30 minutes is read, so Josie's Activity opens with two unread (Ari's
 -- dethroning and Alli's follow), as on the board.

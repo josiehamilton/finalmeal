@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(80);
+select plan(92);
 
 -- The Following and Nearby feeds, pick detail and place_pickers. Uses the dev seed, read as
 -- Josie (...0001), who follows Mike, Ari and Dev (all trusted and public) and has asked to follow
@@ -389,6 +389,87 @@ select is(
   (select p.other_count || ':' || jsonb_array_length(p.people)
    from public.place_pickers(public.test_place('Marutama'), 1) as p),
   '1:1', 'Marutama as Josie: Dev, and the people list obeys the limit');
+
+-- ---------------------------------------------------------------- pick detail and pickers: edge cases
+select is((select count(*)::int from public.get_pick_detail('00000000-0000-4000-8000-0000000000ff')), 0,
+  'detail of an unknown pick id gives no row');
+select is(
+  (select p.other_count || ':' || p.people::text from public.place_pickers(null, 3) as p), '0:[]',
+  'place_pickers of a null place: nobody');
+select lives_ok($$ select * from public.place_pickers(public.test_place('Marutama'), 500) $$,
+  'a huge place_pickers limit is capped, not an error');
+select is(
+  (select p.other_count || ':' || p.people::text from public.place_pickers(public.test_place('Marutama'), 0) as p),
+  '1:[]', 'a limit of zero names nobody but still counts (Dev)');
+
+-- A private account is counted but never named among the pickers
+reset role;
+update public.profiles set visibility = 'private' where username = 'devpatel';
+set local role authenticated;
+select public.test_login(public.test_user('josiehamilton'));
+select is(
+  (select d.pickers from public.get_pick_detail(public.test_pick('devpatel', 'Pad See Ew')) as d), '[]'::jsonb,
+  'pickers leaves out a private account (Dev, the only one with Pad See Ew as a Final)');
+select is(
+  (select d.final_count from public.get_pick_detail(public.test_pick('devpatel', 'Pad See Ew')) as d), 1,
+  'but final_count still counts him');
+reset role;
+update public.profiles set visibility = 'public' where username = 'devpatel';
+
+-- A blocked person is left out of pickers and place_pickers
+insert into public.blocks (blocker_id, blocked_id) values (public.test_user('josiehamilton'), public.test_user('mikebrennan'));
+set local role authenticated;
+select public.test_login(public.test_user('josiehamilton'));
+select is(
+  (select jsonb_array_length(d.pickers) from public.get_pick_detail(public.test_pick('josiehamilton', 'Wagyu Beef Don')) as d), 1,
+  'pickers leaves out a person Josie blocked (Mike has the Wagyu Beef Don too)');
+select is(
+  (select p.other_count || ':' || p.people::text from public.place_pickers(public.test_place('Sushi Itto'), 3) as p), '0:[]',
+  'place_pickers leaves out a blocked person (Mike is the only other one at Sushi Itto)');
+reset role;
+delete from public.blocks;
+
+-- ---------------------------------------------------------------- a promoted swap shows once
+-- Dev fills his five Finals, then promotes Khao Soi over slot 2: promote_pick writes promoted
+-- and dethroned together, and only the dethroned card is shown.
+set local role authenticated;
+select public.test_login(public.test_user('devpatel'));
+select public.add_pick(public.test_place('Kin Kao'), null, 'Swap Test ' || n, 'final') from generate_series(1, 3) n;
+select public.promote_pick(public.test_pick('devpatel', 'Khao Soi'), 2);
+select public.test_login(public.test_user('josiehamilton'));
+select is(
+  (select f.other_dish_name from public.following_feed(null, null, 50) as f
+   where f.kind = 'dethroned' and f.actor_username = 'devpatel'),
+  'Pad See Ew', 'the promote swap shows as a dethroned card naming the replaced dish');
+select ok(not exists (select 1 from public.following_feed(null, null, 50) as f where f.kind = 'promoted'),
+  'and its promoted row is hidden');
+
+-- ---------------------------------------------------------------- keyset ties across a page boundary
+-- Three visible activities share one created_at (older than everything else); a page that ends
+-- inside the tie must continue with the rest of it, no repeat and no gap.
+reset role;
+insert into public.activities (actor_id, type, pick_id, created_at)
+select k.user_id, 'added_honorable', k.id, now() - interval '9 days'
+from public.picks k
+where k.id in (public.test_pick('mikebrennan', 'Spicy Tuna Roll'), public.test_pick('mikebrennan', 'Smash Burger'),
+               public.test_pick('arimitchell', 'Pork Gyro'));
+set local role authenticated;
+select public.test_login(public.test_user('josiehamilton'));
+select is(
+  (with total as (select count(*)::int as n from public.following_feed(null, null, 50)),
+        last as (select f.at, f.item_key from total, public.following_feed(null, null, total.n - 1) as f
+                 offset (select n - 2 from total) limit 1)
+   select count(*)::int from last, public.following_feed(last.at, last.item_key, 50)),
+  1, 'a page that ends inside a tie continues with exactly the remaining row');
+select is(
+  (with total as (select count(*)::int as n from public.following_feed(null, null, 50)),
+        p1 as (select f.item_key, f.ordinality from total, public.following_feed(null, null, total.n - 1) with ordinality as f),
+        last as (select f.at, f.item_key from total, public.following_feed(null, null, total.n - 1) as f
+                 offset (select n - 2 from total) limit 1),
+        p2 as (select f.item_key, f.ordinality from last, public.following_feed(last.at, last.item_key, 50) with ordinality as f)
+   select array(select item_key from p1 order by ordinality) || array(select item_key from p2 order by ordinality)),
+  (select array_agg(f.item_key order by f.ordinality) from public.following_feed(null, null, 50) with ordinality as f),
+  'the two pages together are the whole feed, in order, with no repeat');
 
 select * from finish();
 rollback;
