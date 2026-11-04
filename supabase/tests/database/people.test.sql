@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(49);
+select plan(61);
 
 -- Runs on top of the dev seed (Josie ...0001 follows Mike, Ari and Dev; Alli is in Saskatoon;
 -- Sam is a new account), plus the fixtures below. Rolled back at the end.
@@ -36,6 +36,16 @@ from (values
   ('00000000-0000-0000-0000-0000000000a4', 'bea_arden', 'Bea Arden', 'Bea bio', 6173331, 'public', true)
 ) as v(id, username, display_name, bio, geoname, vis, show_city)
 join public.cities c on c.geoname_id = v.geoname;
+
+-- Quinn is a new account with three active followers: a display-name-word match for 'a'
+-- (Quinn Alvarez) that out-ranks nobody, however many followers she has.
+insert into auth.users (id) values ('00000000-0000-0000-0000-0000000000a6');
+insert into public.profiles (id, username, display_name)
+values ('00000000-0000-0000-0000-0000000000a6', 'quinn_a', 'Quinn Alvarez');
+insert into public.follows (follower_id, followee_id, status) values
+  ('00000000-0000-4000-8000-000000000002', '00000000-0000-0000-0000-0000000000a6', 'active'),
+  ('00000000-0000-4000-8000-000000000005', '00000000-0000-0000-0000-0000000000a6', 'active'),
+  ('00000000-0000-4000-8000-000000000004', '00000000-0000-0000-0000-0000000000a6', 'active');
 
 -- Nina has no home city.
 insert into public.profiles (id, username, display_name, trust_level)
@@ -76,6 +86,18 @@ select ok(not has_function_privilege('authenticated', 'public._is_blocked(uuid, 
   '_is_blocked is not executable by clients');
 select ok(not has_function_privilege('anon', 'public.get_profile(uuid)', 'execute'),
   'anon cannot run get_profile');
+select ok(not has_function_privilege('anon', 'public.list_followers(uuid, text, integer, integer)', 'execute'),
+  'anon cannot run list_followers');
+select ok(not has_function_privilege('anon', 'public.list_following(uuid, text, integer, integer)', 'execute'),
+  'anon cannot run list_following');
+select ok(not has_function_privilege('anon', 'public.search_people(text, integer)', 'execute'),
+  'anon cannot run search_people');
+select ok(not has_function_privilege('anon', 'public.suggested_people(integer)', 'execute'),
+  'anon cannot run suggested_people');
+select ok(not has_function_privilege('authenticated', 'public._person_match(text, text, text)', 'execute'),
+  '_person_match is not executable by clients');
+select ok(not has_function_privilege('authenticated', 'public.approve_requests_on_public()', 'execute'),
+  'the approve-on-public trigger function is not executable by clients');
 
 -- ================================================================ Josie (stranger to Priya)
 set local role authenticated;
@@ -104,6 +126,10 @@ select is((select viewer_follow from public.get_profile('00000000-0000-4000-8000
   'Josie follows Mike, so viewer_follow is active');
 select is((select home_city from public.get_profile('00000000-0000-0000-0000-0000000000a2')), null,
   'show_home_city = false hides the city from others');
+select public.test_login('00000000-0000-0000-0000-0000000000a2');
+select is((select home_city from public.get_profile('00000000-0000-0000-0000-0000000000a2')),
+  'Vancouver, BC, Canada', 'but the owner still sees their own city');
+select public.test_login('00000000-0000-4000-8000-000000000001');
 select is((select bio from public.get_profile('00000000-0000-0000-0000-0000000000a2')), 'Vera bio',
   'but a public profile''s bio is visible');
 select is((select count(*)::int from public.get_profile('00000000-0000-0000-0000-0000000000a4')), 0,
@@ -165,6 +191,24 @@ select is((select count(*)::int from public.list_followers('00000000-0000-4000-8
 select is((select count(*)::int from public.list_followers('00000000-0000-0000-0000-0000000000a4')), 0,
   'a list on a profile that blocked the caller is empty');
 
+-- A blocked person is left out of an otherwise visible list (Josie blocks Sam, a follower, and
+-- Dev, someone she follows).
+reset role;
+insert into public.blocks (blocker_id, blocked_id) values
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000006'),
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000005');
+set local role authenticated;
+select public.test_login('00000000-0000-4000-8000-000000000001');
+select is((select count(*)::int from public.list_followers('00000000-0000-4000-8000-000000000001')), 3,
+  'list_followers leaves out followers the caller blocked (Sam and Dev both follow Josie)');
+select is((select count(*)::int from public.list_followers('00000000-0000-4000-8000-000000000001')
+   where username in ('samokafor', 'devpatel')), 0, 'and they are Sam and Dev');
+select is((select string_agg(username, ',' order by username)
+   from public.list_following('00000000-0000-4000-8000-000000000001')),
+  'arimitchell,mikebrennan', 'list_following leaves out someone the caller blocked (Dev)');
+select is((select count(*)::int from public.list_followers('00000000-0000-4000-8000-000000000002')
+   where username = 'josiehamilton'), 1, 'other lists are unaffected');
+
 -- ================================================================ search_people
 select is((select string_agg(username, ',') from public.search_people('ar')), 'arimitchell',
   'search_people(ar) finds arimitchell (and not Bea Arden, who blocked Josie)');
@@ -172,6 +216,9 @@ select is((select string_agg(username, ',' order by username) from public.search
   'private accounts are included');
 select is((select string_agg(username, ',') from public.search_people('lind')), 'vera_l',
   'matches the start of a display-name word (Lindqvist)');
+select is((select string_agg(username, ',') from public.search_people('a')),
+  'arimitchell,allimercer,quinn_a',
+  'search_people ordering: username matches before display-name matches (Quinn has the most followers but comes last); followers first within a tier (Ari 1 before Alli 0)');
 select is((select count(*)::int from public.search_people('josie')), 0, 'the caller is excluded');
 select is((select count(*)::int from public.search_people('   ')), 0, 'a blank query returns nothing');
 select is((select count(*)::int from public.search_people(null)), 0, 'a null query returns nothing');

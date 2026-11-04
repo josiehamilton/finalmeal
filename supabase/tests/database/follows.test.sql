@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(42);
+select plan(51);
 
 -- Follows are written only through functions. Fixtures are inserted as the superuser; the dev
 -- seed is deleted first and comes back when this transaction rolls back.
@@ -36,6 +36,12 @@ select has_function('public', 'unfollow_user', array['uuid'], 'unfollow_user exi
 select has_function('public', 'respond_follow_request', array['uuid', 'boolean'], 'respond_follow_request exists');
 select has_trigger('public', 'profiles', 'profiles_approve_requests_on_public',
   'the approve-on-public trigger exists');
+select ok(not has_function_privilege('anon', 'public.follow_user(uuid)', 'execute'),
+  'anon cannot run follow_user');
+select ok(not has_function_privilege('anon', 'public.unfollow_user(uuid)', 'execute'),
+  'anon cannot run unfollow_user');
+select ok(not has_function_privilege('anon', 'public.respond_follow_request(uuid, boolean)', 'execute'),
+  'anon cannot run respond_follow_request');
 
 -- ================================================================ A follows a public user
 set local role authenticated;
@@ -111,6 +117,29 @@ select is((select count(*)::int from public.activities
 select lives_ok($$select public.unfollow_user('00000000-0000-0000-0000-00000000000b')$$,
   'unfollowing again is a no-op');
 
+-- Cancelling a pending request: the row and its follow_requested activity go.
+select public.follow_user('00000000-0000-0000-0000-00000000000d');
+select lives_ok($$select public.unfollow_user('00000000-0000-0000-0000-00000000000d')$$,
+  'A cancels a pending request');
+select is((select count(*)::int from public.follows where followee_id = '00000000-0000-0000-0000-00000000000d')
+   + (select count(*)::int from public.activities
+      where type = 'follow_requested' and target_user_id = '00000000-0000-0000-0000-00000000000d'),
+  0, 'cancelling removes the requested row and its follow_requested activity');
+
+-- Unfollowing after an accepted request also removes the owner's follow_accepted activity.
+select public.test_login('00000000-0000-0000-0000-00000000000e');
+select public.follow_user('00000000-0000-0000-0000-00000000000d');
+select public.test_login('00000000-0000-0000-0000-00000000000d');
+select public.respond_follow_request('00000000-0000-0000-0000-00000000000e', true);
+select public.test_login('00000000-0000-0000-0000-00000000000e');
+select public.unfollow_user('00000000-0000-0000-0000-00000000000d');
+-- The activity is D's, so count it as the superuser (E cannot read it).
+reset role;
+select is((select count(*)::int from public.activities
+   where type = 'follow_accepted' and target_user_id = '00000000-0000-0000-0000-00000000000e'),
+  0, 'unfollowing removes the follow_accepted activity about that follow');
+set local role authenticated;
+
 -- ================================================================ blocks, either way
 reset role;
 insert into public.blocks (blocker_id, blocked_id) values
@@ -125,6 +154,22 @@ select throws_ok($$select public.follow_user('00000000-0000-0000-0000-0000000000
 select public.test_login('00000000-0000-0000-0000-00000000000e');
 select throws_ok($$select public.follow_user('00000000-0000-0000-0000-00000000000a')$$,
   'P0001', 'profile_unavailable', 'A blocked E, so E cannot follow A');
+
+-- Accepting across a block is refused (declining still cleans up).
+reset role;
+insert into public.follows (follower_id, followee_id, status) values
+  ('00000000-0000-0000-0000-00000000000e', '00000000-0000-0000-0000-00000000000d', 'requested');
+insert into public.blocks (blocker_id, blocked_id) values
+  ('00000000-0000-0000-0000-00000000000d', '00000000-0000-0000-0000-00000000000e');
+set local role authenticated;
+select public.test_login('00000000-0000-0000-0000-00000000000d');
+select throws_ok($$select public.respond_follow_request('00000000-0000-0000-0000-00000000000e', true)$$,
+  'P0001', 'profile_unavailable', 'accepting a request from someone D blocked raises profile_unavailable');
+select is((select status::text from public.follows
+   where follower_id = '00000000-0000-0000-0000-00000000000e' and followee_id = '00000000-0000-0000-0000-00000000000d'),
+  'requested', 'and the request is still requested');
+select lives_ok($$select public.respond_follow_request('00000000-0000-0000-0000-00000000000e', false)$$,
+  'D can still decline it');
 
 -- ================================================================ no profile / signed out
 select public.test_login('00000000-0000-0000-0000-00000000000f');
