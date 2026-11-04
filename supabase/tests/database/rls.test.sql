@@ -176,8 +176,9 @@ select throws_ok($$
   update public.notifications set user_id = '00000000-0000-0000-0000-00000000000a'
   where id = '70000000-0000-0000-0000-00000000000b'
 $$, '42501', null, 'B cannot hand B''s notification to A');
-select lives_ok($$update public.notifications set read_at = now() where id = '70000000-0000-0000-0000-00000000000b'$$,
-  'B can mark B''s own notification read');
+-- Phase 4: read_at changes only through mark_notifications_read.
+select throws_ok($$update public.notifications set read_at = now() where id = '70000000-0000-0000-0000-00000000000b'$$,
+  '42501', null, 'B cannot update B''s own notification directly either');
 
 -- Follows: no direct deletes any more, not even by a party (use unfollow_user, or
 -- respond_follow_request to decline)
@@ -201,8 +202,8 @@ select is((select count(*)::int from public.follows
 select is((select count(*)::int from public.follows
    where follower_id = '00000000-0000-0000-0000-00000000000a' and followee_id = '00000000-0000-0000-0000-00000000000b'),
   1, 'B''s refused delete left the follow where B is the followee');
-select isnt((select read_at from public.notifications where id = '70000000-0000-0000-0000-00000000000b'),
-  null, 'B''s read_at update landed');
+select is((select read_at from public.notifications where id = '70000000-0000-0000-0000-00000000000b'),
+  null, 'B''s refused read_at update changed nothing');
 
 -- ===== Signed in as A =====
 set local role authenticated;

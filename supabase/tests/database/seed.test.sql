@@ -107,8 +107,8 @@ select is((select count(*)::int from public.activities), 4, '4 activities');
 select is(
   (select count(*)::int from public.notifications
     where user_id = '00000000-0000-4000-8000-000000000001'),
-  3,
-  '3 notifications for josie'
+  4,
+  '4 notifications for josie (the activities fan out to them)'
 );
 select is(
   (select other_pick_id is not null from public.activities where type = 'dethroned'),

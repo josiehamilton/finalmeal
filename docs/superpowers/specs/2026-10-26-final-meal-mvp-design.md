@@ -99,7 +99,9 @@ All tables use UUID primary keys and `created_at`/`updated_at` timestamps. Row-l
 | `shared_lists` | `owner_id`, `slug` (unique), `title`, `note`, `filter` (JSON: `scope` = `final_five`/`everything`/`custom`, `cities[]`, `food_type_tag_ids[]`, `dietary_tag_ids[]`, `personal_tag_ids[]`, `tiers[]`), `is_active` | evaluated live on every view; `filter` is validated by a shared schema in `packages/core` |
 | `activities` | `actor_id`, `type` (`added_final`, `added_honorable`, `dethroned`, `promoted`, `followed`, `follow_requested`, `follow_accepted`, `saved_pick`, `saved_from_list`), `pick_id`, `other_pick_id`, `list_id`, `target_user_id` | feeds the Following feed and notifications; respects privacy and blocks |
 | `notifications` | `user_id`, `activity_id`, `read_at` | per-recipient inbox |
-| `push_tokens` | `user_id`, `expo_token`, `platform` | |
+| `push_tokens` | `user_id`, `expo_token`, `platform`, `updated_at` | written only by `register_push_token`; a token seen under another person moves to the caller |
+| `notification_preferences` | `user_id`, `push_dethroned`, `push_new_followers`, `push_saves`, `push_friends_finals` | one row per profile (created by a trigger), all default on; the person can change only these four |
+| `push_outbox` | `user_id`, `activity_id`, `title`, `body`, `data`, `status` (`pending`/`sending`/`sent`/`failed`), `sender`, `attempts`, `sent_at` | queued pushes, filled when an activity is committed; a sender function delivers them (log-only until Phase 8); no client access |
 | `device_attestations` | `user_id`, `platform`, `result`, `checked_at` | feeds trust |
 | `reports` | `reporter_id`, `target_type` (`pick`/`profile`/`list`/`place`), `target_id`, `reason`, `status` | |
 

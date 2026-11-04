@@ -38,6 +38,28 @@ export function newTestClient(): FinalMealClient {
   });
 }
 
+/** The local stack's service-role key, for tests that call service-only endpoints. Never use it in app code. */
+export function serviceRoleKey(): string {
+  const key = readEnvFile(ENV_FILE).SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) {
+    throw new Error(
+      'packages/api/.env.test.local is missing SUPABASE_SERVICE_ROLE_KEY. Run pnpm env:local with Supabase running.',
+    );
+  }
+  return key;
+}
+
+/** The local stack's API URL (the same one the test client uses). */
+export function apiUrl(): string {
+  const url = readEnvFile(ENV_FILE).SUPABASE_URL;
+  if (!url) {
+    throw new Error(
+      'packages/api/.env.test.local is missing SUPABASE_URL. Run pnpm env:local with Supabase running.',
+    );
+  }
+  return url;
+}
+
 /** Short random lowercase hex, for fresh emails and usernames on every run. */
 export function randomSuffix(): string {
   return Math.random().toString(16).slice(2, 12);

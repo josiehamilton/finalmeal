@@ -54,10 +54,19 @@ const targets = [
   ['packages/api/.env.test.local', 'SUPABASE_URL', 'SUPABASE_KEY'],
 ];
 
+// The service-role key is for the API integration tests only (they call the push-dispatch Edge
+// Function). It is never written to an app env file: apps ship to phones and browsers. The legacy
+// JWT key is preferred: the gateway's verify_jwt check (config.toml) rejects the newer
+// `sb_secret_...` key, which is not a JWT.
+const serviceKey = status.SERVICE_ROLE_KEY || status.SECRET_KEY;
+const testFile = 'packages/api/.env.test.local';
+
 for (const [file, urlName, keyName] of targets) {
   const path = resolve(root, file);
   // apps/web and apps/mobile may not exist yet; create them so the file is ready when they do.
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${urlName}=${url}\n${keyName}=${key}\n`);
+  let content = `${urlName}=${url}\n${keyName}=${key}\n`;
+  if (file === testFile && serviceKey) content += `SUPABASE_SERVICE_ROLE_KEY=${serviceKey}\n`;
+  writeFileSync(path, content);
   console.log(`wrote ${file}`);
 }

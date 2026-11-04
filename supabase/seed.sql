@@ -278,8 +278,6 @@ insert into public.activities (actor_id, type, list_id)
 select '00000000-0000-4000-8000-000000000002', 'saved_from_list', id
 from public.shared_lists where slug = 'josies-vancouver';
 
--- One notification for josie per activity that targets her or her picks.
-insert into public.notifications (user_id, activity_id)
-select '00000000-0000-4000-8000-000000000001', id
-from public.activities
-where type in ('followed', 'saved_pick', 'saved_from_list');
+-- Notifications are not inserted here: the activities above fan out to them by themselves (the
+-- activities_fan_out trigger runs as each statement commits). Josie gets four: Ari's swap (she
+-- follows Ari), Alli's follow, and Mike's save of her gyro and of her list.

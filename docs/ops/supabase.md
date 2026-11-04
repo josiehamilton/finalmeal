@@ -38,7 +38,7 @@ The CLI is a pinned root devDependency (`supabase` in the root `package.json`, c
 - Schema, policies and functions change **only** through files in `supabase/migrations/`. Create one with `pnpm exec supabase migration new <name>`. If you explore in Studio, turn the result into a migration before committing.
 - Auth, storage and API settings live in `supabase/config.toml`.
 - Edge Functions live in `supabase/functions/`.
-- `supabase/seed.sql` is sample data for local development only. It never runs in production: `pnpm exec supabase db push` does not run it, so never run it against the cloud project. It mirrors the design canvas: 6 people (`@example.com` emails, fixed ids `00000000-0000-4000-8000-00000000000N`, josie is `...0001`), 14 places, 17 dishes, 28 picks, Josie's personal tags (the global food-type and dietary tags are no longer in the seed: they come from the `tag_vocabulary` migration, see Tags), follows, 2 shared lists, one save, and a few activities with notifications. `pnpm db:reset` loads it. The other database tests empty these tables inside their own rolled-back transaction, so they stay independent of the seed.
+- `supabase/seed.sql` is sample data for local development only. It never runs in production: `pnpm exec supabase db push` does not run it, so never run it against the cloud project. It mirrors the design canvas: 6 people (`@example.com` emails, fixed ids `00000000-0000-4000-8000-00000000000N`, josie is `...0001`), 14 places, 17 dishes, 28 picks, Josie's personal tags (the global food-type and dietary tags are no longer in the seed: they come from the `tag_vocabulary` migration, see Tags), follows, 2 shared lists, one save, and a few activities (their notifications come from the fan-out trigger, not from the seed). `pnpm db:reset` loads it. The other database tests empty these tables inside their own rolled-back transaction, so they stay independent of the seed.
 - Every new setting, extension, bucket or secret gets a line in the inventory below.
 - Secrets are listed here by name only. Never commit `.env` or `.env.local` files.
 
@@ -84,6 +84,7 @@ Do these before the first `pnpm exec supabase db push` and `pnpm exec supabase c
 | `[auth.email.template.confirmation]` | subject `Your Final Meal code`, `./supabase/templates/confirmation.html` | The email a brand-new person gets. Identical to the one above; both must be kept in sync. |
 | `[db.seed] sql_paths` | `./seed.sql`, `./seed/places_vancouver.sql` | The dev seed, then the generated Foursquare extract (see Places). |
 | `[storage.buckets.avatars]` | public, `2MiB`, `image/jpeg` | Profile photos (see Storage buckets). |
+| `[functions.push-dispatch] verify_jwt` | `true` | The push sender is called with the service-role key only (see Edge Functions). Needs `pnpm db:stop && pnpm db:start` for the stack to serve `supabase/functions`. |
 | `[storage.buckets.pick-photos]` | public, `4MiB`, `image/jpeg` | Photos on picks (see Storage buckets). Needs `pnpm db:stop && pnpm db:start` before `db reset` creates it. |
 
 ### Extensions
@@ -159,6 +160,16 @@ All installed into the `extensions` schema by `20261026233813_extensions_and_typ
 | `public.list_followers(p_user_id, p_q, p_offset, p_limit)` and `public.list_following(...)` | Stable, security definer, `authenticated` only. Columns `id, username, display_name, avatar_path, viewer_follow, follows_viewer, is_me`. Active follows only, newest follow first (then username). `p_q` uses `_person_match`. Empty unless `_can_see(caller, p_user_id)`; people blocked either way with the caller are left out. `p_offset` is floored at 0 and `p_limit` capped at 50 (default 20). |
 | `public.search_people(p_q, p_limit default 20)` | Stable, security definer, `authenticated` only. Same columns. Username-prefix matches first, then display-name-word matches, then active-follower count (most first), then username. Excludes the caller and blocked people; includes private accounts (name and photo are always visible). A blank or null query returns nothing. `p_limit` capped at 50. Scans `profiles` (no index on the folded names yet; fine at MVP size). |
 | `public.suggested_people(p_limit default 5)` | Stable, security definer, `authenticated` only. Same columns plus `top_dish` (the dish name of the person's slot-1 final, else null). Trusted, public accounts the caller has no follow row with at all (so someone already asked is not suggested), excluding the caller and blocks. Order: home within 25 km (25 000 m) of the caller's `home_location` first, then active-follower count, then username. A caller without a home city just gets the second and third keys. Never uses the phone's position. `p_limit` capped at 50. |
+| `public.create_notification_preferences()` (trigger `profiles_create_notification_preferences`) | After insert on `profiles`: creates the person's `notification_preferences` row (all four switches on). The migration backfilled existing profiles. Internal. |
+| `public.register_push_token(p_token, p_platform)` | Security definer, `authenticated` only. The token must match `^Expo(nent)?PushToken\[[^\]]+\]$` and the platform must be `ios` or `android`, else `invalid_push_token`. Upserts on `expo_token`: a token seen under another person moves to the caller (the same phone signed into a new account). `not_authenticated` (`42501`), `profile_not_found`. |
+| `public.unregister_push_token(p_token)` | Security definer, `authenticated` only. Deletes the caller's row for that token; does nothing for a token that is not theirs. |
+| `public.mark_notifications_read(p_ids default null)` | Security definer, `authenticated` only. Sets `read_at = now()` on the caller's unread notifications: the listed ids, or all of them when `p_ids` is null. |
+| `public.unread_notification_count()` | Stable, security definer, `authenticated` only. The caller's unread notifications, leaving out those whose actor has a block with the caller (so the badge matches the list). |
+| `public.get_my_notifications(p_before default null, p_limit default 20)` | Stable, security definer, `authenticated` only. Columns `id, created_at, read_at, type, actor_id, actor_username, actor_display_name, actor_avatar_path, pick_id, dish_name, photo_path, other_dish_name, list_title, viewer_follow, request_pending`. Newest first, `created_at < p_before`, `p_limit` capped at 50. `dish_name` is the pick's dish, `other_dish_name` the replaced pick's dish (dethroned). `request_pending` is true for a `follow_requested` row whose follow is still `requested`. Rows whose actor has a block with the caller (either direction) are left out. |
+| `public._push_text(p_type, p_actor_name, p_dish, p_other_dish, p_list_title)` | Internal. Immutable. Returns `(title, body)`: title `Final Meal`, body per activity type (see Notifications and push). |
+| `public._fan_out_activity()` (constraint trigger `activities_fan_out`) | Internal. Security definer. After insert on `activities`, `deferrable initially deferred`, per row: runs at commit. See Notifications and push. |
+| `public.claim_push_batch(p_limit default 100)` | Security definer, `service_role` only. Returns up to `p_limit` (capped at 500) `pending` `push_outbox` rows, oldest first, with `for update skip locked`, and sets them to `sending` with `attempts + 1`. |
+| `public.finish_push_batch(p_ids, p_status, p_sender)` | Security definer, `service_role` only. For rows still `sending`: sets `status` (`sent` or `failed`, else `invalid_push_status`), `sender` and `sent_at`. |
 | `public._begin_pick_write()`, `_check_pick_photo(uid, path)`, `_set_pick_tags(pick, tag_ids, personal_tags)`, `_resolve_dish(place, dish_id, dish_name)`, `_claim_final_slot(uid, replace_slot)`, `_own_pick(uid, pick_id)`, `_close_slot_gap(uid, slot)` | Internal helpers for the pick functions (execute revoked from clients). `_begin_pick_write` finds the caller (`not_authenticated`, `profile_not_found`) and takes a per-person advisory lock so counting finals and the duplicate check cannot race. `_resolve_dish` is described under Dishes and picks below. |
 
 ### Tables (schema `public`, row-level security on)
@@ -167,7 +178,7 @@ Migrations: `20261026234036_core_tables.sql` and `20261026234037_social_tables.s
 
 - Core: `profiles`, `places`, `dishes`, `picks`, `tags`, `pick_tags`
 - Reference data: `cities` (see Cities below) and the global rows of `tags` (see Tags below)
-- Social and operations: `follows`, `saves`, `blocks`, `shared_lists`, `activities`, `notifications`, `push_tokens`, `device_attestations`, `reports`
+- Social and operations: `follows`, `saves`, `blocks`, `shared_lists`, `activities`, `notifications`, `push_tokens`, `notification_preferences`, `push_outbox`, `follow_push_log`, `device_attestations`, `reports`
 
 ### Row-level security
 
@@ -181,18 +192,21 @@ Migration: `20261027000454_rls_baseline.sql`; tests: `supabase/tests/database/rl
 | `tags` | read global tags | read global tags and own personal tags; insert, update, delete own personal tags only |
 | `pick_tags` | read when the tag is visible | same; no direct writes (use `add_pick` / `update_pick`) |
 | `follows` | none | read only the rows you are in (`follows_select_own`); no direct writes (use `follow_user`, `unfollow_user`, `respond_follow_request`; see Follows and people) |
-| `saves`, `blocks`, `push_tokens` | none | all operations, own rows only |
+| `saves`, `blocks` | none | all operations, own rows only |
+| `push_tokens` | none | read own; no direct writes (use `register_push_token` / `unregister_push_token`; see Notifications and push) |
+| `notification_preferences` | none | read own; update only the four `push_*` columns on own (no insert or delete) |
+| `push_outbox`, `follow_push_log` | none | none (all privileges revoked; only `service_role` and the security-definer functions touch them) |
 | `device_attestations` | none | read own |
 | `shared_lists` | read active lists | read active lists and own inactive ones; insert, update, delete own |
 | `activities` | none | read only the ones you wrote (`activities_select_own`); no direct writes |
-| `notifications` | none | read and update own |
+| `notifications` | none | read own; no direct writes (use `mark_notifications_read`; see Notifications and push) |
 | `reports` | none | insert as yourself; cannot read |
 
 Known gaps (full carry-forward list with the phase that closes each: `docs/known-gaps.md`):
 
 - **Follow status.** Closed in Phase 4: follows have no direct writes at all (see Follows and people).
 - **Default TRUNCATE grants.** `anon` and `authenticated` hold the default `TRUNCATE` grant on public tables. It is not reachable through PostgREST (no HTTP verb maps to it), but a later migration should revoke it.
-- **`notifications_update_own` is row-level.** A user can rewrite `activity_id` on their own notifications (the policy only checks `user_id`). Tighten with a column grant limited to `read_at`.
+- **`notifications_update_own`.** Closed in Phase 4: notifications have no direct client writes (see Notifications and push).
 
 ### Profile writes
 
@@ -274,6 +288,29 @@ Migrations: `20261103100000_activity_types_social.sql` (enum values only, in the
 - **Privacy in every read function** (spec 5.5), even though table policies are tightened in Phase 7: a private account's bio, home city and dish count go only to the owner and active followers; name, @username, photo and follower counts are always visible; blocks hide a person completely (no profile, not in lists or search, cannot follow).
 - **Error codes** (message of a `P0001` exception; the apps map them to friendly copy): `cannot_follow_self`, `profile_unavailable` (also when accepting a request across a block), `request_not_found`; `profile_not_found` and `not_authenticated` (SQLSTATE `42501`) are the existing ones.
 
+### Notifications and push
+
+Migration: `20261103110000_notifications.sql`; tests: `supabase/tests/database/notifications.test.sql` (pgTAP), `packages/api/src/push.integration.test.ts` (the Edge Function, against the local stack) and the changed assertions in `rls.test.sql` and `seed.test.sql`.
+
+- **Fan-out.** `activities_fan_out` is a deferred constraint trigger, so it runs when the transaction commits and sees every activity written in it. It skips an activity deleted before commit, and skips an `added_final` / `promoted` when a `dethroned` for the same `pick_id` and `created_at` exists (a swap shows once: followers get the `dethroned` only). Recipients are never the actor and never across a block (either direction).
+
+| Activity | Recipients | In-app notification | Push preference |
+|---|---|---|---|
+| `followed`, `follow_requested`, `follow_accepted` | `target_user_id` | yes | `push_new_followers` |
+| `saved_pick` | owner of `pick_id` | yes | `push_saves` |
+| `saved_from_list` | owner of `list_id` | yes | `push_saves` |
+| `dethroned` | the actor's active followers | yes | `push_dethroned` |
+| `added_final`, `promoted` | the actor's active followers | no (the feed covers them) | `push_friends_finals` |
+| `added_honorable` | nobody | no | none |
+
+  The notification's `created_at` is the activity's. A `push_outbox` row is queued only when the preference is on and the recipient has at least one token. A `followed` push is skipped when the same actor already pushed the same person in the last 24 hours; `follow_push_log` remembers that, because unfollowing deletes the activity and with it the `push_outbox` row. Unfollowing, declining a request or removing a pick deletes the activity, so its notification and any unsent push go with it (cascade).
+- **Push text** (`_push_text`): title `Final Meal`; `<Name> started following you.`, `<Name> wants to follow you.`, `<Name> approved your follow request.`, `<Name> saved your <Dish>.`, `<Name> saved picks from your list <Title>.`, `<Name> dethroned <Old> with <New> on their Final Meal.`, `<Name> added <Dish> to their Final Meal.`, `<Name> promoted <Dish> to their Final Meal.` `<Name>` is the actor's display name. `data` is `{ "type", "pickId" (when there is one), "userId" (the actor) }`.
+- **Notifications** have no direct client writes (`INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` revoked; `notifications_update_own` dropped), so `activity_id` cannot be rewritten; `read_at` changes through `mark_notifications_read`. Index `notifications_activity (activity_id)`. The table is in the `supabase_realtime` publication (the app can refresh live; row-level security still applies). Because the seed's activities fan out by themselves, `seed.sql` no longer inserts notifications; Josie has four.
+- **Preferences.** `notification_preferences`: select own; update own, limited to the four `push_*` columns by a column grant; no insert or delete (a trigger on `profiles` creates the row).
+- **Push tokens.** `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` revoked from clients; `push_tokens_own` replaced by `push_tokens_select_own`. Written by `register_push_token` / `unregister_push_token`.
+- **Push queue.** `push_outbox` and `follow_push_log` have row-level security on, no policies and every privilege revoked from `anon` and `authenticated`. Status goes `pending`, `sending` (claimed), then `sent` or `failed`.
+- **Error codes** (message of a `P0001` exception): `invalid_push_token` (also for a bad platform; maps to the `unknown` copy in the apps, which never trigger it), `invalid_push_status` (service role only).
+
 ### Storage buckets
 
 Migrations (policies): `20261027052235_avatars_storage.sql` and `20261027210100_pick_photos_storage.sql`; tests: `supabase/tests/database/storage.test.sql` and `supabase/tests/database/pick_photos.test.sql`.
@@ -286,8 +323,13 @@ Migrations (policies): `20261027052235_avatars_storage.sql` and `20261027210100_
 
 ### Edge Functions
 
-None yet.
+- **`push-dispatch`** (`supabase/functions/push-dispatch/index.ts`, shared code in `supabase/functions/_shared/push-sender.ts`; `[functions.push-dispatch] verify_jwt = true` in `config.toml`). POST. The gateway checks the JWT signature and the function then requires its `role` claim to be `service_role` (or the exact service key), otherwise 401. It claims up to 100 queued pushes (`claim_push_batch`), looks up each person's tokens, sends one message per token through the sender chosen by the `PUSH_SENDER` secret, then marks the rows `sent` (or `failed` when every token of a row failed, or the person has no token left) with `finish_push_batch`. Replies `{ claimed, sent, failed, sender }`. It talks to the database through PostgREST with `fetch` (no network imports), using the `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` the platform provides.
+- **Senders** (`senderFromEnv`): `log` (the default; writes `[push:log] <to> <title>: <body>` per message to the function's log) and `noop`. `expo` and unknown values fall back to `log` with a one-time warning; the Expo sender is Phase 8.
+- **Calling it locally.** `pnpm push:dispatch` posts to `<API_URL>/functions/v1/push-dispatch` with the local service key and prints the reply; the log lines are in `docker logs supabase_edge_runtime_finalmeal`. The key is the legacy `SERVICE_ROLE_KEY` JWT from `supabase status`, because the newer `sb_secret_...` key is not a JWT and `verify_jwt` rejects it. `pnpm env:local` also writes it to `packages/api/.env.test.local` as `SUPABASE_SERVICE_ROLE_KEY` (that file only, never an app env file) for the integration test.
+- **If the function is not served** (a stack started before `supabase/functions` existed does not mount it): `pnpm db:stop && pnpm db:start`, or run `pnpm exec supabase functions serve`.
+- **Phase 8:** the Expo sender, and a schedule that calls the function (cron or a database webhook); see `docs/known-gaps.md`.
 
 ### Secrets (names only)
 
+- `PUSH_SENDER`: which sender `push-dispatch` uses: `log` (default, also used when unset), `noop`. Not set locally. Phase 8 adds `expo`.
 - `HF_TOKEN`: Josie's Hugging Face token, read from the root `.env.local` (never committed) by `scripts/import-places.mjs` only.

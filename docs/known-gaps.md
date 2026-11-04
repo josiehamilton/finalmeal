@@ -4,8 +4,7 @@ Things that are deliberately unfinished or must be revisited, with the phase tha
 
 ## Phase 3 and Phase 7: privacy and safety
 
-- Revoke the default `TRUNCATE` grants that `anon` and `authenticated` hold on public tables (not reachable through PostgREST, but should not exist). Done for `picks` and `pick_tags` (Phase 3) and `follows` and `activities` (Phase 4); the other tables remain.
-- Narrow `notifications_update_own` so a user can only change `read_at`, not `activity_id`.
+- Revoke the default `TRUNCATE` grants that `anon` and `authenticated` hold on public tables (not reachable through PostgREST, but should not exist). Done for `picks` and `pick_tags` (Phase 3) and `follows`, `activities`, `notifications`, `push_tokens` and the new Phase 4 tables (Phase 4); the other tables remain.
 - Enforce private profiles and blocks in the read policies.
 - Decide what happens to tag ownership when a personal tag is changed after it is attached to picks.
 
@@ -43,6 +42,7 @@ Each item names the phase that closes it.
 
 ## Phase 8: launch
 
+- Expo push sender, and schedule `push-dispatch` (cron or a database webhook on `push_outbox`). Phase 4 queues pushes and the function delivers them through the `log` sender only. Also prune old `push_outbox` rows (sent and failed), and decide what to do with rows left in `sending` when a dispatch dies midway (nothing re-queues them yet) and with `failed` rows (no retry yet).
 - `KeyboardAvoider` (apps/mobile) adds `StatusBar.currentHeight` on Android to match `measureInWindow`. Verify it on real devices with cutouts, a hidden status bar and landscape; add an Android-platform unit test and an unmount listener-removal assertion.
 - iOS keyboard padding jumps instead of easing; consider animating it with the keyboard's duration.
 
