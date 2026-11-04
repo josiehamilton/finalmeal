@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(86);
+select plan(87);
 
 -- Start from an empty database: the dev seed is deleted here and comes back
 -- when this transaction rolls back.
@@ -120,8 +120,11 @@ select is((select count(*)::int from public.shared_lists where slug = 'a-inactiv
   0, 'B cannot see A''s inactive shared list');
 select is((select count(*)::int from public.shared_lists where slug = 'a-active'),
   1, 'B can see A''s active shared list');
-select is((select count(*)::int from public.activities), 1, 'a signed-in user can read activities');
-select is((select count(*)::int from public.follows), 2, 'a signed-in user can read follows');
+-- Phase 4: activities are readable only by their actor, and a follow row only by the two
+-- people in it (feeds, counts and lists come from functions). The seeded activity is A's and
+-- the seeded follow rows are A->B and A->C, so B sees no activity and one follow row.
+select is((select count(*)::int from public.activities), 0, 'B cannot read A''s activities (activities_select_own)');
+select is((select count(*)::int from public.follows), 1, 'B sees only the follow row B is in (A follows B; follows_select_own)');
 select is((select count(*)::int from public.saves), 0, 'B cannot see A''s saves');
 select is((select count(*)::int from public.blocks), 0, 'B cannot see A''s blocks');
 select is((select count(*)::int from public.push_tokens), 0, 'B cannot see A''s push tokens');
@@ -139,8 +142,10 @@ select lives_ok($$update public.shared_lists set title = 'hijacked' where id = '
   'B''s update of A''s list runs without error (and affects 0 rows)');
 select lives_ok($$update public.profiles set display_name = 'hijacked' where id = '00000000-0000-0000-0000-00000000000a'$$,
   'B''s update of A''s profile runs without error (and affects 0 rows)');
-select lives_ok($$delete from public.follows where follower_id = '00000000-0000-0000-0000-00000000000a' and followee_id = '00000000-0000-0000-0000-00000000000c'$$,
-  'B''s delete of a follow between A and C runs without error (and affects 0 rows)');
+-- Phase 4 closed direct writes to follows (follow_user / unfollow_user / respond_follow_request
+-- are the only way in), so this is refused outright instead of quietly matching zero rows.
+select throws_ok($$delete from public.follows where follower_id = '00000000-0000-0000-0000-00000000000a' and followee_id = '00000000-0000-0000-0000-00000000000c'$$,
+  '42501', null, 'B cannot delete a follow between A and C (no direct follows writes)');
 
 -- Rejected writes
 select throws_ok($$
@@ -174,9 +179,10 @@ $$, '42501', null, 'B cannot hand B''s notification to A');
 select lives_ok($$update public.notifications set read_at = now() where id = '70000000-0000-0000-0000-00000000000b'$$,
   'B can mark B''s own notification read');
 
--- Follows: either party may delete
-select lives_ok($$delete from public.follows where followee_id = '00000000-0000-0000-0000-00000000000b'$$,
-  'B can delete a follow where B is the followee');
+-- Follows: no direct deletes any more, not even by a party (use unfollow_user, or
+-- respond_follow_request to decline)
+select throws_ok($$delete from public.follows where followee_id = '00000000-0000-0000-0000-00000000000b'$$,
+  '42501', null, 'B cannot delete a follow where B is the followee (no direct follows writes)');
 
 -- ===== Back to the superuser, before A acts: what B's attempts really did =====
 reset role;
@@ -194,7 +200,7 @@ select is((select count(*)::int from public.follows
   1, 'B''s delete of the follow between A and C removed nothing');
 select is((select count(*)::int from public.follows
    where follower_id = '00000000-0000-0000-0000-00000000000a' and followee_id = '00000000-0000-0000-0000-00000000000b'),
-  0, 'B removed the follow where B is the followee');
+  1, 'B''s refused delete left the follow where B is the followee');
 select isnt((select read_at from public.notifications where id = '70000000-0000-0000-0000-00000000000b'),
   null, 'B''s read_at update landed');
 
@@ -270,12 +276,13 @@ select throws_ok($$update public.picks set note = 'edited by A' where id = '3000
   '42501', null, 'A cannot edit A''s own pick directly (use update_pick)');
 select lives_ok($$update public.shared_lists set title = 'Renamed' where id = '50000000-0000-0000-0000-000000000001'$$,
   'A can edit A''s own list');
-select lives_ok($$
+select throws_ok($$
   insert into public.follows (follower_id, followee_id)
   values ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000b')
-$$, 'A can follow B');
-select lives_ok($$delete from public.follows where follower_id = '00000000-0000-0000-0000-00000000000a' and followee_id = '00000000-0000-0000-0000-00000000000c'$$,
-  'A can delete a follow where A is the follower');
+$$, '42501', null, 'A cannot follow B directly (use follow_user)');
+select throws_ok($$delete from public.follows where follower_id = '00000000-0000-0000-0000-00000000000a' and followee_id = '00000000-0000-0000-0000-00000000000c'$$,
+  '42501', null, 'A cannot delete a follow directly (use unfollow_user)');
+select is((select count(*)::int from public.activities), 1, 'A reads A''s own activity');
 select throws_ok($$
   insert into public.device_attestations (user_id, platform, result)
   values ('00000000-0000-0000-0000-00000000000a', 'ios', 'passed')
@@ -294,9 +301,9 @@ select is((select is_featured from public.tags where id = '40000000-0000-0000-00
   false, 'A''s update of a global tag changed nothing');
 select is((select count(*)::int from public.follows where followee_id = '00000000-0000-0000-0000-00000000000b'
    and follower_id = '00000000-0000-0000-0000-00000000000a'), 1,
-  'A''s follow of B exists (re-added after B removed the old one)');
-select is((select count(*)::int from public.follows where followee_id = '00000000-0000-0000-0000-00000000000c'), 0,
-  'A removed the follow of C');
+  'A''s follow of B is still there (direct writes were refused)');
+select is((select count(*)::int from public.follows where followee_id = '00000000-0000-0000-0000-00000000000c'), 1,
+  'A''s refused delete left the follow of C');
 
 select * from finish();
 rollback;

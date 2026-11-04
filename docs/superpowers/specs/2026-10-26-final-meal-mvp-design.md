@@ -93,11 +93,11 @@ All tables use UUID primary keys and `created_at`/`updated_at` timestamps. Row-l
 | `picks` | `user_id`, `dish_id`, `tier` (`final`/`honorable`), `slot` (1–5, final only), `note` (≤280), `photo_path`, `original_dish_name` | unique (`user_id`, `dish_id`); unique (`user_id`, `slot`) where tier = final; a check makes slot required for final and null for honorable |
 | `tags` | `kind` (`food_type`/`dietary`/`personal`), `name`, `slug`, `owner_id` (personal only), `is_featured` | food_type/dietary are global and admin-managed; personal tags are visible only to their owner |
 | `pick_tags` | `pick_id`, `tag_id` | personal tags only on the owner's picks |
-| `follows` | `follower_id`, `followee_id`, `status` (`active`/`requested`) | private accounts get `requested` until approved |
+| `follows` | `follower_id`, `followee_id`, `status` (`active`/`requested`) | private accounts get `requested` until approved; written only through `follow_user`, `unfollow_user` and `respond_follow_request` (no direct client writes), and a row is readable only by the two people in it |
 | `saves` | `user_id`, `dish_id` | "save to try" |
 | `blocks` | `blocker_id`, `blocked_id` | blocked users never see each other |
 | `shared_lists` | `owner_id`, `slug` (unique), `title`, `note`, `filter` (JSON: `scope` = `final_five`/`everything`/`custom`, `cities[]`, `food_type_tag_ids[]`, `dietary_tag_ids[]`, `personal_tag_ids[]`, `tiers[]`), `is_active` | evaluated live on every view; `filter` is validated by a shared schema in `packages/core` |
-| `activities` | `actor_id`, `type` (`added_final`, `added_honorable`, `dethroned`, `promoted`, `followed`, `saved_pick`, `saved_from_list`), `pick_id`, `other_pick_id`, `list_id`, `target_user_id` | feeds the Following feed and notifications; respects privacy and blocks |
+| `activities` | `actor_id`, `type` (`added_final`, `added_honorable`, `dethroned`, `promoted`, `followed`, `follow_requested`, `follow_accepted`, `saved_pick`, `saved_from_list`), `pick_id`, `other_pick_id`, `list_id`, `target_user_id` | feeds the Following feed and notifications; respects privacy and blocks |
 | `notifications` | `user_id`, `activity_id`, `read_at` | per-recipient inbox |
 | `push_tokens` | `user_id`, `expo_token`, `platform` | |
 | `device_attestations` | `user_id`, `platform`, `result`, `checked_at` | feeds trust |

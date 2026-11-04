@@ -109,7 +109,7 @@ All installed into the `extensions` schema by `20261026233813_extensions_and_typ
 | `pick_tier` | `final`, `honorable` |
 | `tag_kind` | `food_type`, `dietary`, `personal` |
 | `follow_status` | `active`, `requested` |
-| `activity_type` | `added_final`, `added_honorable`, `dethroned`, `promoted`, `followed`, `saved_pick`, `saved_from_list` |
+| `activity_type` | `added_final`, `added_honorable`, `dethroned`, `promoted`, `followed`, `saved_pick`, `saved_from_list`, `follow_requested`, `follow_accepted` (the last two added in Phase 4, migration `20261103100000_activity_types_social.sql`) |
 | `report_target` | `pick`, `profile`, `list`, `place` |
 | `report_status` | `open`, `actioned`, `dismissed` |
 
@@ -148,6 +148,17 @@ All installed into the `extensions` schema by `20261026233813_extensions_and_typ
 | `public.remove_pick(p_pick_id)` | Security definer, `authenticated` only. Deletes the pick, its `pick_tags` (cascade) and every activity about it: those it wrote and any `dethroned` that named it as the replaced pick (their notifications go by cascade). Later finals move up one slot. The photo object is removed by the client (best effort). |
 | `public.update_pick(p_pick_id, p_note, p_tag_ids, p_personal_tags, p_photo_path)` | Security definer, `authenticated` only. Replaces the note, the whole tag set and the photo path (null clears; null arrays mean no tags), with the same tag and photo rules as `add_pick`. Everything or nothing. |
 | `public.move_final(p_pick_id, p_to_slot)` | Security definer, `authenticated` only. Moves a final to `p_to_slot` (1..n) and shifts the finals between up or down by one. Returns all the caller's finals in slot order. A pick that is not final, or a slot outside 1..n, raises `invalid_slot`; moving to the current slot is a no-op. |
+| `public._is_blocked(a, b)` | Internal (execute revoked from clients). Stable, security definer. True when either person has blocked the other. |
+| `public._can_see(p_viewer, p_owner)` | Internal. Stable, security definer. False across a block or when the owner has no profile; true when the viewer is the owner, the owner is `public`, or the viewer follows the owner with `status = 'active'`. The one rule behind "private accounts show picks, bio and city only to the owner and active followers". |
+| `public._person_match(p_username, p_display_name, p_q)` | Internal. Immutable. 1 when the username starts with the query, 2 when a word of the display name starts with it (a multi-word query matches consecutive words), else 0 (also 0 for a blank query). Case- and accent-insensitive (`city_fold`); LIKE wildcards in the query are literal. |
+| `public.follow_user(p_user_id)` | Security definer, `authenticated` only. Returns `follow_status`. Raises `not_authenticated` (SQLSTATE `42501`), `cannot_follow_self`, `profile_not_found` (the caller has no profile) or `profile_unavailable` (no such profile, or blocked either way). Idempotent: an existing row returns its status and writes nothing. Otherwise a public target gets an `active` row and a `followed` activity (`actor_id` caller, `target_user_id` target); a private target gets a `requested` row and a `follow_requested` activity. A per-follower advisory lock serialises concurrent calls. |
+| `public.unfollow_user(p_user_id)` | Security definer, `authenticated` only. Deletes the caller's follow row (active or requested) and the caller's `followed` / `follow_requested` activities aimed at that person (their notifications go by cascade). A no-op when there is nothing to delete. |
+| `public.respond_follow_request(p_follower_id, p_accept)` | Security definer, `authenticated` only; the caller is the person being followed. Raises `request_not_found` unless a `requested` row exists. Accept: status becomes `active` and a `follow_accepted` activity is written (`actor_id` caller, `target_user_id` the follower). Decline: the row and its `follow_requested` activity are deleted. |
+| `approve_requests_on_public` (trigger `profiles_approve_requests_on_public`) | After update of `visibility` on `profiles`, only when it goes `private` to `public`: every `requested` row for that profile becomes `active`, with no activities. Security definer (the person has no write access to `follows`). Going public to private leaves existing followers active. |
+| `public.get_profile(p_user_id)` | Stable, security definer, `authenticated` only. One row, or none when the profile is missing or blocked either way. `bio` and `home_city` (= `home_place_text`) are null unless `can_see_picks`; `home_city` is also null when `show_home_city` is false and the caller is not the owner; `dishes_count` (all picks) is null unless `can_see_picks`. `followers_count` / `following_count` count active follows only and are always visible. `viewer_follow` is `none`, `requested` or `active`; `follows_viewer` is true when the target actively follows the caller. |
+| `public.list_followers(p_user_id, p_q, p_offset, p_limit)` and `public.list_following(...)` | Stable, security definer, `authenticated` only. Columns `id, username, display_name, avatar_path, viewer_follow, follows_viewer, is_me`. Active follows only, newest follow first (then username). `p_q` uses `_person_match`. Empty unless `_can_see(caller, p_user_id)`; people blocked either way with the caller are left out. `p_offset` is floored at 0 and `p_limit` capped at 50 (default 20). |
+| `public.search_people(p_q, p_limit default 20)` | Stable, security definer, `authenticated` only. Same columns. Username-prefix matches first, then display-name-word matches, then active-follower count (most first), then username. Excludes the caller and blocked people; includes private accounts (name and photo are always visible). A blank or null query returns nothing. `p_limit` capped at 50. Scans `profiles` (no index on the folded names yet; fine at MVP size). |
+| `public.suggested_people(p_limit default 5)` | Stable, security definer, `authenticated` only. Same columns plus `top_dish` (the dish name of the person's slot-1 final, else null). Trusted, public accounts the caller has no follow row with at all (so someone already asked is not suggested), excluding the caller and blocks. Order: home within 25 km (25 000 m) of the caller's `home_location` first, then active-follower count, then username. A caller without a home city just gets the second and third keys. Never uses the phone's position. `p_limit` capped at 50. |
 | `public._begin_pick_write()`, `_check_pick_photo(uid, path)`, `_set_pick_tags(pick, tag_ids, personal_tags)`, `_resolve_dish(place, dish_id, dish_name)`, `_claim_final_slot(uid, replace_slot)`, `_own_pick(uid, pick_id)`, `_close_slot_gap(uid, slot)` | Internal helpers for the pick functions (execute revoked from clients). `_begin_pick_write` finds the caller (`not_authenticated`, `profile_not_found`) and takes a per-person advisory lock so counting finals and the duplicate check cannot race. `_resolve_dish` is described under Dishes and picks below. |
 
 ### Tables (schema `public`, row-level security on)
@@ -169,17 +180,17 @@ Migration: `20261027000454_rls_baseline.sql`; tests: `supabase/tests/database/rl
 | `picks` | read | read; no direct writes (use the pick functions; see Dishes and picks) |
 | `tags` | read global tags | read global tags and own personal tags; insert, update, delete own personal tags only |
 | `pick_tags` | read when the tag is visible | same; no direct writes (use `add_pick` / `update_pick`) |
-| `follows` | none | read; follow as yourself; delete when either party |
+| `follows` | none | read only the rows you are in (`follows_select_own`); no direct writes (use `follow_user`, `unfollow_user`, `respond_follow_request`; see Follows and people) |
 | `saves`, `blocks`, `push_tokens` | none | all operations, own rows only |
 | `device_attestations` | none | read own |
 | `shared_lists` | read active lists | read active lists and own inactive ones; insert, update, delete own |
-| `activities` | none | read; no direct writes |
+| `activities` | none | read only the ones you wrote (`activities_select_own`); no direct writes |
 | `notifications` | none | read and update own |
 | `reports` | none | insert as yourself; cannot read |
 
 Known gaps (full carry-forward list with the phase that closes each: `docs/known-gaps.md`):
 
-- **Follow status.** A user can set their own follow `status`, for the same reason.
+- **Follow status.** Closed in Phase 4: follows have no direct writes at all (see Follows and people).
 - **Default TRUNCATE grants.** `anon` and `authenticated` hold the default `TRUNCATE` grant on public tables. It is not reachable through PostgREST (no HTTP verb maps to it), but a later migration should revoke it.
 - **`notifications_update_own` is row-level.** A user can rewrite `activity_id` on their own notifications (the policy only checks `user_id`). Tighten with a column grant limited to `read_at`.
 
@@ -192,7 +203,7 @@ Migration: `20261027052232_profiles_onboarding.sql`; tests: `supabase/tests/data
 - **Functions** (`is_username_available`, `create_my_profile`, `set_my_home_city`, `finish_onboarding`): see Functions and triggers. They are `security definer` with `search_path = ''`. Execute is granted to `authenticated` only and explicitly revoked from `anon` (Supabase grants new functions to `anon` by default). Error messages are the contract with `packages/api`: `profile_exists`, `username_taken`, `invalid_username`, `city_not_found`, `profile_not_found`.
 - `city_label` is not one of these: it is a plain immutable security-invoker function, executable by anyone, and PostgREST exposes it as a computed column on `cities`.
 - **`profiles_avatar_path_own` check:** `avatar_path` must be null or `<own id>/avatar-<unix-ms>.jpg`, so a profile cannot point at someone else's file (a violation is `23514`).
-- Remaining column protection (Phase 3/7): `follows.status`, see Known gaps above.
+- `follows.status` column protection was closed in Phase 4: follows have no direct client writes (see Follows and people).
 
 ### Sign-in emails
 
@@ -251,6 +262,17 @@ Migration: `20261027210000_picks_functions.sql`; tests: `supabase/tests/database
 - **Trust:** `trust_level` decides what counts in `suggest_dishes.pick_count` and `dish_stats`; any signed-in person with a profile can add picks.
 - **Error codes** (message of a `P0001` exception): `final_full`, `duplicate_pick`, `place_not_found`, `invalid_dish_name`, `pick_not_found`, `invalid_photo` have friendly copy in `@finalmeal/api`; `invalid_slot` (a replace or target slot that does not apply) and `invalid_tag` (a tag id that does not exist or is not a global tag) are for programming errors and show the generic message; `invalid_tag_name` and `profile_not_found` come from the existing tag and profile code. `custom_place_limit` (from `create_custom_place`, the 20-a-day cap) has friendly copy too. `create_personal_tag` without a user id in the token raises `not_authenticated` (SQLSTATE `42501`), which the apps show as the generic message.
 - **Photo path:** `picks.photo_path` is null or `<uid>/pick-<digits>.jpg`, checked by `add_pick` and `update_pick` (the table itself has no check; the functions are the only writers).
+
+### Follows and people
+
+Migrations: `20261103100000_activity_types_social.sql` (enum values only, in their own file because a new value cannot be used in the transaction that adds it) and `20261103100100_follows.sql`; tests: `supabase/tests/database/follows.test.sql`, `supabase/tests/database/people.test.sql` and the changed assertions in `rls.test.sql`.
+
+- **Follows are written only through functions.** `INSERT`, `UPDATE`, `DELETE` and `TRUNCATE` on `follows` are revoked from `anon` and `authenticated` (a direct write fails with `42501`); the policies `follows_insert_as_follower` and `follows_delete_either_party` are dropped. This closes the old "a person can set their own follow `status`" gap. Functions: `follow_user`, `unfollow_user`, `respond_follow_request`, plus the trigger `profiles_approve_requests_on_public` (see Functions and triggers).
+- **Reads of `follows`.** `follows_select` (any signed-in person reads every row) is replaced by `follows_select_own`: a row is visible only when `follower_id` or `followee_id` is the caller. Counts and lists come from `get_profile`, `list_followers` and `list_following`, which apply the privacy rules. An index `follows_followee_created (followee_id, created_at desc)` serves follower counts and lists.
+- **Reads of `activities`.** `activities_select` (any signed-in person reads all) is replaced by `activities_select_own` (`actor_id` is the caller), and `TRUNCATE` is revoked. Feeds and notifications read activities through functions (later Phase 4 tasks).
+- **Changed `rls.test.sql` assertions** (each explained in the file): B and A now see only the follow rows they are part of and only their own activities; the direct follow inserts and deletes that used to succeed (or to affect zero rows) now throw `42501`, so the "after" checks show those rows unchanged.
+- **Privacy in every read function** (spec 5.5), even though table policies are tightened in Phase 7: a private account's bio, home city and dish count go only to the owner and active followers; name, @username, photo and follower counts are always visible; blocks hide a person completely (no profile, not in lists or search, cannot follow).
+- **Error codes** (message of a `P0001` exception; the apps map them to friendly copy): `cannot_follow_self`, `profile_unavailable`, `request_not_found`; `profile_not_found` and `not_authenticated` (SQLSTATE `42501`) are the existing ones.
 
 ### Storage buckets
 

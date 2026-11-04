@@ -4,8 +4,7 @@ Things that are deliberately unfinished or must be revisited, with the phase tha
 
 ## Phase 3 and Phase 7: privacy and safety
 
-- Column-level protection for `follows.status` (policies are row-level today). `profiles.trust_level` and `profiles.is_business_affiliated` are already protected by column grants (Phase 2).
-- Revoke the default `TRUNCATE` grants that `anon` and `authenticated` hold on public tables (not reachable through PostgREST, but should not exist). Done for `picks` and `pick_tags` (Phase 3); the other tables remain.
+- Revoke the default `TRUNCATE` grants that `anon` and `authenticated` hold on public tables (not reachable through PostgREST, but should not exist). Done for `picks` and `pick_tags` (Phase 3) and `follows` and `activities` (Phase 4); the other tables remain.
 - Narrow `notifications_update_own` so a user can only change `read_at`, not `activity_id`.
 - Enforce private profiles and blocks in the read policies.
 - Decide what happens to tag ownership when a personal tag is changed after it is attached to picks.
