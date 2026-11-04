@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { MyProfile } from '@finalmeal/api';
 import { colors } from '@finalmeal/ui-tokens';
 import { fontFamily } from '../lib/fonts';
@@ -9,14 +9,22 @@ import { PrimaryButton } from './PrimaryButton';
 interface StatProps {
   n: number;
   label: string;
+  /** Makes the stat a link. */
+  onPress?: () => void;
 }
 
-function Stat({ n, label }: StatProps) {
-  return (
+function Stat({ n, label, onPress }: StatProps) {
+  const text = (
     <Text style={styles.stat}>
       <Text style={styles.statNumber}>{n}</Text>
       {` ${label}`}
     </Text>
+  );
+  if (!onPress) return text;
+  return (
+    <Pressable accessibilityRole="link" onPress={onPress} hitSlop={8}>
+      {text}
+    </Pressable>
   );
 }
 
@@ -25,10 +33,20 @@ interface ProfileHeaderProps {
   /** The number of picks on screen. It stands in for the profile's own count, which can lag behind a change. */
   dishes?: number;
   onEdit: () => void;
+  /** Opens the followers list. */
+  onOpenFollowers?: () => void;
+  /** Opens the following list. */
+  onOpenFollowing?: () => void;
 }
 
 /** Avatar, name, home city, bio, follower stats and Edit profile. */
-export function ProfileHeader({ profile, dishes, onEdit }: ProfileHeaderProps) {
+export function ProfileHeader({
+  profile,
+  dishes,
+  onEdit,
+  onOpenFollowers,
+  onOpenFollowing,
+}: ProfileHeaderProps) {
   const { counts } = profile;
   const dishCount = dishes ?? counts.dishes;
   const city = profile.showHomeCity ? profile.homeCity : null;
@@ -50,8 +68,12 @@ export function ProfileHeader({ profile, dishes, onEdit }: ProfileHeaderProps) {
       </View>
       {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
       <View style={styles.stats}>
-        <Stat n={counts.followers} label={counts.followers === 1 ? 'follower' : 'followers'} />
-        <Stat n={counts.following} label="following" />
+        <Stat
+          n={counts.followers}
+          label={counts.followers === 1 ? 'follower' : 'followers'}
+          onPress={onOpenFollowers}
+        />
+        <Stat n={counts.following} label="following" onPress={onOpenFollowing} />
         <Stat n={dishCount} label={dishCount === 1 ? 'dish' : 'dishes'} />
       </View>
       <PrimaryButton label="Edit profile" variant="ghost" size="compact" onPress={onEdit} />

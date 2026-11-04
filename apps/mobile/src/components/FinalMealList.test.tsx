@@ -14,6 +14,13 @@ describe('FinalMealList', () => {
     expect(onOpen).toHaveBeenCalledWith(finals[1]);
   });
 
+  it('shows no empty seats when there is nothing to add (someone else’s list)', async () => {
+    await render(<FinalMealList picks={makeFinals(2)} dimmedIds={null} onOpen={noop} />);
+    expect(screen.getAllByRole('button', { name: /^\d\. Dish/ })).toHaveLength(2);
+    expect(screen.queryByText('Add a dish')).toBeNull();
+    expect(screen.queryByTestId('seat-3')).toBeNull();
+  });
+
   it('says one seat is left at four', async () => {
     const onAdd = jest.fn();
     await render(<FinalMealList picks={makeFinals(4)} dimmedIds={null} onOpen={noop} onAdd={onAdd} />);

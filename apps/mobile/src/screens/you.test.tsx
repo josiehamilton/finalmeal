@@ -50,6 +50,14 @@ describe('You tab', () => {
     expect(screen.getByText('0 dishes')).toBeOnTheScreen();
   });
 
+  it('opens the followers and following lists from the stats', async () => {
+    await render(<You />);
+    await fireEvent.press(screen.getByText('0 followers'));
+    expect(mockRouter.push).toHaveBeenLastCalledWith('/u/u1/follows?tab=followers');
+    await fireEvent.press(screen.getByText('1 following'));
+    expect(mockRouter.push).toHaveBeenLastCalledWith('/u/u1/follows?tab=following');
+  });
+
   it('uses singular follower and dish at 1', async () => {
     mockGetPicks.mockResolvedValue([makePick()]);
     mockProfile = makeProfile({ counts: { followers: 1, following: 1, dishes: 1 } });

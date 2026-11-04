@@ -186,6 +186,8 @@ export default function You() {
           profile={profile}
           dishes={picks?.length}
           onEdit={() => router.push('/settings/edit-profile')}
+          onOpenFollowers={() => router.push(`/u/${profile.id}/follows?tab=followers`)}
+          onOpenFollowing={() => router.push(`/u/${profile.id}/follows?tab=following`)}
         />
         <PhotoNotice style={styles.notice} />
         {error ? (

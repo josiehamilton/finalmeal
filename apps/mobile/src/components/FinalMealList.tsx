@@ -12,8 +12,8 @@ interface FinalMealListProps {
   /** The ids to dim under a filter (they keep their place and number); null when nothing is filtered. */
   dimmedIds: ReadonlySet<string> | null;
   onOpen: (pick: Pick) => void;
-  /** Opens Add a dish with Final Meal chosen. */
-  onAdd: () => void;
+  /** Opens Add a dish with Final Meal chosen. Leave it out on someone else's list: no empty seats. */
+  onAdd?: () => void;
 }
 
 /** The Final Meal: the filled slots, then the seats still open. */
@@ -32,7 +32,7 @@ export function FinalMealList({ picks, dimmedIds, onOpen, onAdd }: FinalMealList
           </View>
         );
       })}
-      <EmptySeats first={picks.length + 1} onAdd={onAdd} />
+      {onAdd ? <EmptySeats first={picks.length + 1} onAdd={onAdd} /> : null}
     </View>
   );
 }
