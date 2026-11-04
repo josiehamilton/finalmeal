@@ -38,4 +38,17 @@ describe('FollowButton', () => {
     await render(<FollowButton state="none" followsViewer={false} isMe onPress={jest.fn()} />);
     expect(screen.queryByRole('button')).toBeNull();
   });
+
+  it('tells a screen reader it is busy, in both sizes', async () => {
+    const view = await render(
+      <FollowButton state="active" followsViewer={false} busy onPress={jest.fn()} />,
+    );
+    expect(screen.getByRole('button', { name: 'Following' })).toBeBusy();
+    await view.rerender(
+      <FollowButton state="active" followsViewer={false} busy onPress={jest.fn()} size="row" />,
+    );
+    expect(screen.getByRole('button', { name: 'Following' })).toBeBusy();
+    await view.rerender(<FollowButton state="active" followsViewer={false} onPress={jest.fn()} />);
+    expect(screen.getByRole('button', { name: 'Following' })).not.toBeBusy();
+  });
 });

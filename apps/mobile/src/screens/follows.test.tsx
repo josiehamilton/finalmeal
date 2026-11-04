@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { getProfile, listFollowers, listFollowing } from '@finalmeal/api';
+import { resetFollowStore, setFollowState } from '../state/follow-store';
 import Follows from '../../app/(app)/u/[id]/follows';
 import { makeProfile } from '../test-support/profile';
 import { makeAlli, makePerson } from '../test-support/people';
@@ -51,6 +52,7 @@ describe('Followers and following', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
+    resetFollowStore();
     mockParams = { id: 'u1', tab: 'followers' };
     mockGetProfile.mockResolvedValue(josie());
     mockFollowers.mockResolvedValue([
@@ -208,5 +210,102 @@ describe('Followers and following', () => {
     await render(<Follows />);
     expect(await screen.findByText('Josie Hamilton')).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Follow' })).toBeNull();
+  });
+
+  it('lets you retry when a later page fails, and carries on from the same place', async () => {
+    mockFollowers
+      .mockResolvedValueOnce(people(20))
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce(people(2, 'q'));
+    await render(<Follows />);
+    await screen.findByText('Person p1');
+    await fireEvent(screen.getByTestId('people-list'), 'endReached');
+    expect(await screen.findByText('Something went wrong. Try again.')).toBeOnTheScreen();
+    // The first twenty stay where they were.
+    expect(screen.getByText('Person p1')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+    await act(async () => {});
+    expect(mockFollowers).toHaveBeenCalledTimes(3);
+    expect(mockFollowers).toHaveBeenLastCalledWith(client, 'u1', {
+      q: undefined,
+      offset: 20,
+      limit: 20,
+    });
+    expect(screen.queryByText('Something went wrong. Try again.')).toBeNull();
+  });
+
+  it('does not repeat a row when the list shifts between pages', async () => {
+    const first = people(20);
+    mockFollowers
+      .mockResolvedValueOnce(first)
+      .mockResolvedValueOnce([first[0]!, first[19]!, ...people(2, 'q')]);
+    const errors = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await render(<Follows />);
+    await screen.findByText('Person p1');
+    await fireEvent(screen.getByTestId('people-list'), 'endReached');
+    await act(async () => {});
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
+    const rows: { id: string }[] = screen.getByTestId('people-list').props.data;
+    expect(rows.map((row) => row.id)).toHaveLength(22);
+    expect(new Set(rows.map((row) => row.id)).size).toBe(22);
+  });
+
+  it('retries only the list, not the profile, from the list’s Try again', async () => {
+    mockFollowers.mockRejectedValueOnce(new Error('boom'));
+    await render(<Follows />);
+    await fireEvent.press(await screen.findByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('Alli Mercer')).toBeOnTheScreen();
+    expect(mockGetProfile).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('@josiehamilton')).toBeOnTheScreen();
+  });
+
+  describe('a private account you are not approved for, reached by its address', () => {
+    const privateAlli = (overrides = {}) =>
+      makeAlli({
+        visibility: 'private',
+        bio: null,
+        homeCity: null,
+        canSeePicks: false,
+        counts: { followers: 12, following: 8, dishes: null },
+        ...overrides,
+      });
+
+    it('says the account is private instead of counts over an empty list', async () => {
+      mockParams = { id: 'u4', tab: 'followers' };
+      mockGetProfile.mockResolvedValue(privateAlli());
+      await render(<Follows />);
+      expect(await screen.findByText('This account is private')).toBeOnTheScreen();
+      expect(screen.getByText('Follow to see their picks.')).toBeOnTheScreen();
+      expect(screen.getByText('@allimercer')).toBeOnTheScreen();
+      expect(screen.queryByText('12 Followers')).toBeNull();
+      expect(screen.queryByText('No followers yet.')).toBeNull();
+      expect(mockFollowers).not.toHaveBeenCalled();
+      expect(mockFollowing).not.toHaveBeenCalled();
+    });
+
+    it('says the request is waiting when one was made', async () => {
+      mockGetProfile.mockResolvedValue(privateAlli({ viewerFollow: 'requested' }));
+      await render(<Follows />);
+      expect(await screen.findByText('Your request is waiting for approval.')).toBeOnTheScreen();
+    });
+  });
+
+  it('shows a follow made on a profile pushed over it when you come back', async () => {
+    await render(<Follows />);
+    await screen.findByText('Alli Mercer');
+    expect(screen.getByRole('button', { name: 'Follow back' })).toBeOnTheScreen();
+    await act(async () => {
+      setFollowState('u4', 'active');
+    });
+    expect(screen.queryByRole('button', { name: 'Follow back' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Following' })).toHaveLength(2);
+  });
+
+  it('replaces a stale remembered state with what the list was just told', async () => {
+    setFollowState('u4', 'requested');
+    await render(<Follows />);
+    await screen.findByText('Alli Mercer');
+    expect(screen.getByRole('button', { name: 'Follow back' })).toBeOnTheScreen();
   });
 });

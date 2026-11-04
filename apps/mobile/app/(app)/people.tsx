@@ -9,16 +9,13 @@ import { PersonRow } from '../../src/components/PersonRow';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { SEARCH_DEBOUNCE_MS, SearchField } from '../../src/components/SearchField';
+import { cityName } from '../../src/lib/city-name';
 import { fontFamily } from '../../src/lib/fonts';
 import { getSupabase } from '../../src/lib/supabase';
 import { useSession } from '../../src/providers/SessionProvider';
+import { syncFollowStates } from '../../src/state/follow-store';
 
 const LIMIT = 20;
-
-/** "Vancouver" from a city label like "Vancouver, BC, Canada". */
-function cityName(label: string): string {
-  return label.split(',')[0]?.trim() || label;
-}
 
 /** "#1 · Plain Biryani" for a suggested person with a number one dish; nothing for a search result. */
 function topDishLine(person: PersonRowData | SuggestedPerson): string | undefined {
@@ -50,7 +47,9 @@ export default function People() {
     setError(null);
     getSuggestedPeople(getSupabase(), LIMIT)
       .then((people) => {
-        if (!cancelled) setSuggested(people);
+        if (cancelled) return;
+        syncFollowStates(people);
+        setSuggested(people);
       })
       .catch((e) => {
         if (!cancelled) setError(friendlyMessage(e));
@@ -67,7 +66,9 @@ export default function People() {
     setFound(null);
     searchPeople(getSupabase(), query, LIMIT)
       .then((people) => {
-        if (!cancelled) setFound(people);
+        if (cancelled) return;
+        syncFollowStates(people);
+        setFound(people);
       })
       .catch((e) => {
         if (!cancelled) setError(friendlyMessage(e));

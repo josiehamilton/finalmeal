@@ -4,6 +4,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import { followUser, unfollowUser } from '@finalmeal/api';
 import type { FollowState } from '@finalmeal/api';
 import { useFollow } from './follow';
+import { resetFollowStore, setFollowState, syncFollowStates } from './follow-store';
 import type { FollowTarget } from './follow';
 
 jest.mock('@finalmeal/api', () => ({
@@ -49,6 +50,7 @@ describe('useFollow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
+    resetFollowStore();
     alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockFollow.mockResolvedValue('active');
     mockUnfollow.mockResolvedValue(undefined);
@@ -219,5 +221,73 @@ describe('useFollow', () => {
     });
     await rerender(person({ viewerFollow: 'active' }));
     expect(result.current.state).toBe('active');
+  });
+  describe('shared between buttons', () => {
+    it('keeps every button for a person in step', async () => {
+      const first = await renderHook(() => useFollow(person()));
+      const second = await renderHook(() => useFollow(person()));
+      await act(async () => {
+        await first.result.current.toggle();
+      });
+      expect(first.result.current.state).toBe('active');
+      expect(second.result.current.state).toBe('active');
+    });
+
+    it('does not mix up two different people', async () => {
+      const first = await renderHook(() => useFollow(person()));
+      const other = await renderHook(() =>
+        useFollow(person({ id: 'u9', username: 'someoneelse' })),
+      );
+      await act(async () => {
+        await first.result.current.toggle();
+      });
+      expect(other.result.current.state).toBe('none');
+    });
+
+    it('shows what was done elsewhere in place of a stale state it was handed', async () => {
+      setFollowState('u4', 'active');
+      const { result } = await renderHook(() => useFollow(person({ viewerFollow: 'none' })));
+      expect(result.current.state).toBe('active');
+    });
+
+    it('takes fresh server answers from syncFollowStates', async () => {
+      setFollowState('u4', 'requested');
+      const { result } = await renderHook(() => useFollow(person()));
+      await act(async () => {
+        syncFollowStates([{ id: 'u4', viewerFollow: 'active' }]);
+      });
+      expect(result.current.state).toBe('active');
+    });
+
+    it('ignores a tap on one button while another has a call in flight', async () => {
+      const call = deferred<FollowState>();
+      mockFollow.mockReturnValue(call.promise);
+      const first = await renderHook(() => useFollow(person()));
+      const second = await renderHook(() => useFollow(person()));
+      let done!: Promise<void>;
+      await act(async () => {
+        done = first.result.current.toggle();
+      });
+      await act(async () => {
+        await second.result.current.toggle();
+      });
+      expect(mockFollow).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        call.resolve('active');
+        await done;
+      });
+      expect(second.result.current.state).toBe('active');
+    });
+
+    it('puts every button back when the call fails', async () => {
+      mockFollow.mockRejectedValue(new Error('boom'));
+      const first = await renderHook(() => useFollow(person()));
+      const second = await renderHook(() => useFollow(person()));
+      await act(async () => {
+        await first.result.current.toggle();
+      });
+      expect(first.result.current.state).toBe('none');
+      expect(second.result.current.state).toBe('none');
+    });
   });
 });

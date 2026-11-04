@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { followUser } from '@finalmeal/api';
+import { resetFollowStore } from '../state/follow-store';
 import { makePerson } from '../test-support/people';
 import { PersonRow } from './PersonRow';
 
@@ -14,6 +15,7 @@ const mockFollow = jest.mocked(followUser);
 describe('PersonRow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetFollowStore();
     mockFollow.mockResolvedValue('active');
   });
 
@@ -47,5 +49,24 @@ describe('PersonRow', () => {
   it('has no button for yourself', async () => {
     await render(<PersonRow person={makePerson({ isMe: true })} onOpen={jest.fn()} />);
     expect(screen.queryByRole('button', { name: 'Follow' })).toBeNull();
+  });
+
+  it('says so under the row when a follow fails, and the button goes back', async () => {
+    mockFollow.mockRejectedValue(new Error('boom'));
+    await render(<PersonRow person={makePerson()} onOpen={jest.fn()} />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Follow' }));
+    expect(await screen.findByText('Something went wrong. Try again.')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Follow' })).toBeOnTheScreen();
+  });
+
+  it('agrees with another row for the same person', async () => {
+    await render(
+      <>
+        <PersonRow person={makePerson()} onOpen={jest.fn()} />
+        <PersonRow person={makePerson()} onOpen={jest.fn()} />
+      </>,
+    );
+    await fireEvent.press(screen.getAllByRole('button', { name: 'Follow' })[0]!);
+    expect(await screen.findAllByRole('button', { name: 'Following' })).toHaveLength(2);
   });
 });

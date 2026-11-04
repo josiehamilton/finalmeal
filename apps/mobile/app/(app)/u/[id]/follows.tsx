@@ -11,6 +11,7 @@ import { ScreenHeader } from '../../../../src/components/ScreenHeader';
 import { SEARCH_DEBOUNCE_MS, SearchField } from '../../../../src/components/SearchField';
 import { fontFamily } from '../../../../src/lib/fonts';
 import { getSupabase } from '../../../../src/lib/supabase';
+import { syncFollowStates } from '../../../../src/state/follow-store';
 
 type FollowsTab = 'followers' | 'following';
 
@@ -30,7 +31,9 @@ export default function Follows() {
   const [loading, setLoading] = useState(true);
   const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tries, setTries] = useState(0);
+  // Separate counters: retrying the list must not blank the screen to refetch the profile.
+  const [profileTries, setProfileTries] = useState(0);
+  const [listTries, setListTries] = useState(0);
   // Only the newest request may change the list: a slower, older one must not overwrite it.
   const request = useRef(0);
   const loadingMore = useRef(false);
@@ -51,7 +54,7 @@ export default function Follows() {
     return () => {
       cancelled = true;
     };
-  }, [id, tries]);
+  }, [id, profileTries]);
 
   useEffect(() => {
     const timer = setTimeout(() => setQuery(text.trim()), SEARCH_DEBOUNCE_MS);
@@ -68,8 +71,10 @@ export default function Follows() {
 
   // A new tab, search or retry starts the list again from the top.
   const ready = profile !== undefined && profile !== null;
+  // A private account the viewer may not see has no list to show, only the private message.
+  const mayList = ready && (profile.canSeePicks || profile.isMe);
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !mayList) return;
     const mine = ++request.current;
     loadingMore.current = false;
     setLoading(true);
@@ -79,6 +84,7 @@ export default function Follows() {
     fetchPage(0)
       .then((page) => {
         if (mine !== request.current) return;
+        syncFollowStates(page);
         setRows(page);
         setMore(page.length === PAGE);
       })
@@ -92,7 +98,7 @@ export default function Follows() {
       // Leaving also stops a slow request from setting state afterwards.
       request.current++;
     };
-  }, [fetchPage, ready, tries]);
+  }, [fetchPage, ready, mayList, listTries]);
 
   function loadMore() {
     if (!more || loading || loadingMore.current) return;
@@ -102,7 +108,12 @@ export default function Follows() {
     fetchPage(rows.length)
       .then((page) => {
         if (mine !== request.current) return;
-        setRows((current) => [...current, ...page]);
+        syncFollowStates(page);
+        // The list is newest first, so a follow between pages can repeat a row: keep the first.
+        setRows((current) => {
+          const have = new Set(current.map((row) => row.id));
+          return [...current, ...page.filter((row) => !have.has(row.id))];
+        });
         setMore(page.length === PAGE);
       })
       .catch((e) => {
@@ -145,8 +156,19 @@ export default function Follows() {
             {profileError ?? 'This profile isn’t available.'}
           </Text>
           {profileError ? (
-            <PrimaryButton label="Try again" onPress={() => setTries((n) => n + 1)} />
+            <PrimaryButton label="Try again" onPress={() => setProfileTries((n) => n + 1)} />
           ) : null}
+        </View>
+      ) : !mayList ? (
+        <View style={styles.private}>
+          <Text style={styles.privateTitle} accessibilityRole="header">
+            This account is private
+          </Text>
+          <Text style={styles.privateBody}>
+            {profile.viewerFollow === 'requested'
+              ? 'Your request is waiting for approval.'
+              : 'Follow to see their picks.'}
+          </Text>
         </View>
       ) : (
         <>
@@ -193,7 +215,7 @@ export default function Follows() {
                   <Text style={styles.problem} accessibilityRole="alert">
                     {error}
                   </Text>
-                  <PrimaryButton label="Try again" onPress={() => setTries((n) => n + 1)} />
+                  <PrimaryButton label="Try again" onPress={() => setListTries((n) => n + 1)} />
                 </View>
               ) : (
                 <Text style={styles.empty}>{empty}</Text>
@@ -201,9 +223,12 @@ export default function Follows() {
             }
             ListFooterComponent={
               rows.length > 0 && error ? (
-                <Text style={styles.footerError} accessibilityRole="alert">
-                  {error}
-                </Text>
+                <View style={styles.problemBox}>
+                  <Text style={styles.footerError} accessibilityRole="alert">
+                    {error}
+                  </Text>
+                  <PrimaryButton label="Try again" onPress={loadMore} />
+                </View>
               ) : undefined
             }
           />
@@ -226,6 +251,21 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.uiMedium,
     fontSize: 15,
     color: colors.bone,
+    textAlign: 'center',
+  },
+  private: { alignItems: 'center', gap: 8, paddingHorizontal: 32, paddingTop: 56 },
+  privateTitle: {
+    fontFamily: fontFamily.serif,
+    fontSize: 22,
+    lineHeight: 22 * 1.2,
+    color: colors.bone,
+    textAlign: 'center',
+  },
+  privateBody: {
+    fontFamily: fontFamily.ui,
+    fontSize: 15,
+    lineHeight: 15 * 1.5,
+    color: colors.smoke,
     textAlign: 'center',
   },
   problemBox: { alignItems: 'center', gap: 20, paddingTop: 32 },

@@ -26,6 +26,7 @@ import { fontFamily } from '../../../src/lib/fonts';
 import { getSupabase } from '../../../src/lib/supabase';
 import { useSession } from '../../../src/providers/SessionProvider';
 import { useFollow } from '../../../src/state/follow';
+import { syncFollowStates } from '../../../src/state/follow-store';
 
 type ProfileTab = 'final' | 'honorable';
 
@@ -47,10 +48,12 @@ interface BodyProps {
   refreshing: boolean;
   refreshError: string | null;
   onRefresh: () => void;
+  /** Loads the profile again without blanking the screen. */
+  onReload: () => void;
 }
 
 /** A loaded profile. Its picks load only when the server says the viewer may see them. */
-function OtherProfileBody({ view, refreshing, refreshError, onRefresh }: BodyProps) {
+function OtherProfileBody({ view, refreshing, refreshError, onRefresh, onReload }: BodyProps) {
   const router = useRouter();
   const follow = useFollow(view);
   const [tab, setTab] = useState<ProfileTab>('final');
@@ -83,6 +86,17 @@ function OtherProfileBody({ view, refreshing, refreshError, onRefresh }: BodyPro
       cancelled = true;
     };
   }, [view, mayLoadPicks, picksTry]);
+
+  // What you can see depends on the follow. When it settles on something the loaded profile did not
+  // expect, load it again: a follow that went straight through because the account went public
+  // shows their picks, and unfollowing an approved private account drops its bio, city and dish
+  // count too. Asking, or cancelling a request, changes nothing you can see.
+  const gainedAccess = follow.state === 'active' && !view.canSeePicks;
+  const lostAccess = follow.state !== 'active' && view.canSeePicks && view.visibility === 'private';
+  const reloadNeeded = !follow.busy && (gainedAccess || lostAccess);
+  useEffect(() => {
+    if (reloadNeeded) onReload();
+  }, [reloadNeeded]);
 
   // Unfollowing a private account takes its picks away at once, before any reload.
   const canSee = view.canSeePicks && (view.visibility === 'public' || follow.state === 'active');
@@ -242,6 +256,8 @@ export default function OtherProfile() {
       try {
         const loaded = await getProfile(getSupabase(), id);
         if (request !== latest.current) return;
+        // What the server just said about this person beats anything the store remembers.
+        if (loaded) syncFollowStates([loaded]);
         setView(loaded);
         setError(null);
       } catch (e) {
@@ -294,6 +310,7 @@ export default function OtherProfile() {
           refreshing={refreshing}
           refreshError={error}
           onRefresh={() => void refresh()}
+          onReload={() => void load(true)}
         />
       )}
     </SafeAreaView>

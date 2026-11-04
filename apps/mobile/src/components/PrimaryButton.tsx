@@ -9,6 +9,8 @@ interface PrimaryButtonProps {
   disabled?: boolean;
   /** Shows a spinner in place of the label and ignores presses. */
   busy?: boolean;
+  /** Tells a screen reader a call is in flight while the label stays put (an optimistic button). */
+  announceBusy?: boolean;
   /** `ghost` is the outlined button; `secondary` is the raised-ash button used beside a primary. */
   variant?: 'primary' | 'ghost' | 'secondary';
   icon?: ReactNode;
@@ -22,6 +24,7 @@ export function PrimaryButton({
   onPress,
   disabled = false,
   busy = false,
+  announceBusy = false,
   variant = 'primary',
   icon,
   size = 'regular',
@@ -34,7 +37,7 @@ export function PrimaryButton({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled: inactive, busy }}
+      accessibilityState={{ disabled: inactive, busy: busy || announceBusy }}
       disabled={inactive}
       onPress={onPress}
       style={({ pressed }) => [

@@ -3,6 +3,13 @@ import { Alert } from 'react-native';
 import { followUser, friendlyMessage, unfollowUser } from '@finalmeal/api';
 import type { FollowState } from '@finalmeal/api';
 import { getSupabase } from '../lib/supabase';
+import {
+  beginFollowCall,
+  endFollowCall,
+  hasFollowCall,
+  setFollowState,
+  useFollowState,
+} from './follow-store';
 
 /** Who a Follow button is for, and how the signed-in person follows them now. */
 export interface FollowTarget {
@@ -40,26 +47,27 @@ function confirmUnfollow(username: string, isPrivate: boolean): Promise<boolean>
 }
 
 /**
- * The follow state of one person, changed optimistically: the button moves at once, one call is in
- * flight at a time (extra taps are ignored), the state the server returns wins, and a failure puts
- * the old state back with friendly copy. Unfollowing someone you follow asks first.
+ * The follow state of one person, kept in a store shared by every Follow button, and changed
+ * optimistically: the button moves at once, one call per person is in flight at a time (extra
+ * taps, from any button, are ignored), the state the server returns wins, and a failure puts the
+ * old state back with friendly copy. Unfollowing someone you follow asks first.
  */
 export function useFollow(person: FollowTarget): FollowControl {
-  const [state, setState] = useState<FollowState>(person.viewerFollow);
+  const { id, username, visibility, viewerFollow } = person;
+  const state = useFollowState(id, viewerFollow);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // A ref as well as the state: two taps in one frame both see the same render's `busy`.
-  const inFlight = useRef(false);
 
-  // A fresh answer from the screen (a reload) replaces ours, unless a call is mid-flight.
+  // A fresh answer from the screen (a reload) replaces the store's, unless a call is mid-flight.
+  const seen = useRef(viewerFollow);
   useEffect(() => {
-    if (!inFlight.current) setState(person.viewerFollow);
-  }, [person.viewerFollow]);
+    if (seen.current === viewerFollow) return;
+    seen.current = viewerFollow;
+    if (!hasFollowCall(id)) setFollowState(id, viewerFollow);
+  }, [id, viewerFollow]);
 
-  const { id, username, visibility } = person;
   const toggle = useCallback(async () => {
-    if (inFlight.current) return;
-    inFlight.current = true;
+    if (!beginFollowCall(id)) return;
     const before = state;
     try {
       if (before === 'active' && !(await confirmUnfollow(username, visibility === 'private'))) {
@@ -68,17 +76,17 @@ export function useFollow(person: FollowTarget): FollowControl {
       setBusy(true);
       setError(null);
       if (before === 'none') {
-        setState(visibility === 'private' ? 'requested' : 'active');
-        setState(await followUser(getSupabase(), id));
+        setFollowState(id, visibility === 'private' ? 'requested' : 'active');
+        setFollowState(id, await followUser(getSupabase(), id));
       } else {
-        setState('none');
+        setFollowState(id, 'none');
         await unfollowUser(getSupabase(), id);
       }
     } catch (e) {
-      setState(before);
+      setFollowState(id, before);
       setError(friendlyMessage(e));
     } finally {
-      inFlight.current = false;
+      endFollowCall(id);
       setBusy(false);
     }
   }, [id, username, visibility, state]);

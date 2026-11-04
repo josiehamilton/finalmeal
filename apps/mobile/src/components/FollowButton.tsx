@@ -41,6 +41,7 @@ export function FollowButton({
         label={label}
         variant={filled ? 'primary' : 'ghost'}
         size="compact"
+        announceBusy={busy}
         onPress={onPress}
       />
     );

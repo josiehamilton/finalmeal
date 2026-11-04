@@ -1,8 +1,9 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import type { AlertButton } from 'react-native';
 import { followUser, getMyPicks, getProfile, getProfilePicks, unfollowUser } from '@finalmeal/api';
 import type { Pick } from '@finalmeal/api';
+import { resetFollowStore, setFollowState } from '../state/follow-store';
 import OtherProfile from '../../app/(app)/u/[id]';
 import { makeProfile } from '../test-support/profile';
 import { makeAlli } from '../test-support/people';
@@ -86,6 +87,7 @@ describe('Other profile', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
+    resetFollowStore();
     mockParams = { id: 'u4' };
     mockGetProfile.mockResolvedValue(makeAlli());
     mockGetProfilePicks.mockResolvedValue(alliPicks());
@@ -281,6 +283,15 @@ describe('Other profile', () => {
     const alert = jest.spyOn(Alert, 'alert');
     await render(<OtherProfile />);
     expect(await screen.findByText('Plain Biryani')).toBeOnTheScreen();
+    mockGetProfile.mockResolvedValue(
+      makeAlli({
+        visibility: 'private',
+        bio: null,
+        homeCity: null,
+        canSeePicks: false,
+        counts: { followers: 566, following: 203, dishes: null },
+      }),
+    );
     await fireEvent.press(screen.getByRole('button', { name: 'Following' }));
     expect(alert.mock.calls[0]?.[1]).toBe('You’ll need to request again to see their picks.');
     const buttons: AlertButton[] = alert.mock.calls[0]?.[2] ?? [];
@@ -289,6 +300,46 @@ describe('Other profile', () => {
     });
     expect(await screen.findByText('This account is private')).toBeOnTheScreen();
     expect(screen.queryByText('Plain Biryani')).toBeNull();
+    // The reload takes the bio, city and dish count away too.
+    await waitFor(() => expect(screen.queryByText(/Spice level/)).toBeNull());
+    expect(screen.queryByText('4 dishes')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Follow' })).toBeOnTheScreen();
+  });
+
+  it('reloads when a private account turned out to be public and the follow went straight through', async () => {
+    mockGetProfile.mockResolvedValueOnce(
+      makeAlli({
+        visibility: 'private',
+        bio: null,
+        homeCity: null,
+        canSeePicks: false,
+        counts: { followers: 12, following: 8, dishes: null },
+      }),
+    );
+    await render(<OtherProfile />);
+    mockGetProfile.mockResolvedValue(
+      makeAlli({ viewerFollow: 'active', counts: { followers: 568, following: 203, dishes: 4 } }),
+    );
+    await fireEvent.press(await screen.findByRole('button', { name: 'Follow' }));
+    expect(await screen.findByText('Plain Biryani')).toBeOnTheScreen();
+    expect(screen.queryByText('This account is private')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Following' })).toBeOnTheScreen();
+  });
+
+  it('does not reload for a public account when you follow', async () => {
+    await render(<OtherProfile />);
+    await fireEvent.press(await screen.findByRole('button', { name: 'Follow' }));
+    await screen.findByRole('button', { name: 'Following' });
+    expect(mockGetProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a follow made elsewhere on the same person when you come back', async () => {
+    await render(<OtherProfile />);
+    await screen.findByRole('button', { name: 'Follow' });
+    await act(async () => {
+      setFollowState('u4', 'active');
+    });
+    expect(screen.getByRole('button', { name: 'Following' })).toBeOnTheScreen();
   });
 
   it('says the profile is not available when there is none, or it is hidden by a block', async () => {
@@ -326,7 +377,6 @@ describe('Other profile', () => {
   it('sends you to the You tab when the server says the profile is yours', async () => {
     mockGetProfile.mockResolvedValue(makeAlli({ isMe: true }));
     await render(<OtherProfile />);
-    await screen.findByText('Alli Mercer').catch(() => null);
-    expect(mockRedirect).toHaveBeenCalledWith('/you');
+    await waitFor(() => expect(mockRedirect).toHaveBeenCalledWith('/you'));
   });
 });
