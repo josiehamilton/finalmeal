@@ -2,6 +2,7 @@ export type { Database } from './database.types';
 export { DEFAULT_AUTH_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, createFinalMealClient } from './client';
 export type { FinalMealClient, FinalMealClientOptions } from './client';
 export { ApiError, throwIfError } from './errors';
+export type { ExistingPick } from './errors';
 export type { FriendlyCode } from './errors';
 export { friendlyCode, friendlyMessage } from './friendly';
 export { checkSession, sendEmailCode, signOut, verifyEmailCode } from './auth';
@@ -42,3 +43,37 @@ export {
   updatePick,
 } from './picks';
 export type { AddPickInput, Pick, PickPatch } from './picks';
+export { getPickDetail, getProfilePicks } from './picks';
+export type { PickDetail } from './picks';
+export {
+  followUser,
+  getProfile,
+  getSuggestedPeople,
+  listFollowers,
+  listFollowing,
+  respondToFollowRequest,
+  searchPeople,
+  unfollowUser,
+} from './people';
+export type {
+  FollowState,
+  PeopleListOptions,
+  PersonRow,
+  PersonSummary,
+  ProfileView,
+  SuggestedPerson,
+} from './people';
+export { getFollowingFeed, getNearbyFeed, getPlacePickers } from './feed';
+export type { FeedCursor, FeedItem, FeedKind } from './feed';
+export { getMySaves, saveDish, unsaveDish } from './saves';
+export type { SavedDish } from './saves';
+export {
+  getMyNotificationSettings,
+  getMyNotifications,
+  getUnreadCount,
+  markNotificationsRead,
+  subscribeToMyNotifications,
+  updateMyNotificationSettings,
+} from './notifications';
+export type { ActivityItem, ActivityType, NotificationSettings } from './notifications';
+export { registerPushToken, unregisterPushToken } from './push';

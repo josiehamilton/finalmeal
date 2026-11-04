@@ -24,6 +24,11 @@ export type FriendlyCode =
   | 'invalid_tag_name'
   | 'address_required'
   | 'custom_place_limit'
+  | 'request_not_found'
+  | 'dish_not_found'
+  | 'profile_unavailable'
+  | 'cannot_follow_self'
+  | 'invalid_push_token'
   | 'timeout'
   | 'network'
   | 'unknown';
@@ -50,6 +55,11 @@ const FRIENDLY_CODES: ReadonlySet<string> = new Set<FriendlyCode>([
   'invalid_tag_name',
   'address_required',
   'custom_place_limit',
+  'request_not_found',
+  'dish_not_found',
+  'profile_unavailable',
+  'cannot_follow_self',
+  'invalid_push_token',
   'timeout',
   'network',
   'unknown',
@@ -65,11 +75,39 @@ export function isFriendlyCode(code: string): code is FriendlyCode {
  */
 export class ApiError extends Error {
   readonly code: string;
+  /**
+   * For `duplicate_pick`: the pick that is already on the person's list, so the app can offer to
+   * move it instead of looking it up. Null for every other error, or when the backend sent no
+   * readable detail.
+   */
+  readonly existingPick: ExistingPick | null;
 
-  constructor(message: string, code: string) {
+  constructor(message: string, code: string, existingPick: ExistingPick | null = null) {
     super(message);
     this.name = 'ApiError';
     this.code = code;
+    this.existingPick = existingPick;
+  }
+}
+
+/** The pick a `duplicate_pick` error points at. */
+export interface ExistingPick {
+  id: string;
+  tier: 'final' | 'honorable';
+}
+
+/** Reads the `{"pick_id", "tier"}` JSON the backend puts in a duplicate_pick error's detail. */
+function parseExistingPick(details: string | null | undefined): ExistingPick | null {
+  if (!details) return null;
+  try {
+    const parsed: unknown = JSON.parse(details);
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const { pick_id: id, tier } = parsed as { pick_id?: unknown; tier?: unknown };
+    if (typeof id !== 'string' || id === '') return null;
+    if (tier !== 'final' && tier !== 'honorable') return null;
+    return { id, tier };
+  } catch {
+    return null;
   }
 }
 
@@ -79,6 +117,8 @@ export interface ErrorLike {
   code?: string | null;
   status?: number | null;
   name?: string;
+  /** Postgres' DETAIL text, for the errors that carry one. */
+  details?: string | null;
 }
 
 /** Messages the onboarding functions raise (SQLSTATE P0001); each is also a `FriendlyCode`. */
@@ -101,6 +141,11 @@ const DOMAIN_MESSAGES: ReadonlySet<string> = new Set([
   'invalid_tag_name',
   'address_required',
   'custom_place_limit',
+  'request_not_found',
+  'dish_not_found',
+  'profile_unavailable',
+  'cannot_follow_self',
+  'invalid_push_token',
 ]);
 
 const RATE_LIMIT_CODES: ReadonlySet<string> = new Set([
@@ -141,5 +186,10 @@ function codeFor(error: ErrorLike): string {
 /** Throws an `ApiError` when a Supabase response carries an error; does nothing otherwise. */
 export function throwIfError(error: ErrorLike | null): void {
   if (!error) return;
-  throw new ApiError(error.message, codeFor(error));
+  const code = codeFor(error);
+  throw new ApiError(
+    error.message,
+    code,
+    code === 'duplicate_pick' ? parseExistingPick(error.details) : null,
+  );
 }

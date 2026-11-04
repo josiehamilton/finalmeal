@@ -257,6 +257,40 @@ export type Database = {
           },
         ];
       };
+      follow_push_log: {
+        Row: {
+          actor_id: string;
+          last_pushed_at: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          actor_id: string;
+          last_pushed_at: string;
+          user_id: string;
+        };
+        Update: {
+          actor_id?: string;
+          last_pushed_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'follow_push_log_actor_id_fkey';
+            columns: ['actor_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'follow_push_log_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       follows: {
         Row: {
           created_at: string;
@@ -289,6 +323,45 @@ export type Database = {
             foreignKeyName: 'follows_follower_id_fkey';
             columns: ['follower_id'];
             isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      notification_preferences: {
+        Row: {
+          created_at: string;
+          push_dethroned: boolean;
+          push_friends_finals: boolean;
+          push_new_followers: boolean;
+          push_saves: boolean;
+          updated_at: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          push_dethroned?: boolean;
+          push_friends_finals?: boolean;
+          push_new_followers?: boolean;
+          push_saves?: boolean;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          push_dethroned?: boolean;
+          push_friends_finals?: boolean;
+          push_new_followers?: boolean;
+          push_saves?: boolean;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'notification_preferences_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: true;
             referencedRelation: 'profiles';
             referencedColumns: ['id'];
           },
@@ -603,12 +676,71 @@ export type Database = {
           },
         ];
       };
+      push_outbox: {
+        Row: {
+          activity_id: string;
+          attempts: number;
+          body: string;
+          created_at: string;
+          data: NonNullable<Json>;
+          id: string;
+          sender: string | null;
+          sent_at: string | null;
+          status: string;
+          title: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          activity_id: string;
+          attempts?: number;
+          body: string;
+          created_at?: string;
+          data?: NonNullable<Json>;
+          id?: string;
+          sender?: string | null;
+          sent_at?: string | null;
+          status?: string;
+          title: string;
+          user_id: string;
+        };
+        Update: {
+          activity_id?: string;
+          attempts?: number;
+          body?: string;
+          created_at?: string;
+          data?: NonNullable<Json>;
+          id?: string;
+          sender?: string | null;
+          sent_at?: string | null;
+          status?: string;
+          title?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'push_outbox_activity_id_fkey';
+            columns: ['activity_id'];
+            isOneToOne: false;
+            referencedRelation: 'activities';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'push_outbox_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       push_tokens: {
         Row: {
           created_at: string;
           expo_token: string;
           id: string;
           platform: string | null;
+          updated_at: string;
           user_id: string;
         };
         ComputedFields: never;
@@ -617,6 +749,7 @@ export type Database = {
           expo_token: string;
           id?: string;
           platform?: string | null;
+          updated_at?: string;
           user_id: string;
         };
         Update: {
@@ -624,6 +757,7 @@ export type Database = {
           expo_token?: string;
           id?: string;
           platform?: string | null;
+          updated_at?: string;
           user_id?: string;
         };
         Relationships: [
@@ -680,17 +814,23 @@ export type Database = {
           created_at: string;
           dish_id: string;
           user_id: string;
+          via_pick_id: string | null;
+          via_user_id: string | null;
         };
         ComputedFields: never;
         Insert: {
           created_at?: string;
           dish_id: string;
           user_id: string;
+          via_pick_id?: string | null;
+          via_user_id?: string | null;
         };
         Update: {
           created_at?: string;
           dish_id?: string;
           user_id?: string;
+          via_pick_id?: string | null;
+          via_user_id?: string | null;
         };
         Relationships: [
           {
@@ -710,6 +850,20 @@ export type Database = {
           {
             foreignKeyName: 'saves_user_id_fkey';
             columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'saves_via_pick_id_fkey';
+            columns: ['via_pick_id'];
+            isOneToOne: false;
+            referencedRelation: 'picks';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'saves_via_user_id_fkey';
+            columns: ['via_user_id'];
             isOneToOne: false;
             referencedRelation: 'profiles';
             referencedColumns: ['id'];
@@ -821,12 +975,34 @@ export type Database = {
     };
     Functions: {
       _begin_pick_write: { Args: Record<PropertyKey, never>; Returns: string };
+      _can_see: { Args: { p_owner: string; p_viewer: string }; Returns: boolean };
       _check_pick_photo: { Args: { p_path: string; p_uid: string }; Returns: undefined };
       _claim_final_slot: {
         Args: { p_replace_slot: number; p_uid: string };
         Returns: Record<string, unknown>;
       };
       _close_slot_gap: { Args: { p_slot: number; p_uid: string }; Returns: undefined };
+      _feed_card: {
+        Args: { p_pick_id: string; p_viewer: string };
+        Returns: {
+          actor_avatar_path: string;
+          actor_display_name: string;
+          actor_id: string;
+          actor_username: string;
+          dish_id: string;
+          dish_name: string;
+          list_count: number;
+          note: string;
+          photo_path: string;
+          pick_id: string;
+          place: Database['public']['Tables']['places']['Row'];
+          saved_by_me: boolean;
+          slot: number;
+          tags: Json;
+          tier: Database['public']['Enums']['pick_tier'];
+        }[];
+      };
+      _is_blocked: { Args: { a: string; b: string }; Returns: boolean };
       _own_pick: {
         Args: { p_pick_id: string; p_uid: string };
         Returns: {
@@ -847,6 +1023,25 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      _person_match: {
+        Args: { p_display_name: string; p_q: string; p_username: string };
+        Returns: number;
+      };
+      _pick_tags_json: { Args: { p_include_personal: boolean; p_pick_id: string }; Returns: Json };
+      _push_still_wanted: { Args: { p_activity: string; p_user: string }; Returns: boolean };
+      _push_text: {
+        Args: {
+          p_actor_name: string;
+          p_dish: string;
+          p_list_title: string;
+          p_other_dish: string;
+          p_type: Database['public']['Enums']['activity_type'];
+        };
+        Returns: {
+          body: string;
+          title: string;
+        }[];
       };
       _resolve_dish: {
         Args: { p_dish_id: string; p_dish_name: string; p_place_id: string };
@@ -897,6 +1092,28 @@ export type Database = {
           >;
         };
         Returns: string;
+      };
+      claim_push_batch: {
+        Args: { p_limit?: number };
+        Returns: {
+          activity_id: string;
+          attempts: number;
+          body: string;
+          created_at: string;
+          data: NonNullable<Json>;
+          id: string;
+          sender: string | null;
+          sent_at: string | null;
+          status: string;
+          title: string;
+          user_id: string;
+        }[];
+        SetofOptions: {
+          from: '*';
+          to: 'push_outbox';
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
       };
       create_custom_place: {
         Args: {
@@ -1029,6 +1246,98 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      finish_push_batch: {
+        Args: { p_ids: string[]; p_sender: string; p_status: string };
+        Returns: undefined;
+      };
+      follow_user: {
+        Args: { p_user_id: string };
+        Returns: Database['public']['Enums']['follow_status'];
+      };
+      following_feed: {
+        Args: { p_before?: string; p_before_key?: string; p_limit?: number };
+        Returns: {
+          actor_avatar_path: string;
+          actor_display_name: string;
+          actor_id: string;
+          actor_username: string;
+          at: string;
+          dish_id: string;
+          dish_name: string;
+          item_key: string;
+          kind: string;
+          list_count: number;
+          note: string;
+          other_dish_name: string;
+          photo_path: string;
+          pick_id: string;
+          place: Database['public']['Tables']['places']['Row'];
+          saved_by_me: boolean;
+          slot: number;
+          tags: Json;
+          tier: Database['public']['Enums']['pick_tier'];
+        }[];
+      };
+      get_my_notifications: {
+        Args: { p_before?: string; p_limit?: number };
+        Returns: {
+          actor_avatar_path: string;
+          actor_display_name: string;
+          actor_id: string;
+          actor_username: string;
+          created_at: string;
+          dish_name: string;
+          id: string;
+          list_title: string;
+          other_dish_name: string;
+          photo_path: string;
+          pick_id: string;
+          read_at: string;
+          request_pending: boolean;
+          type: Database['public']['Enums']['activity_type'];
+          viewer_follow: string;
+        }[];
+      };
+      get_my_saves: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          dish_id: string;
+          dish_name: string;
+          distance_m: number;
+          photo_path: string;
+          place: Database['public']['Tables']['places']['Row'];
+          saved_at: string;
+          via_pick_id: string;
+          via_tier: Database['public']['Enums']['pick_tier'];
+          via_user_id: string;
+          via_username: string;
+        }[];
+      };
+      get_pick_detail: {
+        Args: { p_pick_id: string };
+        Returns: {
+          created_at: string;
+          dish_id: string;
+          dish_name: string;
+          final_count: number;
+          is_mine: boolean;
+          list_count: number;
+          note: string;
+          original_dish_name: string;
+          owner_avatar_path: string;
+          owner_display_name: string;
+          owner_id: string;
+          owner_username: string;
+          photo_path: string;
+          pick_id: string;
+          pickers: Json;
+          place: Database['public']['Tables']['places']['Row'];
+          saved_by_me: boolean;
+          slot: number;
+          tags: Json;
+          tier: Database['public']['Enums']['pick_tier'];
+        }[];
+      };
       get_place: {
         Args: { p_id: string };
         Returns: {
@@ -1060,7 +1369,51 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      get_profile: {
+        Args: { p_user_id: string };
+        Returns: {
+          avatar_path: string;
+          bio: string;
+          can_see_picks: boolean;
+          dishes_count: number;
+          display_name: string;
+          followers_count: number;
+          following_count: number;
+          follows_viewer: boolean;
+          home_city: string;
+          id: string;
+          is_me: boolean;
+          username: string;
+          viewer_follow: string;
+          visibility: Database['public']['Enums']['profile_visibility'];
+        }[];
+      };
       is_username_available: { Args: { p_username: string }; Returns: boolean };
+      list_followers: {
+        Args: { p_limit?: number; p_offset?: number; p_q?: string; p_user_id: string };
+        Returns: {
+          avatar_path: string;
+          display_name: string;
+          follows_viewer: boolean;
+          id: string;
+          is_me: boolean;
+          username: string;
+          viewer_follow: string;
+        }[];
+      };
+      list_following: {
+        Args: { p_limit?: number; p_offset?: number; p_q?: string; p_user_id: string };
+        Returns: {
+          avatar_path: string;
+          display_name: string;
+          follows_viewer: boolean;
+          id: string;
+          is_me: boolean;
+          username: string;
+          viewer_follow: string;
+        }[];
+      };
+      mark_notifications_read: { Args: { p_ids?: string[] }; Returns: undefined };
       mask_place: {
         Args: {
           p: Omit<
@@ -1118,6 +1471,30 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      nearby_feed: {
+        Args: { p_limit?: number; p_offset?: number };
+        Returns: {
+          actor_avatar_path: string;
+          actor_display_name: string;
+          actor_id: string;
+          actor_username: string;
+          at: string;
+          dish_id: string;
+          dish_name: string;
+          item_key: string;
+          kind: string;
+          list_count: number;
+          note: string;
+          other_dish_name: string;
+          photo_path: string;
+          pick_id: string;
+          place: Database['public']['Tables']['places']['Row'];
+          saved_by_me: boolean;
+          slot: number;
+          tags: Json;
+          tier: Database['public']['Enums']['pick_tier'];
+        }[];
+      };
       nearest_city: {
         Args: { lat: number; lng: number };
         Returns: {
@@ -1140,7 +1517,22 @@ export type Database = {
         };
       };
       normalize_dish_name: { Args: { input: string }; Returns: string };
+      place_pickers: {
+        Args: { p_limit?: number; p_place_id: string };
+        Returns: {
+          other_count: number;
+          people: Json;
+        }[];
+      };
       place_search_key: { Args: { input: string }; Returns: string };
+      popular_places: {
+        Args: { p_city_id: string; p_lim?: number };
+        Returns: {
+          distance_m: number;
+          pick_count: number;
+          place: Database['public']['Tables']['places']['Row'];
+        }[];
+      };
       popular_tags: {
         Args: { p_kind: Database['public']['Enums']['tag_kind'] };
         Returns: {
@@ -1182,7 +1574,13 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      register_push_token: { Args: { p_platform: string; p_token: string }; Returns: undefined };
       remove_pick: { Args: { p_pick_id: string }; Returns: undefined };
+      respond_follow_request: {
+        Args: { p_accept: boolean; p_follower_id: string };
+        Returns: undefined;
+      };
+      save_dish: { Args: { p_dish_id: string; p_via_pick_id?: string }; Returns: undefined };
       search_cities: {
         Args: { lim?: number; q: string };
         Returns: {
@@ -1204,12 +1602,16 @@ export type Database = {
           isSetofReturn: true;
         };
       };
-      popular_places: {
-        Args: { p_city_id: string; p_lim?: number };
+      search_people: {
+        Args: { p_limit?: number; p_q: string };
         Returns: {
-          distance_m: number;
-          pick_count: number;
-          place: Database['public']['Tables']['places']['Row'];
+          avatar_path: string;
+          display_name: string;
+          follows_viewer: boolean;
+          id: string;
+          is_me: boolean;
+          username: string;
+          viewer_follow: string;
         }[];
       };
       search_places: {
@@ -1273,7 +1675,24 @@ export type Database = {
           pick_count: number;
         }[];
       };
+      suggested_people: {
+        Args: { p_limit?: number };
+        Returns: {
+          avatar_path: string;
+          display_name: string;
+          follows_viewer: boolean;
+          id: string;
+          is_me: boolean;
+          top_dish: string;
+          username: string;
+          viewer_follow: string;
+        }[];
+      };
       tag_slug: { Args: { input: string }; Returns: string };
+      unfollow_user: { Args: { p_user_id: string }; Returns: undefined };
+      unread_notification_count: { Args: Record<PropertyKey, never>; Returns: number };
+      unregister_push_token: { Args: { p_token: string }; Returns: undefined };
+      unsave_dish: { Args: { p_dish_id: string }; Returns: undefined };
       update_pick: {
         Args: {
           p_note: string;
@@ -1310,7 +1729,9 @@ export type Database = {
         | 'promoted'
         | 'followed'
         | 'saved_pick'
-        | 'saved_from_list';
+        | 'saved_from_list'
+        | 'follow_requested'
+        | 'follow_accepted';
       follow_status: 'active' | 'requested';
       pick_tier: 'final' | 'honorable';
       place_source: 'fsq' | 'custom';
@@ -1441,6 +1862,8 @@ export const Constants = {
         'followed',
         'saved_pick',
         'saved_from_list',
+        'follow_requested',
+        'follow_accepted',
       ],
       follow_status: ['active', 'requested'],
       pick_tier: ['final', 'honorable'],

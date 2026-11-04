@@ -20,6 +20,9 @@ const COPY = {
   address_required: 'Add the street address, or mark it as a food truck or pop-up.',
   invalid_tag_name: 'Tags can be up to 40 characters.',
   custom_place_limit: 'You’ve added a lot of spots today. Try again tomorrow.',
+  request_not_found: 'That request isn’t there any more.',
+  dish_not_found: 'That dish isn’t there any more.',
+  profile_unavailable: 'This profile isn’t available.',
   network: 'Can’t reach the kitchen right now.',
   unknown: 'Something went wrong. Try again.',
 } as const;
@@ -43,6 +46,8 @@ export function friendlyMessage(e: unknown): string {
     case 'city_not_found':
     case 'profile_not_found':
     case 'invalid_tag':
+    case 'cannot_follow_self':
+    case 'invalid_push_token':
       return COPY.unknown;
     default:
       return COPY[code];

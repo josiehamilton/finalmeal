@@ -2,6 +2,8 @@ import { looksLikeJpeg } from './avatar';
 import type { FinalMealClient } from './client';
 import { ApiError, throwIfError } from './errors';
 import type { ErrorLike } from './errors';
+import { toPersonSummary } from './people';
+import type { PersonSummary } from './people';
 import { PLACE_COLUMNS, toPlace } from './places';
 import type { Place, PlaceRow } from './places';
 import { requireUserId } from './profile';
@@ -67,6 +69,41 @@ export function toPick(row: PickRow, photoUrl: (path: string) => string): Pick {
   };
 }
 
+/** The flat columns the feed and pick-detail functions return for a pick, its dish, place and tags. */
+export interface PickColumns {
+  pick_id: string;
+  tier: 'final' | 'honorable';
+  slot: number | null;
+  note: string | null;
+  photo_path: string | null;
+  original_dish_name: string;
+  created_at: string;
+  dish_id: string;
+  dish_name: string;
+  /** A `places` row as JSON. */
+  place: unknown;
+  /** `[{id, kind, name, slug, is_featured}]`: global tags only, except for the owner's own detail. */
+  tags: unknown;
+}
+
+/** A `Pick` from those columns (the same shape `getMyPicks` builds from its embedded select). */
+export function toPickFromColumns(c: PickColumns, photoUrl: (path: string) => string): Pick {
+  return toPick(
+    {
+      id: c.pick_id,
+      tier: c.tier,
+      slot: c.slot,
+      note: c.note,
+      photo_path: c.photo_path,
+      original_dish_name: c.original_dish_name,
+      created_at: c.created_at,
+      dish: { id: c.dish_id, name: c.dish_name, place: c.place as PlaceRow },
+      pick_tags: ((c.tags ?? []) as TagRow[]).map((tag) => ({ tag })),
+    },
+    photoUrl,
+  );
+}
+
 /** Finals by slot, then honorable mentions newest first. */
 export function sortPicks(picks: readonly Pick[]): Pick[] {
   return [...picks].sort((a, b) => {
@@ -76,7 +113,7 @@ export function sortPicks(picks: readonly Pick[]): Pick[] {
   });
 }
 
-function photoUrlFor(client: FinalMealClient): (path: string) => string {
+export function photoUrlFor(client: FinalMealClient): (path: string) => string {
   return (path) => client.storage.from(PICK_PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
 }
 
@@ -129,6 +166,93 @@ export async function getMyPicks(client: FinalMealClient): Promise<Pick[]> {
   throwIfError(error);
   const url = photoUrlFor(client);
   return sortPicks(((data ?? []) as unknown as PickRow[]).map((row) => toPick(row, url)));
+}
+
+/**
+ * Another person's picks, in the same order as `getMyPicks`. Call it only when their profile says
+ * `canSeePicks` (the database enforces that for private accounts in Phase 7). Their personal tags
+ * are never returned.
+ */
+export async function getProfilePicks(client: FinalMealClient, userId: string): Promise<Pick[]> {
+  const uid = await requireUserId(client);
+  const { data, error } = await client
+    .from('picks')
+    .select(PICK_SELECT)
+    .eq('user_id', userId)
+    .retry(false);
+  throwIfError(error);
+  const url = photoUrlFor(client);
+  return sortPicks(
+    ((data ?? []) as unknown as PickRow[]).map((row) => {
+      const pick = toPick(row, url);
+      return userId === uid
+        ? pick
+        : { ...pick, tags: pick.tags.filter((t) => t.kind !== 'personal') };
+    }),
+  );
+}
+
+export interface PickDetail {
+  pick: Pick;
+  owner: PersonSummary;
+  isMine: boolean;
+  /** How many trusted, public people have this dish as a Final Meal. */
+  finalCount: number;
+  /** How many people have it on their list at all. */
+  listCount: number;
+  /** Up to four of the people who have it as a Final Meal (the owner first). */
+  pickers: PersonSummary[];
+  savedByMe: boolean;
+}
+
+interface PickDetailRow extends PickColumns {
+  owner_id: string;
+  owner_username: string;
+  owner_display_name: string;
+  owner_avatar_path: string | null;
+  is_mine: boolean;
+  final_count: number;
+  list_count: number;
+  pickers: unknown;
+  saved_by_me: boolean;
+}
+
+interface PickerJson {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_path: string | null;
+}
+
+/**
+ * One pick with its owner and who else has the dish, or null when it is gone or the viewer may
+ * not see its owner (a private account they do not follow, or a block). Only the owner sees
+ * their own personal tags.
+ */
+export async function getPickDetail(
+  client: FinalMealClient,
+  id: string,
+): Promise<PickDetail | null> {
+  const { data, error } = await client
+    .rpc('get_pick_detail', { p_pick_id: id }, { get: true })
+    .retry(false);
+  throwIfError(error);
+  const row = (data ?? [])[0] as unknown as PickDetailRow | undefined;
+  if (!row) return null;
+  return {
+    pick: toPickFromColumns(row, photoUrlFor(client)),
+    owner: toPersonSummary(client, {
+      id: row.owner_id,
+      username: row.owner_username,
+      display_name: row.owner_display_name,
+      avatar_path: row.owner_avatar_path,
+    }),
+    isMine: row.is_mine,
+    finalCount: row.final_count,
+    listCount: row.list_count,
+    pickers: ((row.pickers ?? []) as PickerJson[]).map((p) => toPersonSummary(client, p)),
+    savedByMe: row.saved_by_me,
+  };
 }
 
 /** One pick by id, or null when there is none. */

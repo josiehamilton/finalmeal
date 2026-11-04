@@ -93,6 +93,11 @@ describe('throwIfError', () => {
     'invalid_tag_name',
     'address_required',
     'custom_place_limit',
+    'request_not_found',
+    'dish_not_found',
+    'profile_unavailable',
+    'cannot_follow_self',
+    'invalid_push_token',
   ])('maps the P0001 message %s to the same-named code', (message) => {
     expect(() => throwIfError({ message, code: 'P0001' })).toThrow(
       expect.objectContaining({ code: message }),
@@ -109,5 +114,59 @@ describe('throwIfError', () => {
     expect(() => throwIfError({ message: 'username_taken', code: '42501' })).toThrow(
       expect.objectContaining({ code: '42501' }),
     );
+  });
+
+  describe('duplicate_pick detail', () => {
+    const duplicate = (details: string | null | undefined) => {
+      try {
+        throwIfError({ message: 'duplicate_pick', code: 'P0001', details });
+      } catch (e) {
+        return e as ApiError;
+      }
+      throw new Error('expected a throw');
+    };
+
+    it('parses the existing pick from the PostgREST details', () => {
+      const error = duplicate(
+        '{"pick_id" : "0b1c2d3e-0000-4000-8000-000000000001", "tier" : "final"}',
+      );
+      expect(error.code).toBe('duplicate_pick');
+      expect(error.existingPick).toEqual({
+        id: '0b1c2d3e-0000-4000-8000-000000000001',
+        tier: 'final',
+      });
+    });
+
+    it.each([
+      ['nothing', undefined],
+      ['null', null],
+      ['an empty string', ''],
+      ['garbage', 'not json at all'],
+      ['a JSON string', '"final"'],
+      ['JSON null', 'null'],
+      ['a missing id', '{"tier":"final"}'],
+      ['an unknown tier', '{"pick_id":"abc","tier":"gold"}'],
+      ['a non-string id', '{"pick_id":7,"tier":"final"}'],
+    ])('gives null for %s', (_label, details) => {
+      expect(duplicate(details).existingPick).toBeNull();
+    });
+
+    it('is null for every other error, even with details', () => {
+      try {
+        throwIfError({
+          message: 'pick_not_found',
+          code: 'P0001',
+          details: '{"pick_id":"abc","tier":"final"}',
+        });
+      } catch (e) {
+        expect((e as ApiError).existingPick).toBeNull();
+        return;
+      }
+      throw new Error('expected a throw');
+    });
+
+    it('defaults to null when an ApiError is built by hand', () => {
+      expect(new ApiError('x', 'y').existingPick).toBeNull();
+    });
   });
 });
