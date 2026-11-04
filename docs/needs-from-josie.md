@@ -38,6 +38,7 @@ A running list, newest needs added as they come up. Nothing here blocks today's 
 | 18 | Copy for the daily limit on adding new spots (20 a day) | Any time | "You’ve added a lot of spots today. Try again tomorrow." |
 | 19 | You tab filters: the empty copy "No honorable mentions match this filter.", tab counts that follow the filter, and leaving out More filters, per-row Promote and the group chevron for now | Any time | Built as described; say if any should change |
 | 20 | **Phase 4 social & feed choices** (all built with these defaults; plan `docs/superpowers/plans/2026-11-03-phase-4-social-feed.md`, "Decisions for Josie"): Nearby = spots within 25 km of your home city; no Trending tab; follow requests in Activity with Approve / Decline; going Private keeps followers, going Public approves pending requests; only the four push toggles shown; no milestone or invite notifications in the MVP; caption "#2 on their Final Meal"; personal tags never shown to others; new empty-state copy ("Nothing new yet.", "Nothing nearby yet.", "No activity yet.", "Nothing saved yet.", "This account is private" / "Follow to see their picks."). | Any time | As listed |
+| 21 | Saved tab chips: "Final Meals" and "Honorable" filter by the tier of the friend's pick you saved from. If they removed that pick or went private, the save shows only under All (and Nearby) and loses its photo. | Any time | As described |
 
 ## Done
 
