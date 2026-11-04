@@ -16,23 +16,24 @@ interface OutboxRow {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-/** The `role` claim of a JWT. The gateway has already checked the signature (verify_jwt). */
-function jwtRole(token: string): string | null {
-  try {
-    const payload = token.split('.')[1];
-    if (!payload) return null;
-    const padded = payload.replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(atob(padded.padEnd(Math.ceil(padded.length / 4) * 4, '='))).role ?? null;
-  } catch {
-    return null;
+/** Compares two strings in time that depends only on their length. */
+function sameSecret(given: string, expected: string): boolean {
+  if (given.length !== expected.length) return false;
+  let difference = 0;
+  for (let i = 0; i < given.length; i++) {
+    difference |= given.charCodeAt(i) ^ expected.charCodeAt(i);
   }
+  return difference === 0;
 }
 
+/**
+ * Only the service key itself is accepted (an exact match), not any token that claims the
+ * service role, so this stays safe even if the gateway's verify_jwt check is ever switched off.
+ */
 function isServiceRole(request: Request, serviceKey: string): boolean {
   const header = request.headers.get('Authorization') ?? '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  if (!token) return false;
-  return token === serviceKey || jwtRole(token) === 'service_role';
+  return token !== '' && sameSecret(token, serviceKey);
 }
 
 Deno.serve(async (request) => {

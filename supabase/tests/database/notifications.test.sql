@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(142);
+select plan(169);
 
 -- Activity fan-out, in-app notifications, preferences, push tokens and the push queue.
 -- The fan-out is a deferred constraint trigger, so it runs at commit; in this transaction each
@@ -99,6 +99,8 @@ select is((select body from public._push_text('saved_pick', 'Alice', 'Ramen', nu
   'Alice saved your Ramen.', 'saved_pick text');
 select is((select body from public._push_text('saved_from_list', 'Alice', null, null, 'Best Eats')),
   'Alice saved picks from your list Best Eats.', 'saved_from_list text');
+select is((select body from public._push_text('saved_from_list', 'Alice', null, null, null)),
+  'Alice saved picks from your list.', 'saved_from_list text without a title has no dangling space');
 select is((select body from public._push_text('dethroned', 'Alice', 'New', 'Old', null)),
   'Alice dethroned Old with New on their Final Meal.', 'dethroned text');
 select is((select body from public._push_text('added_final', 'Alice', 'Ramen', null, null)),
@@ -122,6 +124,8 @@ select throws_ok($$select public.register_push_token('not-a-token', 'ios')$$,
   'P0001', 'invalid_push_token', 'a malformed token is refused');
 select throws_ok($$select public.register_push_token('ExponentPushToken[]', 'ios')$$,
   'P0001', 'invalid_push_token', 'an empty token body is refused');
+select throws_ok($$select public.register_push_token('ExponentPushToken[' || repeat('x', 600) || ']', 'ios')$$,
+  'P0001', 'invalid_push_token', 'a token over 512 characters is refused');
 select throws_ok($$select public.register_push_token('ExponentPushToken[x]', 'web')$$,
   'P0001', 'invalid_push_token', 'an unknown platform is refused');
 select throws_ok($$insert into public.push_tokens (user_id, expo_token) values
@@ -505,6 +509,107 @@ select is(public.unread_notification_count(), 4, 'and left out of the unread cou
 reset role;
 delete from public.blocks;
 
+-- ---------------------------------------------------------------- swaps by promote_pick
+-- A has five finals and an honorable (Dish 5); promoting it into slot 3 writes promoted +
+-- dethroned for the same pick, so followers get the dethroned only.
+set local role authenticated;
+select public.test_login('00000000-0000-0000-0000-00000000000a');
+select public.promote_pick(public.test_pick('00000000-0000-0000-0000-00000000000a', 'Dish 5'), 3);
+reset role;
+set constraints all immediate;
+set constraints all deferred;
+select is(public.test_notes('00000000-0000-0000-0000-00000000000c', 'dethroned'), 2, 'a promote_pick swap gives C a dethroned notification');
+select is(public.test_notes('00000000-0000-0000-0000-00000000000c', 'promoted'), 0, 'and no promoted notification');
+select is(public.test_pushes('00000000-0000-0000-0000-00000000000d', 'dethroned'), 2, 'D gets one dethroned push for it');
+select is(public.test_pushes('00000000-0000-0000-0000-00000000000d', 'promoted'), 2, 'and no promoted push (still the two from before)');
+
+-- ---------------------------------------------------------------- blocks, both directions
+-- D blocks A: A's next swap writes nothing for D, and C (no block) still gets it.
+insert into public.blocks (blocker_id, blocked_id) values ('00000000-0000-0000-0000-00000000000d', '00000000-0000-0000-0000-00000000000a');
+set local role authenticated;
+select public.test_login('00000000-0000-0000-0000-00000000000a');
+select public.add_pick('10000000-0000-0000-0000-0000000000a1', null, 'Block Swap 1', 'final', null, '{}', '{}', null, 1);
+reset role;
+set constraints all immediate;
+set constraints all deferred;
+select is(public.test_notes('00000000-0000-0000-0000-00000000000d', 'dethroned'), 2, 'D blocked A: no new dethroned notification for D');
+select is(public.test_pushes('00000000-0000-0000-0000-00000000000d', 'dethroned'), 2, 'and no new dethroned push');
+select is(public.test_notes('00000000-0000-0000-0000-00000000000c', 'dethroned'), 3, 'C, with no block, still gets the swap');
+delete from public.blocks;
+
+-- A blocks D: the other direction.
+insert into public.blocks (blocker_id, blocked_id) values ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000d');
+set local role authenticated;
+select public.test_login('00000000-0000-0000-0000-00000000000a');
+select public.add_pick('10000000-0000-0000-0000-0000000000a1', null, 'Block Swap 2', 'final', null, '{}', '{}', null, 2);
+reset role;
+set constraints all immediate;
+set constraints all deferred;
+select is(public.test_notes('00000000-0000-0000-0000-00000000000d', 'dethroned'), 2, 'A blocked D: no new dethroned notification for D either');
+select is(public.test_pushes('00000000-0000-0000-0000-00000000000d', 'dethroned'), 2, 'and no new dethroned push');
+select is(public.test_notes('00000000-0000-0000-0000-00000000000c', 'dethroned'), 4, 'C still gets it');
+insert into public.activities (actor_id, type, pick_id)
+values ('00000000-0000-0000-0000-00000000000d', 'saved_pick', public.test_pick('00000000-0000-0000-0000-00000000000a', 'Plain Final'));
+set constraints all immediate;
+set constraints all deferred;
+select is(public.test_notes('00000000-0000-0000-0000-00000000000a', 'saved_pick'), 0, 'a save by someone A blocked notifies A of nothing');
+delete from public.blocks;
+
+-- ---------------------------------------------------------------- a private account's swap
+-- C follows E (private) with approval; E swaps a final; then C unfollows.
+set local role authenticated;
+select public.test_login('00000000-0000-0000-0000-00000000000c');
+select public.follow_user('00000000-0000-0000-0000-00000000000e');
+select public.test_login('00000000-0000-0000-0000-00000000000e');
+select public.respond_follow_request('00000000-0000-0000-0000-00000000000c', true);
+select public.add_pick('10000000-0000-0000-0000-0000000000a1', null, 'E Dish ' || n, 'final')
+from generate_series(1, 5) n;
+reset role;
+set constraints all immediate;
+set constraints all deferred;
+set local role authenticated;
+select public.test_login('00000000-0000-0000-0000-00000000000e');
+select public.add_pick('10000000-0000-0000-0000-0000000000a1', null, 'E New', 'final', null, '{}', '{}', null, 5);
+reset role;
+set constraints all immediate;
+set constraints all deferred;
+set local role authenticated;
+select public.test_login('00000000-0000-0000-0000-00000000000c');
+select is((select dish_name from public.get_my_notifications(null, 50)
+    where actor_username = 'user_e' and type = 'dethroned'),
+  'E New', 'an active follower sees the private account''s new dish');
+select is((select other_dish_name from public.get_my_notifications(null, 50)
+    where actor_username = 'user_e' and type = 'dethroned'),
+  'E Dish 5', 'and the replaced one');
+select is(public.unread_notification_count(),
+  (select count(*)::int from public.get_my_notifications(null, 50) where read_at is null),
+  'the unread count matches the list');
+select public.unfollow_user('00000000-0000-0000-0000-00000000000e');
+select is((select count(*)::int from public.get_my_notifications(null, 50)
+    where actor_username = 'user_e' and type = 'dethroned'), 0,
+  'after unfollowing a private account its swap notification is left out');
+select is((select count(*)::int from public.get_my_notifications(null, 50)
+    where actor_username = 'user_e' and (dish_name is not null or other_dish_name is not null or photo_path is not null or pick_id is not null)), 0,
+  'and no pick details of it come back on any row');
+select is(public.unread_notification_count(),
+  (select count(*)::int from public.get_my_notifications(null, 50) where read_at is null),
+  'the unread count still matches the list');
+select is((select count(*)::int from public.get_my_notifications(null, 50)
+    where actor_username = 'user_a' and type = 'dethroned'), 4, 'A''s public swaps are still listed');
+reset role;
+
+-- ---------------------------------------------------------------- the 50 cap
+insert into public.activities (actor_id, type, target_user_id)
+select '00000000-0000-0000-0000-00000000000e', 'followed', '00000000-0000-0000-0000-00000000000b' from generate_series(1, 60);
+set constraints all immediate;
+set constraints all deferred;
+set local role authenticated;
+select public.test_login('00000000-0000-0000-0000-00000000000b');
+select is((select count(*)::int from public.get_my_notifications(null, 500)), 50,
+  'p_limit is capped at 50 (B has more than 60 rows)');
+select is((select count(*)::int from public.get_my_notifications()), 20, 'the default page is 20');
+reset role;
+
 -- ---------------------------------------------------------------- deleted before commit
 -- An activity removed in the same transaction (a quick follow then unfollow) leaves no trace.
 set local role authenticated;
@@ -535,6 +640,8 @@ select ok(has_function_privilege('service_role', 'public.finish_push_batch(uuid[
   'service_role can finish a batch');
 select ok(not has_function_privilege('authenticated', 'public._fan_out_activity()', 'execute'),
   'the fan-out function is not callable by clients');
+select ok(not has_function_privilege('authenticated', 'public._push_still_wanted(uuid, uuid)', 'execute'),
+  'the still-wanted check is not callable by clients');
 select ok(not has_function_privilege('anon', 'public.register_push_token(text, text)', 'execute'),
   'anon cannot register a token');
 select ok(not has_function_privilege('anon', 'public.get_my_notifications(timestamp with time zone, integer)', 'execute'),
@@ -546,8 +653,15 @@ select throws_ok($$select * from public.push_outbox$$, '42501', null, 'a signed-
 select throws_ok($$select * from public.claim_push_batch(10)$$, '42501', null, 'nor claim a batch');
 reset role;
 
+-- The sender re-checks blocks and preferences when it claims: D blocks A now, and C turned
+-- push_friends_finals off after some of C's pushes were queued.
+insert into public.blocks (blocker_id, blocked_id) values ('00000000-0000-0000-0000-00000000000d', '00000000-0000-0000-0000-00000000000a');
 create temp table pending_before as
-  select count(*)::int as n from public.push_outbox where status = 'pending';
+  select count(*)::int as n,
+         count(*) filter (where public._push_still_wanted(user_id, activity_id))::int as live
+  from public.push_outbox where status = 'pending';
+select ok((select live from pending_before) < (select n from pending_before),
+  'some queued pushes are no longer wanted');
 select is((select n from pending_before), (select count(*)::int from public.push_outbox),
   'every queued push is pending before a claim');
 create temp table claimed on commit drop as select * from public.claim_push_batch(2);
@@ -561,8 +675,16 @@ select lives_ok($$select public.finish_push_batch((select array_agg(id) from cla
   'finish_push_batch marks the rows');
 select is((select count(*)::int from public.push_outbox where status = 'sent' and sender = 'log' and sent_at is not null), 2,
   'they are sent, with the sender and a sent_at');
-select is((select count(*)::int from public.claim_push_batch(1000)), (select n - 2 from pending_before),
-  'a second claim takes only the rest');
+select is((select count(*)::int from public.claim_push_batch(1000)), (select live - 2 from pending_before),
+  'a second claim takes only the pushes still wanted');
+select is((select count(*)::int from public.push_outbox where status = 'skipped' and attempts = 0),
+  (select n - live from pending_before), 'the rest are skipped, never attempted');
+select ok(exists (select 1 from public.push_outbox o join public.activities a on a.id = o.activity_id
+    where o.status = 'skipped' and o.user_id = '00000000-0000-0000-0000-00000000000d' and a.actor_id = '00000000-0000-0000-0000-00000000000a'),
+  'a push to someone who has since blocked the actor is skipped');
+select ok(exists (select 1 from public.push_outbox o join public.activities a on a.id = o.activity_id
+    where o.status = 'skipped' and o.user_id = '00000000-0000-0000-0000-00000000000c' and a.type in ('added_final', 'promoted')),
+  'a push whose preference was switched off after queueing is skipped');
 select is((select count(*)::int from public.claim_push_batch(1000)), 0, 'and then there is nothing left to claim');
 select throws_ok($$select public.finish_push_batch('{}', 'pending', 'log')$$, 'P0001', 'invalid_push_status',
   'finish_push_batch only accepts sent or failed');

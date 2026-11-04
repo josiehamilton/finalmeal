@@ -102,6 +102,7 @@ All tables use UUID primary keys and `created_at`/`updated_at` timestamps. Row-l
 | `push_tokens` | `user_id`, `expo_token`, `platform`, `updated_at` | written only by `register_push_token`; a token seen under another person moves to the caller |
 | `notification_preferences` | `user_id`, `push_dethroned`, `push_new_followers`, `push_saves`, `push_friends_finals` | one row per profile (created by a trigger), all default on; the person can change only these four |
 | `push_outbox` | `user_id`, `activity_id`, `title`, `body`, `data`, `status` (`pending`/`sending`/`sent`/`failed`), `sender`, `attempts`, `sent_at` | queued pushes, filled when an activity is committed; a sender function delivers them (log-only until Phase 8); no client access |
+| `follow_push_log` | `actor_id`, `user_id`, `last_pushed_at` | remembers the last "started following you" push so a re-follow within 24 hours does not push again; no client access |
 | `device_attestations` | `user_id`, `platform`, `result`, `checked_at` | feeds trust |
 | `reports` | `reporter_id`, `target_type` (`pick`/`profile`/`list`/`place`), `target_id`, `reason`, `status` | |
 
