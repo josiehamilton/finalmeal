@@ -1,4 +1,5 @@
 import type { ActivityType } from '@finalmeal/core';
+import type { Database } from './database.types';
 import type { FinalMealClient } from './client';
 import { ApiError, throwIfError } from './errors';
 import { toFollowState, toPersonSummary, pageSize } from './people';
@@ -7,6 +8,14 @@ import { PICK_PHOTO_BUCKET } from './picks';
 import { requireUserId } from './profile';
 
 export type { ActivityType } from '@finalmeal/core';
+
+// Fails `tsc` if core's hand-written ActivityType drifts from the database enum.
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+const activityTypeMatchesDatabase: Same<
+  ActivityType,
+  Database['public']['Enums']['activity_type']
+> = true;
+void activityTypeMatchesDatabase;
 
 /** One row in the Activity list. */
 export interface ActivityItem {
@@ -70,7 +79,10 @@ export function toActivityItem(client: FinalMealClient, row: NotificationRow): A
   };
 }
 
-/** The signed-in person's notifications, newest first. Pass the last one's `at` as `before` for the next page. */
+/**
+ * The signed-in person's notifications, newest first. Pass the last one's `at` as `before` for
+ * the next page; a page shorter than `pageSize(limit)` (at most 50) is the last.
+ */
 export async function getMyNotifications(
   client: FinalMealClient,
   opts: { before?: string; limit?: number } = {},
@@ -104,9 +116,15 @@ export async function markNotificationsRead(
   throwIfError(error);
 }
 
+/** Makes every subscription's channel topic unique (see `subscribeToMyNotifications`). */
+let subscriptionCount = 0;
+
 /**
  * Calls `onChange` whenever a new notification arrives for `userId` (refetch the list and the
  * count then). Returns a function that stops listening.
+ * Each call opens its own channel (the client hands back an existing channel for a repeated
+ * topic, which cannot take new listeners), so two screens, or an unmount followed at once by a
+ * mount, do not disturb each other.
  */
 export function subscribeToMyNotifications(
   client: FinalMealClient,
@@ -114,7 +132,7 @@ export function subscribeToMyNotifications(
   onChange: () => void,
 ): () => void {
   const channel = client
-    .channel(`notifications:${userId}`)
+    .channel(`notifications:${userId}:${++subscriptionCount}`)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },

@@ -101,6 +101,10 @@ export async function getFollowingFeed(
  * Picks near the signed-in person's chosen home city (never their phone's position), ranked by
  * recency and how many people have the dish. Empty without a home city. `nextOffset` is null
  * once a page comes back short.
+ *
+ * The ranking moves between requests, so a later page can repeat a card from an earlier one. The
+ * screen removes repeats by `key` when it appends (`appendUniqueByKey` in `@finalmeal/core`) and
+ * still continues from `nextOffset`, which counts the rows returned, repeats included.
  */
 export async function getNearbyFeed(
   client: FinalMealClient,

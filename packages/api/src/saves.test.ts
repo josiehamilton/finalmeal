@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getMySaves, saveDish } from './saves';
+import { getMySaves, saveDish, unsaveDish } from './saves';
 import { fakeClient } from './test-support/fake-client';
 
 const PLACE = {
@@ -77,5 +77,11 @@ describe('saves wrappers', () => {
     });
     const gone = fakeClient(() => ({ error: { message: 'dish_not_found', code: 'P0001' } }));
     await expect(saveDish(gone.client, 'd1')).rejects.toMatchObject({ code: 'dish_not_found' });
+  });
+
+  it('sends the dish to unsave', async () => {
+    const { client, calls } = fakeClient(() => ({}));
+    await unsaveDish(client, 'd1');
+    expect(calls[0]).toMatchObject({ name: 'unsave_dish', args: { p_dish_id: 'd1' } });
   });
 });

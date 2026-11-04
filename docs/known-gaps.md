@@ -40,6 +40,9 @@ Each item names the phase that closes it.
 - **Phase 7:** dish photos lose their location data because the app always re-encodes them (`preparePickPhoto`), but the server doesn't enforce it. A modified client could upload a JPEG with its own metadata (it would only expose the uploader's own data). Consider stripping or rejecting EXIF server-side with the other abuse controls.
 - **Phase 7 (polish):** after "Make it a Final Meal instead" succeeds, the app merges the new tags and note into the pick with a second call. If only that second call fails (a network drop between the two), the screen still closes as saved with no notice, and the tags or note are lost. It needs its own copy (the photo notice would be wrong).
 - **Phase 4:** saving from the Add modal always ends on the You tab, including when it was opened from First landing. Revisit when Feed is real (e.g. dismiss back to the tab it was opened from).
+- **Phase 7:** add integration cases for the blocked-person paths once blocks exist (there is no block API in Phase 4, so only pgTAP covers them): `profile_unavailable` from `follow_user` and from accepting a request across a block, `getProfile` returning null across a block, and `getProfilePicks` returning `[]`.
+- **Phase 7 (polish):** the notifications cursor is the timestamp alone (`get_my_notifications` pages with `created_at < before`). Two notifications for one person with exactly the same `created_at` that straddle a page boundary would lose the second. Each transaction writes at most one notifying activity per recipient today, so it is unlikely; add an id tiebreak (`before` plus `beforeId`) in a database round if that changes.
+- **Phase 4 (screens):** Nearby is offset-paged over a live ranking, so a later page can repeat a card; the screen removes repeats with `appendUniqueByKey` (`@finalmeal/core`) and keeps advancing by `nextOffset`.
 
 ## Phase 8: launch
 

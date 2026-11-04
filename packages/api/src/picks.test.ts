@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FinalMealClient } from './client';
 import { ApiError } from './errors';
-import { addPick, sortPicks, toPick, updatePick } from './picks';
+import { addPick, getProfilePicks, sortPicks, toPick, updatePick } from './picks';
+import { fakeClient } from './test-support/fake-client';
 import type { Pick } from './picks';
 
 /** A client that fails the test on any call, so a rejection that never touched the network is provable. */
@@ -329,5 +330,37 @@ describe('sortPicks', () => {
       stub('f2', 'final', 2, '2026-02-01T00:00:00Z'),
     ]);
     expect(sorted.map((p) => p.id)).toEqual(['f1', 'f2', 'f3', 'h-new', 'h-old']);
+  });
+});
+
+describe('getProfilePicks privacy', () => {
+  const profileRow = (over: Record<string, unknown>) => ({
+    id: 'u9',
+    username: 'priyashah',
+    display_name: 'Priya Shah',
+    avatar_path: null,
+    bio: null,
+    home_city: null,
+    visibility: 'private',
+    followers_count: 0,
+    following_count: 0,
+    dishes_count: null,
+    viewer_follow: 'none',
+    follows_viewer: false,
+    can_see_picks: false,
+    is_me: false,
+    ...over,
+  });
+
+  it('returns nothing, and never reads the picks, when the profile hides them', async () => {
+    // The fake has no `from`, so touching the picks table would throw.
+    const hidden = fakeClient(() => ({ data: [profileRow({})] }));
+    expect(await getProfilePicks(hidden.client, 'u9')).toEqual([]);
+    expect(hidden.calls.map((c) => c.name)).toEqual(['get_profile']);
+  });
+
+  it('returns nothing when there is no such profile (gone, or blocked)', async () => {
+    const gone = fakeClient(() => ({ data: [] }));
+    expect(await getProfilePicks(gone.client, 'u9')).toEqual([]);
   });
 });

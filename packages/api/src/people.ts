@@ -42,7 +42,13 @@ export interface ProfileView extends PersonSummary {
 const DEFAULT_PAGE = 20;
 const MAX_PAGE = 50;
 
+/**
+ * A page size the database accepts: at most 50, never negative, 20 when it is not a number. A
+ * list that comes back shorter than this is the last page (so a caller who asks for more than
+ * 50 must compare against `pageSize(limit)`, not `limit`).
+ */
 export function pageSize(limit: number): number {
+  if (!Number.isFinite(limit)) return DEFAULT_PAGE;
   return Math.min(Math.max(Math.floor(limit), 0), MAX_PAGE);
 }
 

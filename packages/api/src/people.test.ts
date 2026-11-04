@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   followUser,
+  listFollowing,
+  pageSize,
+  respondToFollowRequest,
+  unfollowUser,
   getProfile,
   getSuggestedPeople,
   listFollowers,
@@ -112,5 +116,28 @@ describe('people wrappers', () => {
     expect(await getSuggestedPeople(client, 5)).toMatchObject([
       { username: 'arimitchell', viewerFollow: 'none', topDish: 'Pork Gyro' },
     ]);
+  });
+
+  it('sends the right arguments for unfollow, respond and the following list', async () => {
+    const { client, calls } = fakeClient(() => ({ data: [] }));
+    await unfollowUser(client, 'u2');
+    await respondToFollowRequest(client, 'u3', false);
+    await listFollowing(client, 'u4', { offset: 40 });
+    expect(calls.map((c) => [c.name, c.args])).toEqual([
+      ['unfollow_user', { p_user_id: 'u2' }],
+      ['respond_follow_request', { p_follower_id: 'u3', p_accept: false }],
+      ['list_following', { p_user_id: 'u4', p_q: undefined, p_offset: 40, p_limit: 20 }],
+    ]);
+  });
+});
+
+describe('pageSize', () => {
+  it('caps at 50, floors at 0 and falls back to 20 for a non-number', () => {
+    expect(pageSize(20)).toBe(20);
+    expect(pageSize(500)).toBe(50);
+    expect(pageSize(-3)).toBe(0);
+    expect(pageSize(7.9)).toBe(7);
+    expect(pageSize(Number.NaN)).toBe(20);
+    expect(pageSize(Number.POSITIVE_INFINITY)).toBe(20);
   });
 });

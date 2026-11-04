@@ -7,7 +7,7 @@ import {
   subscribeToMyNotifications,
   toNotificationSettings,
 } from './notifications';
-import { registerPushToken } from './push';
+import { registerPushToken, unregisterPushToken } from './push';
 import { fakeClient } from './test-support/fake-client';
 
 const ROW = {
@@ -83,6 +83,11 @@ describe('notifications wrappers', () => {
       name: 'register_push_token',
       args: { p_token: 'ExponentPushToken[x]', p_platform: 'android' },
     });
+    await unregisterPushToken(ok.client, 'ExponentPushToken[x]');
+    expect(ok.calls[1]).toMatchObject({
+      name: 'unregister_push_token',
+      args: { p_token: 'ExponentPushToken[x]' },
+    });
     const bad = fakeClient(() => ({ error: { message: 'invalid_push_token', code: 'P0001' } }));
     await expect(registerPushToken(bad.client, 'x', 'ios')).rejects.toMatchObject({
       code: 'invalid_push_token',
@@ -115,5 +120,34 @@ describe('subscribeToMyNotifications', () => {
 
     unsubscribe();
     expect(client.removeChannel).toHaveBeenCalledWith(channel);
+  });
+
+  it('gives every subscription its own channel, so two listeners and a quick resubscribe work', () => {
+    const channels: Array<{
+      topic: string;
+      on: ReturnType<typeof vi.fn>;
+      subscribe: ReturnType<typeof vi.fn>;
+    }> = [];
+    const client = {
+      channel: vi.fn((topic: string) => {
+        const channel = { topic, on: vi.fn(), subscribe: vi.fn() };
+        channel.on.mockReturnValue(channel);
+        channel.subscribe.mockReturnValue(channel);
+        channels.push(channel);
+        return channel;
+      }),
+      removeChannel: vi.fn(() => Promise.resolve('ok')),
+    } as unknown as FinalMealClient;
+
+    const stopFirst = subscribeToMyNotifications(client, 'u1', vi.fn());
+    const stopSecond = subscribeToMyNotifications(client, 'u1', vi.fn());
+    expect(channels).toHaveLength(2);
+    expect(channels[0]!.topic).not.toBe(channels[1]!.topic);
+
+    stopFirst();
+    expect(client.removeChannel).toHaveBeenCalledTimes(1);
+    expect(client.removeChannel).toHaveBeenCalledWith(channels[0]);
+    stopSecond();
+    expect(client.removeChannel).toHaveBeenLastCalledWith(channels[1]);
   });
 });

@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "gen:types": "supabase gen types typescript --local > src/database.types.ts"
+    "gen:types": "supabase gen types typescript --local > src/database.types.ts && prettier --write src/database.types.ts"
   },
   "dependencies": {
     "@finalmeal/core": "workspace:*",

@@ -198,6 +198,11 @@ describe('people, follows and feeds (local Supabase)', () => {
     expect(picks.every((p) => p.tags.every((t) => t.kind !== 'personal'))).toBe(true);
   });
 
+  it('returns no picks for a private account the viewer does not follow', async () => {
+    expect(await getProfilePicks(me.client, priyaId)).toEqual([]);
+    expect((await getProfilePicks(me.client, ariId)).length).toBeGreaterThan(0);
+  });
+
   it('lists followers and following, finds people and suggests some', async () => {
     const following = await listFollowing(me.client, me.id);
     expect(following.map((p) => p.username)).toEqual(['arimitchell']);
@@ -296,6 +301,28 @@ describe('follow requests and notifications (local Supabase)', () => {
     expect(await getUnreadCount(fan.client)).toBe(0);
   });
 
+  it('shows a private account’s picks only after the owner approves', async () => {
+    const owner = await newPerson({ isPrivate: true });
+    const vancouver = (await searchCities(owner.client, 'vancouver')).find(
+      (c) => c.country === 'CA',
+    )!;
+    const place = await createCustomPlace(owner.client, {
+      name: `Private Kitchen ${randomSuffix()}`,
+      cityId: vancouver.id,
+      address: '3 Test St, Vancouver, BC',
+    });
+    await addPick(owner.client, { placeId: place.id, dishName: 'Secret Noodles', tier: 'final' });
+    const fan = await newPerson();
+    expect(await getProfilePicks(owner.client, owner.id)).toHaveLength(1);
+
+    await followUser(fan.client, owner.id);
+    expect(await getProfilePicks(fan.client, owner.id)).toEqual([]);
+    await respondToFollowRequest(owner.client, fan.id, true);
+    expect((await getProfilePicks(fan.client, owner.id)).map((p) => p.dish.name)).toEqual([
+      'Secret Noodles',
+    ]);
+  });
+
   it('declines a request and drops it from the person’s list', async () => {
     const owner = await newPerson({ isPrivate: true });
     const fan = await newPerson();
@@ -313,11 +340,18 @@ describe('follow requests and notifications (local Supabase)', () => {
       calls += 1;
     });
     try {
-      // The channel joins in the background, so a notification sent too early is missed: send
-      // another (follow, then unfollow) until one is heard.
-      for (let attempt = 0; attempt < 5 && calls === 0; attempt++) {
+      // The channel joins in the background: wait for it, so one follow is enough.
+      const joinedBy = Date.now() + 10_000;
+      while (
+        !owner.client.getChannels().some((c) => c.state === 'joined') &&
+        Date.now() < joinedBy
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      // Joined is a moment before the database stream is ready, so allow a second try.
+      for (let attempt = 0; attempt < 3 && calls === 0; attempt++) {
         await followUser(fan.client, owner.id);
-        const heardBy = Date.now() + 2500;
+        const heardBy = Date.now() + 4000;
         while (calls === 0 && Date.now() < heardBy) {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }

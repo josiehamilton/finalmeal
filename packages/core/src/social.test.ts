@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   NEARBY_RADIUS_M,
   activitySentence,
+  appendUniqueByKey,
   countLabel,
   feedCaption,
   filterSaves,
@@ -214,5 +215,19 @@ describe('filterSaves', () => {
   it('keeps only saves within the nearby radius, never ones without a distance', () => {
     expect(NEARBY_RADIUS_M).toBe(25000);
     expect(filterSaves(saves, 'nearby')).toEqual([saves[0], saves[1]]);
+  });
+});
+
+describe('appendUniqueByKey', () => {
+  it('appends only items whose key is new, keeping order', () => {
+    const shown = [{ key: 'a' }, { key: 'b' }];
+    const next = [{ key: 'b' }, { key: 'c' }, { key: 'c' }];
+    expect(appendUniqueByKey(shown, next)).toEqual([{ key: 'a' }, { key: 'b' }, { key: 'c' }]);
+  });
+
+  it('does not change the list it was given', () => {
+    const shown = [{ key: 'a' }];
+    appendUniqueByKey(shown, [{ key: 'b' }]);
+    expect(shown).toEqual([{ key: 'a' }]);
   });
 });

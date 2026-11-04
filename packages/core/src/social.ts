@@ -168,3 +168,17 @@ export function filterSaves<S extends SaveLike>(saves: readonly S[], filter: Sav
       return saves.filter((s) => s.distanceM !== null && s.distanceM <= NEARBY_RADIUS_M);
   }
 }
+
+/** Appends `next` to `shown`, skipping items whose `key` is already there (or repeats within `next`). */
+export function appendUniqueByKey<T extends { key: string }>(
+  shown: readonly T[],
+  next: readonly T[],
+): T[] {
+  const seen = new Set(shown.map((item) => item.key));
+  const added = next.filter((item) => {
+    if (seen.has(item.key)) return false;
+    seen.add(item.key);
+    return true;
+  });
+  return [...shown, ...added];
+}

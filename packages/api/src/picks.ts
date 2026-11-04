@@ -2,7 +2,7 @@ import { looksLikeJpeg } from './avatar';
 import type { FinalMealClient } from './client';
 import { ApiError, throwIfError } from './errors';
 import type { ErrorLike } from './errors';
-import { toPersonSummary } from './people';
+import { getProfile, toPersonSummary } from './people';
 import type { PersonSummary } from './people';
 import { PLACE_COLUMNS, toPlace } from './places';
 import type { Place, PlaceRow } from './places';
@@ -169,12 +169,14 @@ export async function getMyPicks(client: FinalMealClient): Promise<Pick[]> {
 }
 
 /**
- * Another person's picks, in the same order as `getMyPicks`. Call it only when their profile says
- * `canSeePicks` (the database enforces that for private accounts in Phase 7). Their personal tags
- * are never returned.
+ * Another person's picks, in the same order as `getMyPicks`. It checks the profile first and
+ * returns nothing, without reading any picks, when the person is gone, hidden by a block, or
+ * private and not followed by the signed-in person (the table itself stays open until the
+ * Phase 7 policies). Their personal tags are never returned.
  */
 export async function getProfilePicks(client: FinalMealClient, userId: string): Promise<Pick[]> {
-  const uid = await requireUserId(client);
+  const profile = await getProfile(client, userId);
+  if (!profile?.canSeePicks) return [];
   const { data, error } = await client
     .from('picks')
     .select(PICK_SELECT)
@@ -185,7 +187,7 @@ export async function getProfilePicks(client: FinalMealClient, userId: string): 
   return sortPicks(
     ((data ?? []) as unknown as PickRow[]).map((row) => {
       const pick = toPick(row, url);
-      return userId === uid
+      return profile.isMe
         ? pick
         : { ...pick, tags: pick.tags.filter((t) => t.kind !== 'personal') };
     }),
