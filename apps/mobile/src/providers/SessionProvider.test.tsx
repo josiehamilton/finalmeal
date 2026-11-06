@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import { Pressable, Text } from 'react-native';
 import { getMyProfile } from '@finalmeal/api';
 import type { FinalMealClient, MyProfile } from '@finalmeal/api';
+import { registerForPushIfAvailable } from '../lib/push';
 import { SessionProvider, useSession } from './SessionProvider';
 import { clearJustOnboarded, markJustOnboarded, useJustOnboarded } from '../state/landing';
 import type { SessionState } from './SessionProvider';
@@ -11,6 +12,8 @@ jest.mock('@finalmeal/api', () => ({
   getMyProfile: jest.fn(),
 }));
 const mockGetMyProfile = jest.mocked(getMyProfile);
+jest.mock('../lib/push', () => ({ registerForPushIfAvailable: jest.fn() }));
+const mockRegisterPush = jest.mocked(registerForPushIfAvailable);
 
 const PROFILE: MyProfile = {
   id: 'u1',
@@ -88,7 +91,53 @@ function Probe() {
 const state = () => JSON.parse(String(screen.getByTestId('state').props.children));
 
 describe('SessionProvider', () => {
-  beforeEach(() => mockGetMyProfile.mockReset());
+  beforeEach(() => {
+    mockGetMyProfile.mockReset();
+    mockRegisterPush.mockReset();
+    mockRegisterPush.mockResolvedValue('unavailable');
+  });
+
+  describe('push registration', () => {
+    it('is offered once the signed-in person has a profile', async () => {
+      mockGetMyProfile.mockResolvedValue(PROFILE);
+      const { client } = fakeClient(SESSION);
+      await render(
+        <SessionProvider client={client}>
+          <Probe />
+        </SessionProvider>,
+      );
+      await waitFor(() => expect(mockRegisterPush).toHaveBeenCalledWith(client));
+      expect(mockRegisterPush).toHaveBeenCalledTimes(1);
+    });
+
+    it('is not offered when signed out, when there is no profile yet, or when the profile fails', async () => {
+      const signedOut = fakeClient(null);
+      const view = await render(
+        <SessionProvider client={signedOut.client}>
+          <Probe />
+        </SessionProvider>,
+      );
+      await waitFor(() => expect(state().loading).toBe(false));
+      await view.unmount();
+      mockGetMyProfile.mockResolvedValue(null);
+      const noProfile = fakeClient(SESSION);
+      const view2 = await render(
+        <SessionProvider client={noProfile.client}>
+          <Probe />
+        </SessionProvider>,
+      );
+      await waitFor(() => expect(state().loading).toBe(false));
+      await view2.unmount();
+      mockGetMyProfile.mockRejectedValue(new TypeError('fetch failed'));
+      await render(
+        <SessionProvider client={fakeClient(SESSION).client}>
+          <Probe />
+        </SessionProvider>,
+      );
+      await waitFor(() => expect(state().error).not.toBeNull());
+      expect(mockRegisterPush).not.toHaveBeenCalled();
+    });
+  });
 
   it('is loading, then exposes the profile for a signed-in person', async () => {
     mockGetMyProfile.mockResolvedValue(PROFILE);

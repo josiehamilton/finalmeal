@@ -10,6 +10,7 @@ import {
 import type { ReactNode } from 'react';
 import { checkSession, friendlyMessage, getMyProfile, signOut, throwIfError } from '@finalmeal/api';
 import type { FinalMealClient, MyProfile } from '@finalmeal/api';
+import { registerForPushIfAvailable } from '../lib/push';
 import { getSupabase } from '../lib/supabase';
 import { clearJustOnboarded } from '../state/landing';
 
@@ -125,8 +126,13 @@ export function SessionProvider({ client, children }: SessionProviderProps) {
           }
         }
       }
-      // A failure is already stored as `error` by loadProfile.
-      loadProfile(userId).catch(() => {});
+      // A failure is already stored as `error` by loadProfile. Once there is a profile, offer
+      // push (a no-op until the app has an Expo project; it never throws).
+      loadProfile(userId)
+        .then((profile) => {
+          if (profile && !cancelled && active) void registerForPushIfAvailable(active);
+        })
+        .catch(() => {});
     })();
     return () => {
       cancelled = true;

@@ -8,6 +8,7 @@ import { colors, typeScale } from '@finalmeal/ui-tokens';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
 import { SettingsRow } from '../../../src/components/SettingsRow';
 import { fontFamily } from '../../../src/lib/fonts';
+import { unregisterPushOnSignOut } from '../../../src/lib/push';
 import { getSupabase } from '../../../src/lib/supabase';
 import { useSession } from '../../../src/providers/SessionProvider';
 
@@ -30,6 +31,8 @@ export default function Settings() {
     setError(null);
     try {
       // The sign-in gate sends a signed-out person to Welcome; nothing to navigate here.
+      // Forget this device's push token first: it needs the session that sign-out ends.
+      await unregisterPushOnSignOut(getSupabase());
       await signOut(getSupabase());
     } catch (e) {
       setError(friendlyMessage(e));
@@ -56,6 +59,11 @@ export default function Settings() {
           <SettingsRow icon="mail" label="Sign-in method" value="Email" />
         </Section>
         <Section title="Preferences">
+          <SettingsRow
+            icon="bell"
+            label="Notifications"
+            onPress={() => router.push('/settings/notifications')}
+          />
           <SettingsRow
             icon="lock"
             label="Privacy & safety"
