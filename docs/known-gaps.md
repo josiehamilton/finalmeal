@@ -5,7 +5,7 @@ Things that are deliberately unfinished or must be revisited, with the phase tha
 ## Phase 3 and Phase 7: privacy and safety
 
 - Revoke the default `TRUNCATE` grants that `anon` and `authenticated` hold on public tables (not reachable through PostgREST, but should not exist). Done for `picks` and `pick_tags` (Phase 3) and `follows`, `activities`, `notifications`, `push_tokens` and the new Phase 4 tables (Phase 4); the other tables remain.
-- Enforce private profiles and blocks in the read policies.
+- Enforce private profiles and blocks in the read policies. Phase 4's new functions already hide private accounts and blocked people, but the table policies for `picks`, `profiles` and `activities` still allow reading private accounts' rows directly; tighten them in Phase 7 (a `get_profile_picks(p_user_id)` function that applies `_can_see` itself would also replace `getProfilePicks`' check-then-read and its extra round trips).
 - Decide what happens to tag ownership when a personal tag is changed after it is attached to picks.
 
 ## Phase 2 carry-forward
@@ -15,7 +15,7 @@ Each item names the phase that closes it.
 - **Closes before the Phase 2 merge:** device verification of Phase 2 on the iPhone 17 and Pixel 10 (plan Task 6 Step 4, Task 9 Steps 1–2) is pending on Josie's Mac. The checklist is in `README.md` ("Device checklist (pending Mac)").
 - **Phase 8:** the auth server answers a wrong code and an expired code the same way, so the "That code has expired…" copy never shows; people see "That code didn’t work…" either way. Revisit with the production auth server.
 - **Phase 3:** the integration tests leave their sign-up people behind in the local database. Run `pnpm db:reset` afterwards (see `README.md`). A cleanup step in the test run would remove the need; add it when Phase 3 adds more integration tests.
-- **Phase 7:** only `followed` pushes are throttled (once per person per 24 hours, `follow_push_log`). Repeated follow requests (request, cancel, request) and save / unsave loops can still push the target every time; throttle `follow_requested` and `saved_pick` / `saved_from_list` pushes the same way.
+- **Phase 7:** `followed` pushes (once per person per 24 hours, `follow_push_log`) and `saved_pick` pushes (once per person and pick per 24 hours, `save_push_log`) are throttled. Repeated follow requests (request, cancel, request) and `saved_from_list` pushes are not, so a loop can still push the target every time; throttle them the same way.
 - **Phase 7:** avatar storage has no per-person quota beyond the one-name rule (`<id>/avatar-<unix-ms>.jpg`, 2 MiB each). The app removes the old photo when a new one is saved, but nothing stops a client from uploading many files; decide on a limit with the other abuse controls.
 - **Phase 8:** the mobile sign-up end-to-end test with Maestro (spec section 10) was not built in Phase 2; it needs the development builds. Web end-to-end runs in Playwright already.
 - **Phase 8:** offline cache of the last-seen profile (spec 5.6). Today the You tab shows the friendly error with Try again when the profile cannot be loaded.
@@ -44,9 +44,14 @@ Each item names the phase that closes it.
 - **Phase 7 (polish):** the notifications cursor is the timestamp alone (`get_my_notifications` pages with `created_at < before`). Two notifications for one person with exactly the same `created_at` that straddle a page boundary would lose the second. Each transaction writes at most one notifying activity per recipient today, so it is unlikely; add an id tiebreak (`before` plus `beforeId`) in a database round if that changes.
 - **Phase 4 (screens):** Nearby is offset-paged over a live ranking, so a later page can repeat a card; the screen removes repeats with `appendUniqueByKey` (`@finalmeal/core`) and keeps advancing by `nextOffset`.
 
+## Later phases: Phase 4 leftovers
+
+- **Phase 5:** Search replaces Find people behind the Feed's search icon; other people's profiles get a Map tab.
+- **Later:** a people list behind "On n Final Meals" (the row is not tappable yet); milestone ("Your Pork Gyro is now on 8 Final Meals") and invite ("joined from your invite") notifications; a Trending tab on the Feed.
+
 ## Phase 8: launch
 
-- Expo push sender, and schedule `push-dispatch` (cron or a database webhook on `push_outbox`). Phase 4 queues pushes and the function delivers them through the `log` sender only. Also prune old `push_outbox` rows (sent, failed and skipped) and old `follow_push_log` rows, and decide what to do with rows left in `sending` when a dispatch dies midway (nothing re-queues them yet) and with `failed` rows (no retry yet).
+- Expo push sender, and schedule `push-dispatch` (cron or a database webhook on `push_outbox`). Phase 4 queues pushes and the function delivers them through the `log` sender only. Also prune old `push_outbox` rows (sent, failed and skipped) and old `follow_push_log` and `save_push_log` rows, and decide what to do with rows left in `sending` when a dispatch dies midway (nothing re-queues them yet) and with `failed` rows (no retry yet).
 - `KeyboardAvoider` (apps/mobile) adds `StatusBar.currentHeight` on Android to match `measureInWindow`. Verify it on real devices with cutouts, a hidden status bar and landscape; add an Android-platform unit test and an unmount listener-removal assertion.
 - iOS keyboard padding jumps instead of easing; consider animating it with the keyboard's duration.
 
