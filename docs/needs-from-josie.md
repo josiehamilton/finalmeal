@@ -41,6 +41,7 @@ A running list, newest needs added as they come up. Nothing here blocks today's 
 | 21 | Saved tab chips: "Final Meals" and "Honorable" filter by the tier of the friend's pick you saved from. If they removed that pick or went private, the save shows only under All (and Nearby) and loses its photo. | Any time | As described |
 | 22 | Profiles and follow lists: Follow buttons are ember everywhere (the FeedEmpty board shows bone buttons in its Popular list), and new empty copy: "No Final Meal dishes yet.", "No Final Meal dishes match this filter.", "No suggestions yet. Search for a friend by name or @handle.", "This profile isn't available.", "Your request is waiting for approval." | Any time | As listed |
 | 23 | Feed details not on the canvas: the Following / Nearby tab row also shows above the empty state; the Honorable badge on cards is a dark pill with an outline; a failed next page shows "Try again" at the bottom; search boxes say "Search followers" / "Search following" / "Search people". | Any time | As listed |
+| 24 | Saved tab details: the "Remove from Saved" alert has a title only; Nearby with no home city shows a "Choose home city" button; the filter chips hide when nothing is saved; long-press remove is also an accessibility action. | Any time | As listed |
 
 ## Done
 
