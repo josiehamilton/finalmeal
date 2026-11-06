@@ -109,6 +109,18 @@ describe('people wrappers', () => {
     expect(calls[0]).toMatchObject({ name: 'search_people', args: { p_q: 'ari', p_limit: 20 } });
   });
 
+  it('ignores a leading @ so a handle typed as shown still finds the person', async () => {
+    const { client, calls } = fakeClient(() => ({ data: [PERSON] }));
+    await searchPeople(client, ' @ari ');
+    expect(calls[0]).toMatchObject({ name: 'search_people', args: { p_q: 'ari' } });
+    await listFollowers(client, 'u9', { q: '@ari' });
+    expect(calls[1]!.args).toMatchObject({ p_q: 'ari' });
+    await listFollowers(client, 'u9', { q: '@' });
+    expect(calls[2]!.args).toMatchObject({ p_q: undefined });
+    expect(await searchPeople(client, '@')).toEqual([]);
+    expect(calls).toHaveLength(3);
+  });
+
   it('adds the top dish to suggested people', async () => {
     const { client } = fakeClient(() => ({
       data: [{ ...PERSON, viewer_follow: 'none', top_dish: 'Pork Gyro' }],

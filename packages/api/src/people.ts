@@ -168,8 +168,14 @@ export interface PeopleListOptions {
   limit?: number;
 }
 
+/** Trims a search query and drops one leading `@`, so a handle typed as shown (`@ari`) matches. */
+function cleanQuery(q: string | undefined): string {
+  const text = (q ?? '').trim();
+  return (text.startsWith('@') ? text.slice(1) : text).trim();
+}
+
 function listArgs(userId: string, opts: PeopleListOptions) {
-  const q = opts.q?.trim();
+  const q = cleanQuery(opts.q);
   return {
     p_user_id: userId,
     p_q: q ? q : undefined,
@@ -204,13 +210,13 @@ export async function listFollowing(
   return ((data ?? []) as PersonRowData[]).map((row) => toPersonRow(client, row));
 }
 
-/** Finds people by username prefix or a word of their name. A blank query finds no one (and asks nothing). */
+/** Finds people by username prefix or a word of their name; a leading `@` is ignored. A blank query finds no one (and asks nothing). */
 export async function searchPeople(
   client: FinalMealClient,
   q: string,
   limit = DEFAULT_PAGE,
 ): Promise<PersonRow[]> {
-  const text = q.trim();
+  const text = cleanQuery(q);
   if (text === '') return [];
   const { data, error } = await client
     .rpc('search_people', { p_q: text, p_limit: pageSize(limit) }, { get: true })
