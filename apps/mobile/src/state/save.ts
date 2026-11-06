@@ -22,9 +22,27 @@ export function announceSavesChanged(): void {
   for (const listener of listeners) listener();
 }
 
+/**
+ * Whether the signed-in person has each dish saved, for the dishes touched this session, keyed by
+ * dish id. Every holder (a feed card, a pick detail, the Saved tab) reads and writes it, so they
+ * agree. An entry beats the `savedByMe` a screen was handed when it was fetched.
+ */
+const states = new Map<string, boolean>();
+/** Dish ids with a save or unsave call in flight, across every holder of that dish. */
+const pending = new Set<string>();
+
+/** Records that a dish is (or is no longer) saved, for every holder. */
+export function setSavedState(dishId: string, saved: boolean): void {
+  if (states.get(dishId) === saved) return;
+  states.set(dishId, saved);
+  for (const listener of listeners) listener();
+}
+
 /** For tests. */
 export function resetSaveChanges(): void {
   version = 0;
+  states.clear();
+  pending.clear();
   for (const listener of listeners) listener();
 }
 
@@ -49,37 +67,42 @@ export interface SaveControl {
 
 /**
  * Whether the signed-in person has saved a dish, as seen from one pick (`viaPickId` is remembered
- * and its owner is told). Changes optimistically, keeps one call in flight (a ref as well as state,
- * so two taps in the same frame make one call), puts the old state back with friendly copy when the
- * call fails, and tells the Saved tab to reload when it works. `initial` is what the server last
- * said; a fresh answer replaces ours unless a call is mid-flight.
+ * and its owner is told). The answer lives in a store shared by every holder of the dish. It
+ * changes optimistically, one call per dish is in flight at a time (extra taps, from any holder,
+ * are ignored), the old state comes back with friendly copy when the call fails, and the Saved tab
+ * is told to reload when it works. `initial` is what the server last said; a fresh answer replaces
+ * the store's unless a call is mid-flight.
  */
 export function useSave(dishId: string, viaPickId: string, initial: boolean): SaveControl {
-  const [saved, setSaved] = useState(initial);
+  const stored = useSyncExternalStore(subscribe, () => states.get(dishId));
+  const saved = stored ?? initial;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inFlight = useRef(false);
 
+  // A changed answer from the server (a refresh) replaces ours, unless a call is mid-flight.
+  const seen = useRef(initial);
   useEffect(() => {
-    if (!inFlight.current) setSaved(initial);
-  }, [initial]);
+    if (seen.current === initial) return;
+    seen.current = initial;
+    if (!pending.has(dishId)) setSavedState(dishId, initial);
+  }, [dishId, initial]);
 
   const toggle = useCallback(async () => {
-    if (inFlight.current) return;
-    inFlight.current = true;
+    if (pending.has(dishId)) return;
+    pending.add(dishId);
     const before = saved;
     setBusy(true);
     setError(null);
-    setSaved(!before);
+    setSavedState(dishId, !before);
     try {
       if (before) await unsaveDish(getSupabase(), dishId);
       else await saveDish(getSupabase(), dishId, viaPickId);
       announceSavesChanged();
     } catch (e) {
-      setSaved(before);
+      setSavedState(dishId, before);
       setError(friendlyMessage(e));
     } finally {
-      inFlight.current = false;
+      pending.delete(dishId);
       setBusy(false);
     }
   }, [saved, dishId, viaPickId]);

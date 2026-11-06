@@ -509,6 +509,22 @@ describe('Add a dish form', () => {
       expect(mockRouter.dismissTo).toHaveBeenCalledWith('/(app)/you');
     });
 
+    it('keeps a duplicate of a different tier a refusal after a lost connection', async () => {
+      mockAddPick
+        .mockRejectedValueOnce(new TypeError('Network request failed'))
+        .mockRejectedValueOnce(new ApiError('duplicate', 'duplicate_pick', { id: 'pk1', tier: 'honorable' }));
+      mockGetPick.mockResolvedValue(pickAt('honorable', null, 'pk1'));
+      await render(withDraft(<AddDish />, READY));
+      await settle();
+      await fireEvent.press(cta('Add to Final Meal'));
+      await settle();
+      await fireEvent.press(cta('Add to Final Meal'));
+      await settle();
+      expect(mockAddPick).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('That dish is already on your list.')).toBeOnTheScreen();
+      expect(mockRouter.dismissTo).not.toHaveBeenCalled();
+    });
+
     it.each([
       ['has no photo', null, 'true'],
       ['already has its photo', 'https://x/p.jpg', 'false'],

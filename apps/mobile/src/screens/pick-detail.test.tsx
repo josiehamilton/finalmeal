@@ -123,6 +123,23 @@ describe('Pick detail', () => {
       expect(mockRouter.back).toHaveBeenCalled();
     });
 
+    it('shows the newest answer when an older load lands last', async () => {
+      let finishOld: (d: ReturnType<typeof makePickDetail>) => void = () => {};
+      mockDetail.mockReset();
+      mockDetail.mockReturnValueOnce(new Promise((resolve) => (finishOld = resolve)));
+      mockDetail.mockResolvedValue(makePickDetail());
+      await render(<PickDetail />);
+      await act(async () => announcePicksChanged());
+      await settle();
+      expect(screen.getByText('Wagyu Beef Don')).toBeOnTheScreen();
+      const stale = makePickDetail();
+      await act(async () =>
+        finishOld({ ...stale, pick: { ...stale.pick, dish: { id: 'd-old', name: 'Stale Dish' } } }),
+      );
+      expect(screen.getByText('Wagyu Beef Don')).toBeOnTheScreen();
+      expect(screen.queryByText('Stale Dish')).toBeNull();
+    });
+
     it('says what went wrong when it cannot load, and retries', async () => {
       mockDetail.mockRejectedValueOnce(new TypeError('Network request failed'));
       await render(<PickDetail />);

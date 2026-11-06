@@ -1,10 +1,10 @@
 import { Alert } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react-native';
 import { ApiError, getMySaves, unsaveDish } from '@finalmeal/api';
 import Saved from '../../app/(app)/(tabs)/saved';
 import { makeSavedBoard } from '../test-support/saves';
 import { makeProfile } from '../test-support/profile';
-import { announceSavesChanged, resetSaveChanges } from '../state/save';
+import { announceSavesChanged, getSavesVersion, resetSaveChanges, useSave } from '../state/save';
 
 const mockRouter = { push: jest.fn() };
 jest.mock('expo-router', () => ({
@@ -121,7 +121,7 @@ describe('Saved tab', () => {
     await show();
     expect(screen.getByText('Wagyu Beef Don')).toBeOnTheScreen();
     expect(screen.queryByText(/via @/)).toBeNull();
-    await fireEvent.press(screen.getByRole('button', { name: /Wagyu Beef Don/ }));
+    await fireEvent.press(screen.getByText('Wagyu Beef Don'));
     expect(mockRouter.push).not.toHaveBeenCalled();
     await fireEvent.press(chip('Final Meals'));
     expect(screen.queryByText('Wagyu Beef Don')).toBeNull();
@@ -135,6 +135,8 @@ describe('Saved tab', () => {
       const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       await show();
       await longPress(/Plain Biryani/);
+      // The reload after a removal asks the server, which no longer has it.
+      mockGet.mockResolvedValue(makeSavedBoard().filter((s) => s.dish.id !== 'd-biryani'));
       expect(alert.mock.calls[0]![0]).toBe('Remove from Saved');
       expect(alert.mock.calls[0]![2]!.map((b) => b.text)).toEqual(['Cancel', 'Remove']);
       expect(mockUnsave).not.toHaveBeenCalled();
@@ -161,6 +163,53 @@ describe('Saved tab', () => {
       await act(async () => alert.mock.calls[0]![2]!.find((b) => b.text === 'Remove')!.onPress!());
       expect(screen.getByText('Plain Biryani')).toBeOnTheScreen();
       expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+    });
+
+    it('puts the card back even when the reload after a failed remove also fails', async () => {
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      mockUnsave.mockRejectedValue(new TypeError('Network request failed'));
+      await show();
+      mockGet.mockRejectedValue(new TypeError('Network request failed'));
+      await longPress(/Plain Biryani/);
+      await act(async () => alert.mock.calls[0]![2]!.find((b) => b.text === 'Remove')!.onPress!());
+      expect(screen.getByText('Plain Biryani')).toBeOnTheScreen();
+      expect(screen.getByText('Wagyu Beef Don')).toBeOnTheScreen();
+      expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+    });
+
+    it('tells the other screens: every holder of the dish shows it unsaved, and Saved announces', async () => {
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      const card = await renderHook(() => useSave('d-biryani', 'pk-alli', true));
+      await show();
+      await longPress(/Plain Biryani/);
+      await act(async () => alert.mock.calls[0]![2]!.find((b) => b.text === 'Remove')!.onPress!());
+      expect(card.result.current.saved).toBe(false);
+      expect(getSavesVersion()).toBeGreaterThan(0);
+    });
+
+    it('is not undone by a reload that started before the removal', async () => {
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      await show();
+      let finishStale: (saves: ReturnType<typeof makeSavedBoard>) => void = () => {};
+      mockGet.mockReturnValueOnce(new Promise((resolve) => (finishStale = resolve)));
+      mockGet.mockResolvedValue(makeSavedBoard().filter((s) => s.dish.id !== 'd-biryani'));
+      await act(async () => announceSavesChanged());
+      await longPress(/Plain Biryani/);
+      await act(async () => alert.mock.calls[0]![2]!.find((b) => b.text === 'Remove')!.onPress!());
+      await act(async () => finishStale(makeSavedBoard()));
+      expect(screen.queryByText('Plain Biryani')).toBeNull();
+      expect(screen.getByText('Wagyu Beef Don')).toBeOnTheScreen();
+    });
+
+    it('clears the remove message when the filter changes', async () => {
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      mockUnsave.mockRejectedValue(new TypeError('Network request failed'));
+      await show();
+      await longPress(/Plain Biryani/);
+      await act(async () => alert.mock.calls[0]![2]!.find((b) => b.text === 'Remove')!.onPress!());
+      expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+      await fireEvent.press(chip('Honorable'));
+      expect(screen.queryByText('Can’t reach the kitchen right now.')).toBeNull();
     });
   });
 

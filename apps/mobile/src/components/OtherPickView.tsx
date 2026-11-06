@@ -95,7 +95,12 @@ export function OtherPickView({ detail }: { detail: PickDetail }) {
 
           <View testID="pick-quote" style={styles.quote}>
             {pick.note ? <Text style={styles.noteText}>{`“${pick.note}”`}</Text> : null}
-            <View style={styles.caption}>
+            {/* The whole caption is one link to the owner, so a screen reader can reach it. */}
+            <Pressable
+              accessibilityRole="link"
+              onPress={() => router.push(`/u/${owner.id}`)}
+              style={styles.caption}
+            >
               <Avatar
                 uri={owner.avatarUrl}
                 name={owner.displayName}
@@ -103,16 +108,10 @@ export function OtherPickView({ detail }: { detail: PickDetail }) {
                 accessibilityLabel={`${owner.displayName}’s photo`}
               />
               <Text style={styles.captionText}>
-                <Text
-                  accessibilityRole="link"
-                  onPress={() => router.push(`/u/${owner.id}`)}
-                  style={styles.captionName}
-                >
-                  {`@${owner.username}`}
-                </Text>
+                <Text style={styles.captionName}>{`@${owner.username}`}</Text>
                 {isFinal ? ` · #${pick.slot} on their Final Meal` : ' · Honorable Mention'}
               </Text>
-            </View>
+            </Pressable>
           </View>
 
           <PickersRow pickers={detail.pickers} finalCount={detail.finalCount} />

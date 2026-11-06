@@ -1,6 +1,13 @@
 import { act, renderHook } from '@testing-library/react-native';
 import { ApiError, saveDish, unsaveDish } from '@finalmeal/api';
-import { announceSavesChanged, getSavesVersion, resetSaveChanges, useSave, useSavesVersion } from './save';
+import {
+  announceSavesChanged,
+  getSavesVersion,
+  resetSaveChanges,
+  setSavedState,
+  useSave,
+  useSavesVersion,
+} from './save';
 
 jest.mock('@finalmeal/api', () => ({
   ...jest.requireActual('@finalmeal/api'),
@@ -88,5 +95,33 @@ describe('useSave', () => {
     );
     await rerender({ initial: true });
     expect(result.current.saved).toBe(true);
+  });
+
+  it('shares the answer between every holder of the same dish, and a store entry beats a stale initial', async () => {
+    const a = await renderHook(() => useSave('d1', 'pk1', false));
+    const b = await renderHook(() => useSave('d1', 'pk2', false));
+    await act(async () => a.result.current.toggle());
+    expect(b.result.current.saved).toBe(true);
+    // Another screen (the Saved tab) says it is gone.
+    await act(async () => setSavedState('d1', false));
+    expect(a.result.current.saved).toBe(false);
+    expect(b.result.current.saved).toBe(false);
+    // Re-mounted from a fetch made before the change: the session's answer still wins.
+    const c = await renderHook(() => useSave('d1', 'pk1', true));
+    expect(c.result.current.saved).toBe(false);
+  });
+
+  it('lets only one holder of a dish have a call in flight', async () => {
+    let finish: () => void = () => {};
+    mockSave.mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
+    const a = await renderHook(() => useSave('d1', 'pk1', false));
+    const b = await renderHook(() => useSave('d1', 'pk2', false));
+    await act(async () => {
+      void a.result.current.toggle();
+      void b.result.current.toggle();
+    });
+    expect(mockSave).toHaveBeenCalledTimes(1);
+    expect(mockUnsave).not.toHaveBeenCalled();
+    await act(async () => finish());
   });
 });

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { saveDish, unsaveDish } from '@finalmeal/api';
 import { FeedCard } from './FeedCard';
+import { getSavesVersion, resetSaveChanges, setSavedState } from '../state/save';
 import { hoursAgo, makeFeedItem } from '../test-support/feed';
 import { makePick } from '../test-support/picks';
 
@@ -18,6 +19,7 @@ const mockUnsave = jest.mocked(unsaveDish);
 describe('FeedCard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetSaveChanges();
     mockSave.mockResolvedValue(undefined);
     mockUnsave.mockResolvedValue(undefined);
   });
@@ -157,7 +159,15 @@ describe('FeedCard', () => {
       expect(screen.queryByText('Can’t reach the kitchen right now.')).toBeNull();
     });
 
-    it('follows a fresh answer from the server when idle', async () => {
+    it('tells the Saved tab, and agrees with a save or unsave made on another screen', async () => {
+      await render(<FeedCard item={makeFeedItem()} />);
+      await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
+      expect(getSavesVersion()).toBe(1);
+      await act(async () => setSavedState('d-gyro', false));
+      expect(screen.getByRole('button', { name: 'Save' })).toBeOnTheScreen();
+    });
+
+        it('follows a fresh answer from the server when idle', async () => {
       const view = await render(<FeedCard item={makeFeedItem()} />);
       await view.rerender(<FeedCard item={makeFeedItem({ savedByMe: true })} />);
       expect(screen.getByRole('button', { name: 'Saved' })).toBeOnTheScreen();

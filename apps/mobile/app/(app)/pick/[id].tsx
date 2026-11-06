@@ -56,15 +56,20 @@ export default function PickDetail() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Only the newest load may set the screen, so a slow older answer never overwrites a newer one.
+  const latest = useRef(0);
   const load = useCallback(async () => {
+    const mine = ++latest.current;
     setLoadError(null);
     try {
       const found = await getPickDetail(getSupabase(), id);
       // Only your own picks need the whole list (finals, slots) for their actions.
-      const mine = found?.isMine ? await getMyPicks(getSupabase()) : null;
+      const own = found?.isMine ? await getMyPicks(getSupabase()) : null;
+      if (mine !== latest.current) return;
       setDetail(found);
-      setPicks(mine);
+      setPicks(own);
     } catch (e) {
+      if (mine !== latest.current) return;
       setLoadError(friendlyMessage(e));
     }
   }, [id]);
@@ -74,9 +79,10 @@ export default function PickDetail() {
 
   /** After a change made here that moves the counts (promote, demote), refresh them quietly. */
   const refreshDetail = useCallback(async () => {
+    const mine = ++latest.current;
     try {
       const found = await getPickDetail(getSupabase(), id);
-      if (found) setDetail(found);
+      if (found && mine === latest.current) setDetail(found);
     } catch {
       // The counts stay as they were; nothing else depends on them.
     }

@@ -1,12 +1,10 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { friendlyMessage, saveDish, unsaveDish } from '@finalmeal/api';
 import type { FeedItem } from '@finalmeal/api';
 import { countLabel, feedCaption, relativeTime } from '@finalmeal/core';
 import { colors, radii } from '@finalmeal/ui-tokens';
 import { fontFamily } from '../lib/fonts';
-import { getSupabase } from '../lib/supabase';
+import { useSave } from '../state/save';
 import { Avatar } from './Avatar';
 import { Icon } from './Icon';
 import { SkullMark } from './SkullMark';
@@ -28,32 +26,8 @@ export function FeedCard({ item, photoHeight = PHOTO_HEIGHT }: FeedCardProps) {
   const router = useRouter();
   const { actor, pick } = item;
   const isFinal = pick.tier === 'final';
-  const [saved, setSaved] = useState(item.savedByMe);
-  const [error, setError] = useState<string | null>(null);
-  // A ref as well as state: two taps in one frame both see the same render.
-  const inFlight = useRef(false);
-
-  // A fresh answer from the server (a refresh) replaces ours, unless a call is mid-flight.
-  useEffect(() => {
-    if (!inFlight.current) setSaved(item.savedByMe);
-  }, [item.savedByMe]);
-
-  async function toggleSave() {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    const before = saved;
-    setError(null);
-    setSaved(!before);
-    try {
-      if (before) await unsaveDish(getSupabase(), pick.dish.id);
-      else await saveDish(getSupabase(), pick.dish.id, pick.id);
-    } catch (e) {
-      setSaved(before);
-      setError(friendlyMessage(e));
-    } finally {
-      inFlight.current = false;
-    }
-  }
+  // Shared with the pick detail and the Saved tab, so they agree about this dish.
+  const { saved, error, toggle } = useSave(pick.dish.id, pick.id, item.savedByMe);
 
   const openPerson = () => router.push(`/u/${actor.id}`);
   const openPick = () => router.push(`/pick/${pick.id}`);
@@ -126,7 +100,7 @@ export function FeedCard({ item, photoHeight = PHOTO_HEIGHT }: FeedCardProps) {
           accessibilityRole="button"
           accessibilityLabel={saved ? 'Saved' : 'Save'}
           accessibilityState={{ selected: saved }}
-          onPress={() => void toggleSave()}
+          onPress={() => void toggle()}
           style={styles.save}
         >
           <Icon

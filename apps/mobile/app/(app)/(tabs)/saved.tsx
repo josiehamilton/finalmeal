@@ -12,7 +12,7 @@ import { SavedGrid } from '../../../src/components/SavedGrid';
 import { fontFamily } from '../../../src/lib/fonts';
 import { getSupabase } from '../../../src/lib/supabase';
 import { useSession } from '../../../src/providers/SessionProvider';
-import { useSavesVersion } from '../../../src/state/save';
+import { announceSavesChanged, setSavedState, useSavesVersion } from '../../../src/state/save';
 
 const CHIPS: { key: SaveFilter; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -49,6 +49,7 @@ export default function Saved() {
   // On every focus, and again when a save changes elsewhere. A refresh keeps what is on screen.
   useFocusEffect(
     useCallback(() => {
+      setRemoveError(null);
       void load();
     }, [load]),
   );
@@ -73,11 +74,23 @@ export default function Saved() {
 
   async function remove(save: SavedDish) {
     setRemoveError(null);
+    // Answers to reloads that started before this are out of date now; they must not bring the card back.
+    latest.current += 1;
+    const index = saves?.findIndex((s) => s.dish.id === save.dish.id) ?? -1;
     setSaves((current) => current?.filter((s) => s.dish.id !== save.dish.id) ?? current);
     try {
       await unsaveDish(getSupabase(), save.dish.id);
+      // Every other holder of the dish (a feed card, an open pick) shows it unsaved too.
+      setSavedState(save.dish.id, false);
+      announceSavesChanged();
     } catch (e) {
       setRemoveError(friendlyMessage(e));
+      // Still saved on the server: put the card back now, whether or not the reload below works.
+      setSaves((current) => {
+        if (!current || current.some((s) => s.dish.id === save.dish.id)) return current;
+        const at = index < 0 ? current.length : Math.min(index, current.length);
+        return [...current.slice(0, at), save, ...current.slice(at)];
+      });
       void load();
     }
   }
@@ -146,7 +159,10 @@ export default function Saved() {
                 accessibilityRole="button"
                 accessibilityLabel={label}
                 accessibilityState={{ selected: on }}
-                onPress={() => setFilter(key)}
+                onPress={() => {
+                  setFilter(key);
+                  setRemoveError(null);
+                }}
                 style={[styles.chip, on && styles.chipOn]}
               >
                 <Text style={[styles.chipText, on && styles.chipTextOn]}>{label}</Text>

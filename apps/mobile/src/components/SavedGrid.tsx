@@ -51,7 +51,8 @@ function SavedCard({ save, width, onOpen, onRemove }: SavedCardProps) {
   const isFinal = save.viaTier === 'final';
   return (
     <Pressable
-      accessibilityRole="button"
+      // A card whose pick is gone has nothing to open, so it is not announced as a button.
+      accessibilityRole={save.viaPickId ? 'button' : undefined}
       accessibilityLabel={`${save.dish.name}, ${save.place.name} · ${save.place.city}`}
       accessibilityActions={[{ name: 'remove', label: 'Remove from Saved' }]}
       onAccessibilityAction={() => onRemove(save)}

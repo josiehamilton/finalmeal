@@ -81,10 +81,13 @@ describe('OtherPickView', () => {
     expect(screen.queryByText(/On \d+ Final Meal/)).toBeNull();
   });
 
-  it('opens the owner from their @username', async () => {
+  it('opens the owner from the caption, which a screen reader can reach as a link', async () => {
     await show();
-    await fireEvent.press(screen.getByText('@mikebrennan'));
+    const link = screen.getByRole('link', { name: /@mikebrennan/ });
+    await fireEvent.press(link);
     expect(mockRouter.push).toHaveBeenCalledWith('/u/u-mike');
+    await fireEvent.press(screen.getByText('@mikebrennan · #2 on their Final Meal'));
+    expect(mockRouter.push).toHaveBeenCalledTimes(2);
   });
 
   it('goes back', async () => {

@@ -69,7 +69,17 @@ describe('SavedGrid', () => {
         onRemove={noop}
       />,
     );
-    await fireEvent.press(screen.getByRole('button', { name: /Wagyu Beef Don/ }));
+    // Not announced as a button: it has nothing to open, but removing is still offered.
+    expect(screen.queryByRole('button', { name: /Wagyu Beef Don/ })).toBeNull();
+    await fireEvent.press(screen.getByText('Wagyu Beef Don'));
     expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('still offers removal on a card whose pick is gone', async () => {
+    const onRemove = jest.fn();
+    const save = makeSavedDish({ via: null, viaPickId: null, viaTier: null });
+    await render(<SavedGrid saves={[save]} onOpen={noop} onRemove={onRemove} />);
+    await fireEvent(screen.getByText('Wagyu Beef Don'), 'longPress');
+    expect(onRemove).toHaveBeenCalledWith(save);
   });
 });
