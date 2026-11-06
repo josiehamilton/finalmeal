@@ -12,7 +12,7 @@ const SWATCHES = [
 ] as const;
 
 interface FoundationProps {
-  /** e.g. "6 people · 14 places · 17 dishes"; null when the API could not be reached. */
+  /** e.g. "7 people · 14 places · 22 dishes"; null when the API could not be reached. */
   statsLine: string | null;
 }
 
