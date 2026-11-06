@@ -4,6 +4,7 @@ import { followUser, friendlyMessage, unfollowUser } from '@finalmeal/api';
 import type { FollowState } from '@finalmeal/api';
 import { getSupabase } from '../lib/supabase';
 import {
+  announceFollowed,
   beginFollowCall,
   endFollowCall,
   hasFollowCall,
@@ -77,7 +78,9 @@ export function useFollow(person: FollowTarget): FollowControl {
       setError(null);
       if (before === 'none') {
         setFollowState(id, visibility === 'private' ? 'requested' : 'active');
-        setFollowState(id, await followUser(getSupabase(), id));
+        const result = await followUser(getSupabase(), id);
+        setFollowState(id, result);
+        if (result === 'active') announceFollowed();
       } else {
         setFollowState(id, 'none');
         await unfollowUser(getSupabase(), id);

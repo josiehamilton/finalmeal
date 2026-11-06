@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { getFollowingFeed, getNearbyFeed, getSuggestedPeople } from '@finalmeal/api';
+import { followUser, getFollowingFeed, getNearbyFeed, getSuggestedPeople } from '@finalmeal/api';
 import { FeedList } from './FeedList';
 import { makeFeedItem, makeFeedItems } from '../test-support/feed';
+import { makeSuggested } from '../test-support/people';
 import { makeProfile } from '../test-support/profile';
+import { clearFollowStates } from '../state/follow-store';
 import { announcePicksChanged, resetPickChanges } from '../state/pick-changes';
 
 const mockRouter = { push: jest.fn(), navigate: jest.fn() };
@@ -52,6 +54,7 @@ describe('FeedList', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetPickChanges();
+    clearFollowStates();
     mockProfile = makeProfile({ counts: { followers: 0, following: 3, dishes: 0 } });
     mockRefreshProfile.mockResolvedValue(null);
     mockSuggested.mockResolvedValue([]);
@@ -185,6 +188,47 @@ describe('FeedList', () => {
       expect(screen.getByTestId('feed-list').props.data).toHaveLength(21);
     });
 
+    it('keeps paging after a pull to refresh fails, from the cursor it already had', async () => {
+      const next = { before: '2026-11-03T10:20:30.123456+00:00', beforeKey: 'k20' };
+      mockFollowing.mockResolvedValueOnce({ items: makeFeedItems(20), next });
+      await show('following');
+      mockFollowing.mockRejectedValueOnce(new TypeError('Network request failed'));
+      await act(async () => {
+        await screen.getByTestId('feed-list').props.refreshControl.props.onRefresh();
+      });
+      expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+      mockFollowing.mockResolvedValueOnce({ items: makeFeedItems(1, 21), next: null });
+      await endReached();
+      await act(async () => {});
+      expect(mockFollowing).toHaveBeenCalledTimes(3);
+      expect(mockFollowing.mock.calls[2]![1]).toBe(next);
+      expect(screen.getByTestId('feed-list').props.data).toHaveLength(21);
+    });
+
+    it('stays quiet at the end when Try again fails a second time, and Try again still works', async () => {
+      const next = { before: '2026-11-03T10:20:30.123456+00:00', beforeKey: 'k20' };
+      mockFollowing.mockResolvedValueOnce({ items: makeFeedItems(20), next });
+      mockFollowing.mockRejectedValue(new TypeError('Network request failed'));
+      await show('following');
+      await endReached();
+      await act(async () => {});
+      expect(mockFollowing).toHaveBeenCalledTimes(2);
+      await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+      await act(async () => {});
+      expect(mockFollowing).toHaveBeenCalledTimes(3);
+      expect(screen.getByText('Can’t reach the kitchen right now.')).toBeOnTheScreen();
+      // The footer changed again; scrolling must still not ask by itself.
+      await endReached();
+      await endReached();
+      await act(async () => {});
+      expect(mockFollowing).toHaveBeenCalledTimes(3);
+      mockFollowing.mockResolvedValue({ items: makeFeedItems(1, 21), next: null });
+      await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+      await act(async () => {});
+      expect(mockFollowing).toHaveBeenCalledTimes(4);
+      expect(screen.getByTestId('feed-list').props.data).toHaveLength(21);
+    });
+
     it('does not page from the old cursor while a refresh is loading', async () => {
       const next = { before: '2026-11-03T10:20:30.123456+00:00', beforeKey: 'k20' };
       mockFollowing.mockResolvedValueOnce({ items: makeFeedItems(20), next });
@@ -303,6 +347,37 @@ describe('FeedList', () => {
       expect(screen.getByText('@arimitchell')).toBeOnTheScreen();
       await act(async () => mockFocus.current());
       expect(mockFollowing).toHaveBeenCalledTimes(2);
+    });
+
+    it('fills in when someone is followed from the empty table, without leaving the screen', async () => {
+      mockProfile = makeProfile({ counts: { followers: 0, following: 0, dishes: 0 } });
+      mockSuggested.mockResolvedValue([
+        makeSuggested({ id: 'u3', username: 'arimitchell', displayName: 'Ari Mitchell' }),
+      ]);
+      jest.mocked(followUser).mockResolvedValue('active');
+      await show('following');
+      expect(screen.getByText('An empty table.')).toBeOnTheScreen();
+      expect(mockFollowing).toHaveBeenCalledTimes(1);
+      mockRefreshProfile.mockClear();
+      mockFollowing.mockResolvedValue({ items: [makeFeedItem()], next: null });
+      await fireEvent.press(screen.getByRole('button', { name: 'Follow' }));
+      await act(async () => {});
+      expect(mockFollowing).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Pork Gyro')).toBeOnTheScreen();
+      expect(screen.queryByText('An empty table.')).toBeNull();
+      expect(mockRefreshProfile).toHaveBeenCalled();
+    });
+
+    it('does not reload for a follow request, which changes nothing in the feed', async () => {
+      mockProfile = makeProfile({ counts: { followers: 0, following: 0, dishes: 0 } });
+      mockSuggested.mockResolvedValue([
+        makeSuggested({ id: 'u3', username: 'arimitchell', displayName: 'Ari Mitchell' }),
+      ]);
+      jest.mocked(followUser).mockResolvedValue('requested');
+      await show('following');
+      await fireEvent.press(screen.getByRole('button', { name: 'Follow' }));
+      await act(async () => {});
+      expect(mockFollowing).toHaveBeenCalledTimes(1);
     });
 
     it('tolerates a profile refresh that fails', async () => {

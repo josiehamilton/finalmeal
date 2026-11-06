@@ -12,6 +12,9 @@ const listeners = new Set<() => void>();
 /** Ids with a follow or unfollow call in flight, across every button for that person. */
 const pending = new Set<string>();
 
+/** Counts up each time a follow call ends with the person now followed; 0 until then. */
+let followedVersion = 0;
+
 function emit() {
   for (const listener of listeners) listener();
 }
@@ -41,6 +44,17 @@ export function syncFollowStates(
     changed = true;
   }
   if (changed) emit();
+}
+
+/** Call after a follow call ends with the person followed (not merely asked), so the feed can fill in. */
+export function announceFollowed(): void {
+  followedVersion += 1;
+  emit();
+}
+
+/** Changes each time someone is newly followed. Compare with the value you first saw. */
+export function useFollowedVersion(): number {
+  return useSyncExternalStore(subscribe, () => followedVersion);
 }
 
 /** The state to show for `id`: the store's, else `fallback` (what the screen was handed). */

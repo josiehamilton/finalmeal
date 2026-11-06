@@ -9,6 +9,7 @@ import { cityName } from '../lib/city-name';
 import { fontFamily } from '../lib/fonts';
 import { getSupabase } from '../lib/supabase';
 import { useSession } from '../providers/SessionProvider';
+import { useFollowedVersion } from '../state/follow-store';
 import { FeedCard } from './FeedCard';
 import { FeedEmpty } from './FeedEmpty';
 import type { FeedEmptyVariant } from './FeedEmpty';
@@ -81,7 +82,9 @@ export function FeedList({ mode }: FeedListProps) {
       const id = ++loadId.current;
       moreInFlight.current = false;
       moreErrorRef.current = false;
-      // The old cursor belongs to the old list: nothing may page from it while this loads.
+      // The old cursor belongs to the old list: nothing may page from it while this loads. If the
+      // load fails the old list stays on screen, so its cursor comes back.
+      const previousNext = nextRef.current;
       nextRef.current = null;
       setLoadingMore(false);
       setMoreError(null);
@@ -97,7 +100,10 @@ export function FeedList({ mode }: FeedListProps) {
         if (mode === 'following' && page.items.length === 0)
           refreshProfileRef.current().catch(() => {});
       } catch (e) {
-        if (id === loadId.current) setError(friendlyMessage(e));
+        if (id === loadId.current) {
+          nextRef.current = previousNext;
+          setError(friendlyMessage(e));
+        }
       } finally {
         if (id === loadId.current) setRefreshing(false);
       }
@@ -159,6 +165,19 @@ export function FeedList({ mode }: FeedListProps) {
       if (itemsRef.current === null || itemsRef.current.length === 0) void reload();
     }, [reload, needsCity]),
   );
+
+  // Following someone from the empty table's Popular list fills the feed in (and updates the count
+  // that words the empty message) without waiting for a focus change.
+  const followedVersion = useFollowedVersion();
+  const seenFollowed = useRef(followedVersion);
+  useEffect(() => {
+    if (seenFollowed.current === followedVersion) return;
+    seenFollowed.current = followedVersion;
+    if (mode !== 'following' || needsCity) return;
+    if (itemsRef.current !== null && itemsRef.current.length > 0) return;
+    refreshProfileRef.current().catch(() => {});
+    void reload();
+  }, [followedVersion, mode, needsCity, reload]);
 
   const variant: FeedEmptyVariant =
     mode === 'nearby'
