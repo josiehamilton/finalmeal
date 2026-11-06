@@ -51,6 +51,18 @@ Sign-in codes expire after 10 minutes, and you can ask for a new one every 30 se
 3. With five Final Meal dishes, adding another asks which one to replace (Swap); the replaced dish becomes an Honorable Mention.
 4. Open any dish on You to edit it, move it up, demote or promote it, get directions, or remove it. Filter You by city or tag with the chips.
 
+**Following, feed and saves (Phase 4)**
+
+1. Sign in as `josiehamilton@example.com` (code from the local inbox). Feed › Following shows Ari's dethroning first (one card), then Pork Gyro and Tonkotsu Ramen. Tap Save on a card: it becomes `Saved`. Feed › Nearby shows Vancouver picks only.
+2. Tap the search icon on Feed to open Find people. Search by name or `@handle`, and follow someone. Tap a name to open their profile; tap a dish to open their pick (`On n Final Meals`, Save to try, Unsave).
+3. Open `@allimercer`: tap `Follow back`, then look at the followers and following lists. Open `@priyashah` (a private account): the button says `Requested` and the page says `This account is private`.
+4. The bell on Feed shows a dot. Activity lists what happened (follows, requests, saves, dethronings) with `Follow back`; `Mark all read` clears the dots. Settings › Notifications has four push switches; push itself starts with the first test build.
+5. The Saved tab shows what you saved to try, with chips and long-press to remove.
+6. Sign out and sign in as `priyashah@example.com` (also in the local inbox). Activity shows requests from Josie and Sam: approve Josie. Back as Josie, Priya's profile and picks now show.
+7. A brand-new account lands on First landing with Nearby picks for its home city; adding a dish from it returns there. After you switch tabs, Feed shows `An empty table.` with Popular people to follow.
+
+Seeded logins: `josiehamilton@example.com` (public, has followers and saves), `priyashah@example.com` (private, with pending follow requests from Josie and Sam). Others: `arimitchell`, `mikebrennan`, `allimercer`, `devpatel`, `samokafor` at `@example.com`.
+
 ### Device checklist (Phase 3, pending an idle Mac)
 
 The iPhone run on 2026-11-02 stopped early because the Mac was overloaded (each tap took minutes). Already passed on the iPhone 17: You with the Vancouver filter, the dish suggestion with "· 2 picks here", tags and photo on the Add form, and the duplicate offer ("Make it a Final Meal instead" moved the ramen to #5). Still to run, from a session on the Mac or by hand. Run `pnpm db:reset && pnpm env:local` first, keep one Expo server, and if Expo Go shows old screens, quit Expo Go and reopen the link (it can serve a cached copy).
@@ -69,6 +81,29 @@ The iPhone run on 2026-11-02 stopped early because the Mac was overloaded (each 
 7. Repeat checks 1, 3 and 5.
 8. Photo failure: start saving a dish with a photo, then cut the network (`adb shell svc wifi disable` and `adb shell svc data disable`). The dish saves without the photo and the notice "Saved without the photo. Add it from the dish any time." shows (on You, or on First landing for a first pick). Turn the network back on with `enable`.
 9. Directions open the maps app.
+
+Take a screenshot of every step and tell Claude about anything that looks wrong.
+
+### Device checklist (Phase 4, pending an idle Mac)
+
+Not yet run on a device: the Phase 4 build was checked by the unit, database, API and web tests only. Run `pnpm db:reset && pnpm env:local` first, keep one Expo server, and take a screenshot of every step.
+
+**iPhone 17** (sign in as `josiehamilton@example.com`, code from the local inbox)
+
+1. Feed › Following shows Ari's dethroning first (one card), then Pork Gyro and Tonkotsu Ramen. Save a card and see `Saved`.
+2. Nearby shows Vancouver picks only, with no Sam or Priya.
+3. Open Mike's Wagyu Beef Don: `On n Final Meals`. Save to try, then Unsave.
+4. Open `@allimercer` from a card: `Follow back`, follow, then check the followers and following lists and search.
+5. Open `@priyashah`: `Requested` and `This account is private`.
+6. The bell dot shows. Activity shows two unread with `Follow back`. Tap `Mark all read`.
+7. Settings › Notifications: switch Saves off, leave and come back, and it's still off.
+8. Saved shows the four seeded saves. Try each chip, and long-press to remove one.
+9. Sign out and sign in as `priyashah@example.com`: approve Josie in Activity. Back as Josie, Priya's profile and pick now show. (Also check that Saved and the Follow buttons show Josie's own state after switching accounts, not the other person's.)
+10. Sign up a new user: First landing shows Nearby in Vancouver. Add a dish from it and land back on First landing. Switch tabs, then Feed shows `An empty table.` with Popular people. Follow one of them from there: the feed fills in.
+
+**Pixel 10**
+
+11. Repeat 1, 4, 6 and 10 in Expo Go, and confirm there is no red error from `expo-notifications` at startup.
 
 Take a screenshot of every step and tell Claude about anything that looks wrong.
 

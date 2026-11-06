@@ -10,7 +10,9 @@ test.describe('foundation page with the local database', () => {
   test('shows live counts from Supabase', async ({ page }) => {
     await page.goto('/');
     // Assert the format (and that the seed isn't empty), so a seed change can't break this test.
-    await expect(page.getByText(/^[1-9]\d* people · [1-9]\d* places · [1-9]\d* dishes$/)).toBeVisible();
+    await expect(
+      page.getByText(/^[1-9]\d* people · [1-9]\d* places · [1-9]\d* dishes$/),
+    ).toBeVisible();
   });
 
   test('paints the night background', async ({ page }) => {
