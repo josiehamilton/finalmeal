@@ -43,6 +43,7 @@ A running list, newest needs added as they come up. Nothing here blocks today's 
 | 23 | Feed details not on the canvas: the Following / Nearby tab row also shows above the empty state; the Honorable badge on cards is a dark pill with an outline; a failed next page shows "Try again" at the bottom; search boxes say "Search followers" / "Search following" / "Search people". | Any time | As listed |
 | 24 | Saved tab details: the "Remove from Saved" alert has a title only; Nearby with no home city shows a "Choose home city" button; the filter chips hide when nothing is saved; long-press remove is also an accessibility action. | Any time | As listed |
 | 25 | Activity and notification settings: a new neutral colour token for a switch that's off (`switchOff` #3A3530, from the board); Follow back in Activity uses the shared 36 px pill (board shows 34); the empty Activity state has no board, so Claude styled it (Newsreader italic title, centred body); Log out waits at most 3 seconds to forget the phone's push token. | Any time | As listed |
+| 26 | "Popular near <city>" (Find people) can include people who aren't actually near; and opening a private account's pick after losing access shows the same "That pick isn’t there any more." as a removed pick. | Any time | As described |
 
 ## Done
 
