@@ -5,7 +5,7 @@ import { ApiError, saveDish, unsaveDish } from '@finalmeal/api';
 import { OtherPickView } from './OtherPickView';
 import { makePickDetail } from '../test-support/saves';
 import { makePick } from '../test-support/picks';
-import { getSavesVersion, resetSaveChanges } from '../state/save';
+import { getSavesVersion, clearSaveStates } from '../state/save';
 
 const mockRouter = { push: jest.fn(), back: jest.fn() };
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter }));
@@ -28,7 +28,7 @@ async function show(detail = makePickDetail()) {
 describe('OtherPickView', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    resetSaveChanges();
+    clearSaveStates();
     mockSave.mockResolvedValue(undefined);
     mockUnsave.mockResolvedValue(undefined);
   });

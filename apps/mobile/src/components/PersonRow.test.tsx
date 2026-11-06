@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { followUser } from '@finalmeal/api';
-import { resetFollowStore } from '../state/follow-store';
+import { clearFollowStates } from '../state/follow-store';
 import { makePerson } from '../test-support/people';
 import { PersonRow } from './PersonRow';
 
@@ -15,7 +15,7 @@ const mockFollow = jest.mocked(followUser);
 describe('PersonRow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    resetFollowStore();
+    clearFollowStates();
     mockFollow.mockResolvedValue('active');
   });
 

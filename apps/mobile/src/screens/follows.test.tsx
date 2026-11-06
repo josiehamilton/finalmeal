@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { getProfile, listFollowers, listFollowing } from '@finalmeal/api';
-import { resetFollowStore, setFollowState } from '../state/follow-store';
+import { clearFollowStates, setFollowState } from '../state/follow-store';
 import Follows from '../../app/(app)/u/[id]/follows';
 import { makeProfile } from '../test-support/profile';
 import { makeAlli, makePerson } from '../test-support/people';
@@ -52,7 +52,7 @@ describe('Followers and following', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
-    resetFollowStore();
+    clearFollowStates();
     mockParams = { id: 'u1', tab: 'followers' };
     mockGetProfile.mockResolvedValue(josie());
     mockFollowers.mockResolvedValue([

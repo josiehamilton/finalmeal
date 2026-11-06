@@ -4,7 +4,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import { followUser, unfollowUser } from '@finalmeal/api';
 import type { FollowState } from '@finalmeal/api';
 import { useFollow } from './follow';
-import { resetFollowStore, setFollowState, syncFollowStates } from './follow-store';
+import { clearFollowStates, setFollowState, syncFollowStates } from './follow-store';
 import type { FollowTarget } from './follow';
 
 jest.mock('@finalmeal/api', () => ({
@@ -50,7 +50,7 @@ describe('useFollow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
-    resetFollowStore();
+    clearFollowStates();
     alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockFollow.mockResolvedValue('active');
     mockUnfollow.mockResolvedValue(undefined);

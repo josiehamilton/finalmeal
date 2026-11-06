@@ -64,8 +64,8 @@ export function hasFollowCall(id: string): boolean {
   return pending.has(id);
 }
 
-/** For tests. */
-export function resetFollowStore(): void {
+/** Forgets every follow state. Called when the session ends (and by tests). */
+export function clearFollowStates(): void {
   states.clear();
   pending.clear();
   emit();

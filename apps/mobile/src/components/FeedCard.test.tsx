@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { saveDish, unsaveDish } from '@finalmeal/api';
 import { FeedCard } from './FeedCard';
-import { getSavesVersion, resetSaveChanges, setSavedState } from '../state/save';
+import { getSavesVersion, clearSaveStates, setSavedState } from '../state/save';
 import { hoursAgo, makeFeedItem } from '../test-support/feed';
 import { makePick } from '../test-support/picks';
 
@@ -19,7 +19,7 @@ const mockUnsave = jest.mocked(unsaveDish);
 describe('FeedCard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    resetSaveChanges();
+    clearSaveStates();
     mockSave.mockResolvedValue(undefined);
     mockUnsave.mockResolvedValue(undefined);
   });

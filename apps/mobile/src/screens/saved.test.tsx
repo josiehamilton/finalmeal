@@ -4,7 +4,7 @@ import { ApiError, getMySaves, unsaveDish } from '@finalmeal/api';
 import Saved from '../../app/(app)/(tabs)/saved';
 import { makeSavedBoard } from '../test-support/saves';
 import { makeProfile } from '../test-support/profile';
-import { announceSavesChanged, getSavesVersion, resetSaveChanges, useSave } from '../state/save';
+import { announceSavesChanged, getSavesVersion, clearSaveStates, useSave } from '../state/save';
 
 const mockRouter = { push: jest.fn() };
 jest.mock('expo-router', () => ({
@@ -36,7 +36,7 @@ const chip = (name: string) => screen.getByRole('button', { name });
 describe('Saved tab', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    resetSaveChanges();
+    clearSaveStates();
     mockProfile = makeProfile();
     mockGet.mockResolvedValue(makeSavedBoard());
     mockUnsave.mockResolvedValue(undefined);

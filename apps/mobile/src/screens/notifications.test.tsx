@@ -8,7 +8,7 @@ import {
   subscribeToMyNotifications,
 } from '@finalmeal/api';
 import Activity from '../../app/(app)/notifications';
-import { resetFollowStore } from '../state/follow-store';
+import { clearFollowStates } from '../state/follow-store';
 import { makeActivity, makeFollowed, makeRequest, makeSaved } from '../test-support/activity';
 import { makeProfile } from '../test-support/profile';
 
@@ -73,7 +73,7 @@ describe('Activity', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    resetFollowStore();
+    clearFollowStates();
     mockProfile = makeProfile();
     mockGet.mockResolvedValue([]);
     mockUnread.mockResolvedValue(0);

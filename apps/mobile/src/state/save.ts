@@ -38,8 +38,8 @@ export function setSavedState(dishId: string, saved: boolean): void {
   for (const listener of listeners) listener();
 }
 
-/** For tests. */
-export function resetSaveChanges(): void {
+/** Forgets every saved state and the reload counter. Called when the session ends (and by tests). */
+export function clearSaveStates(): void {
   version = 0;
   states.clear();
   pending.clear();

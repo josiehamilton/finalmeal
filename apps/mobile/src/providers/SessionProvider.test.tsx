@@ -5,6 +5,8 @@ import type { FinalMealClient, MyProfile } from '@finalmeal/api';
 import { registerForPushIfAvailable } from '../lib/push';
 import { SessionProvider, useSession } from './SessionProvider';
 import { clearJustOnboarded, markJustOnboarded, useJustOnboarded } from '../state/landing';
+import { setFollowState, useFollowState } from '../state/follow-store';
+import { setSavedState, useSave } from '../state/save';
 import type { SessionState } from './SessionProvider';
 
 jest.mock('@finalmeal/api', () => ({
@@ -226,6 +228,33 @@ describe('SessionProvider', () => {
     await act(async () => emit('SIGNED_OUT', null));
     expect(flag).toBe(false);
     clearJustOnboarded();
+  });
+
+  it('forgets saved and follow states when the session ends, so the next person starts clean', async () => {
+    const { client, emit } = fakeClient(SESSION);
+    mockGetMyProfile.mockResolvedValue(PROFILE);
+    let saved = false;
+    let follow = 'none';
+    function Held() {
+      saved = useSave('dish-1', 'pick-1', false).saved;
+      follow = useFollowState('person-1', 'none');
+      return null;
+    }
+    await render(
+      <SessionProvider client={client}>
+        <Probe />
+        <Held />
+      </SessionProvider>,
+    );
+    await act(async () => {
+      setSavedState('dish-1', true);
+      setFollowState('person-1', 'active');
+    });
+    expect(saved).toBe(true);
+    expect(follow).toBe('active');
+    await act(async () => emit('SIGNED_OUT', null));
+    expect(saved).toBe(false);
+    expect(follow).toBe('none');
   });
 
   it('refreshProfile finds the profile in the same tick as a sign-in', async () => {

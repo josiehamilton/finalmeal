@@ -3,7 +3,7 @@ import { Alert } from 'react-native';
 import type { AlertButton } from 'react-native';
 import { followUser, getMyPicks, getProfile, getProfilePicks, unfollowUser } from '@finalmeal/api';
 import type { Pick } from '@finalmeal/api';
-import { resetFollowStore, setFollowState } from '../state/follow-store';
+import { clearFollowStates, setFollowState } from '../state/follow-store';
 import OtherProfile from '../../app/(app)/u/[id]';
 import { makeProfile } from '../test-support/profile';
 import { makeAlli } from '../test-support/people';
@@ -87,7 +87,7 @@ describe('Other profile', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
-    resetFollowStore();
+    clearFollowStates();
     mockParams = { id: 'u4' };
     mockGetProfile.mockResolvedValue(makeAlli());
     mockGetProfilePicks.mockResolvedValue(alliPicks());

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { followUser } from '@finalmeal/api';
-import { resetFollowStore } from '../state/follow-store';
+import { clearFollowStates } from '../state/follow-store';
 import { makeActivity, makeFollowed, makeRequest, makeSaved } from '../test-support/activity';
 import { ActivityRow } from './ActivityRow';
 
@@ -26,7 +26,7 @@ function props(overrides: Partial<React.ComponentProps<typeof ActivityRow>> = {}
 describe('ActivityRow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    resetFollowStore();
+    clearFollowStates();
     mockFollow.mockResolvedValue('active');
   });
 

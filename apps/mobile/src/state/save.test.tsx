@@ -3,7 +3,7 @@ import { ApiError, saveDish, unsaveDish } from '@finalmeal/api';
 import {
   announceSavesChanged,
   getSavesVersion,
-  resetSaveChanges,
+  clearSaveStates,
   setSavedState,
   useSave,
   useSavesVersion,
@@ -21,7 +21,7 @@ const mockSave = jest.mocked(saveDish);
 const mockUnsave = jest.mocked(unsaveDish);
 
 describe('saves version', () => {
-  beforeEach(() => resetSaveChanges());
+  beforeEach(() => clearSaveStates());
 
   it('counts up on every announcement', async () => {
     const { result } = await renderHook(() => useSavesVersion());
@@ -35,7 +35,7 @@ describe('saves version', () => {
 describe('useSave', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    resetSaveChanges();
+    clearSaveStates();
     mockSave.mockResolvedValue(undefined);
     mockUnsave.mockResolvedValue(undefined);
   });

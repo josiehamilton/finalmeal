@@ -12,7 +12,9 @@ import { checkSession, friendlyMessage, getMyProfile, signOut, throwIfError } fr
 import type { FinalMealClient, MyProfile } from '@finalmeal/api';
 import { registerForPushIfAvailable } from '../lib/push';
 import { getSupabase } from '../lib/supabase';
+import { clearFollowStates } from '../state/follow-store';
 import { clearJustOnboarded } from '../state/landing';
+import { clearSaveStates } from '../state/save';
 
 export type Session = NonNullable<
   Awaited<ReturnType<FinalMealClient['auth']['getSession']>>['data']['session']
@@ -102,6 +104,9 @@ export function SessionProvider({ client, children }: SessionProviderProps) {
     if (userId === null) {
       // Whoever signs in next must not be greeted with the last person's First landing.
       clearJustOnboarded();
+      // Nor with the last person's saved and follow buttons.
+      clearSaveStates();
+      clearFollowStates();
       requestRef.current++;
       setResult(null);
       return;

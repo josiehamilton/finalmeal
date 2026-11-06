@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { getSuggestedPeople } from '@finalmeal/api';
 import { FeedEmpty } from './FeedEmpty';
 import { makeSuggested } from '../test-support/people';
-import { resetFollowStore, setFollowState } from '../state/follow-store';
+import { clearFollowStates, setFollowState } from '../state/follow-store';
 
 const mockRouter = { push: jest.fn(), navigate: jest.fn() };
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter }));
@@ -43,7 +43,7 @@ async function show(
 describe('FeedEmpty', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    resetFollowStore();
+    clearFollowStates();
     mockSuggested.mockResolvedValue(SUGGESTED);
   });
 
