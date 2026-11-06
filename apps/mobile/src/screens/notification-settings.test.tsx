@@ -108,6 +108,17 @@ describe('Notification settings', () => {
     expect(toggle('Saves of your picks')).not.toBeChecked();
   });
 
+  it('saves once when a switch is tapped twice before the screen has redrawn', async () => {
+    await show();
+    mockUpdate.mockReturnValue(new Promise(() => {}));
+    const dethroned = toggle('Dethronings');
+    await act(async () => {
+      fireEvent.press(dethroned);
+      fireEvent.press(dethroned);
+    });
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+  });
+
   it('shows the footer note while push is unavailable, and not once it is', async () => {
     const view = await render(<NotificationSettingsScreen />);
     await act(async () => {});

@@ -2,9 +2,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@finalmeal/ui-tokens';
 import { fontFamily } from '../lib/fonts';
 
-/** The canvas switch's "off" track (NotificationSettings board); it is not one of the palette colours. */
-const TRACK_OFF = '#3A3530';
-
 interface ToggleRowProps {
   label: string;
   /** A line of explanation under the label. */
@@ -32,7 +29,7 @@ export function ToggleRow({ label, sub, value, onChange, disabled = false }: Tog
         hitSlop={6}
         style={[
           styles.track,
-          { backgroundColor: value ? colors.ember : TRACK_OFF },
+          { backgroundColor: value ? colors.ember : colors.switchOff },
           { justifyContent: value ? 'flex-end' : 'flex-start' },
         ]}
       >

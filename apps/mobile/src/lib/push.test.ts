@@ -1,6 +1,8 @@
 import { registerPushToken, unregisterPushToken } from '@finalmeal/api';
 import type { FinalMealClient } from '@finalmeal/api';
+import { Platform } from 'react-native';
 import {
+  UNREGISTER_TIMEOUT_MS,
   isPushAvailable,
   registerForPushIfAvailable,
   resetPushForTests,
@@ -41,6 +43,8 @@ const mockUnregister = jest.mocked(unregisterPushToken);
 const client = { fake: 'client' } as unknown as FinalMealClient;
 
 describe('push registration', () => {
+  afterEach(() => jest.restoreAllMocks());
+
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -129,6 +133,31 @@ describe('push registration', () => {
       await registerForPushIfAvailable(client);
       await unregisterPushOnSignOut(client);
       expect(mockUnregister).not.toHaveBeenCalled();
+    });
+
+    it('stores the platform it runs on', async () => {
+      jest.replaceProperty(Platform, 'OS', 'android');
+      await registerForPushIfAvailable(client);
+      expect(mockRegister).toHaveBeenCalledWith(client, 'ExponentPushToken[abc]', 'android');
+    });
+
+    it('does not hold sign-out up when the unregister call hangs', async () => {
+      jest.useFakeTimers();
+      try {
+        await registerForPushIfAvailable(client);
+        mockUnregister.mockReturnValue(new Promise(() => {}));
+        let done = false;
+        const pending = unregisterPushOnSignOut(client).then(() => {
+          done = true;
+        });
+        await jest.advanceTimersByTimeAsync(UNREGISTER_TIMEOUT_MS - 1);
+        expect(done).toBe(false);
+        await jest.advanceTimersByTimeAsync(2);
+        await pending;
+        expect(done).toBe(true);
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('sign-out never throws when unregistering fails', async () => {

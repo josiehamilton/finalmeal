@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { colors } from '@finalmeal/ui-tokens';
 import { ToggleRow } from './ToggleRow';
 
 describe('ToggleRow', () => {
@@ -29,5 +30,16 @@ describe('ToggleRow', () => {
     await render(<ToggleRow label="Saves" value disabled onChange={onChange} />);
     await fireEvent.press(screen.getByRole('switch', { name: 'Saves' }));
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('paints the track from the tokens: ember when on, switchOff when off', async () => {
+    const view = await render(<ToggleRow label="Saves" value onChange={jest.fn()} />);
+    expect(screen.getByRole('switch', { name: 'Saves' })).toHaveStyle({
+      backgroundColor: colors.ember,
+    });
+    await view.rerender(<ToggleRow label="Saves" value={false} onChange={jest.fn()} />);
+    expect(screen.getByRole('switch', { name: 'Saves' })).toHaveStyle({
+      backgroundColor: colors.switchOff,
+    });
   });
 });

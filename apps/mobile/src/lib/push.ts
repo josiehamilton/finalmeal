@@ -46,18 +46,33 @@ export async function registerForPushIfAvailable(
   }
 }
 
+/** How long sign-out waits for the server to forget the token before it goes ahead anyway. */
+export const UNREGISTER_TIMEOUT_MS = 3000;
+
 /**
  * Forgets this device's token before signing out (it needs the session, so call it first).
- * Never throws: a failure only means the server keeps a token it will stop using.
+ * Never throws and never waits longer than `UNREGISTER_TIMEOUT_MS`, so a bad network cannot hold
+ * Log out up. If it fails or times out the server keeps the token until Phase 8's cleanup of
+ * tokens whose person has no live session (docs/known-gaps.md).
+ * Sign-out is not observed in SessionProvider on purpose: by then the session is gone and the
+ * call could no longer be made.
  */
 export async function unregisterPushOnSignOut(client: FinalMealClient): Promise<void> {
   const token = registeredToken;
   if (!token) return;
   registeredToken = null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await unregisterPushToken(client, token);
+    await Promise.race([
+      unregisterPushToken(client, token),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, UNREGISTER_TIMEOUT_MS);
+      }),
+    ]);
   } catch (e) {
     console.warn(e);
+  } finally {
+    clearTimeout(timer);
   }
 }
 

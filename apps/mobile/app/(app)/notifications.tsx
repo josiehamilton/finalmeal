@@ -3,8 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  ApiError,
   friendlyMessage,
   getMyNotifications,
+  getUnreadCount,
   markNotificationsRead,
   respondToFollowRequest,
   subscribeToMyNotifications,
@@ -69,6 +71,8 @@ export default function Activity() {
   const [approvedIds, setApprovedIds] = useState<ReadonlySet<string>>(new Set());
   const [respondingIds, setRespondingIds] = useState<ReadonlySet<string>>(new Set());
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  // How many the server says are unread (null: unknown), which can be more than is loaded.
+  const [serverUnread, setServerUnread] = useState<number | null>(null);
 
   const itemsRef = useRef<ActivityItem[] | null>(null);
   // Where the next page starts: the time of the last notification fetched (a timestamp only).
@@ -78,6 +82,13 @@ export default function Activity() {
   // While a next page has failed, scrolling must not ask again; only Try again does.
   const moreErrorRef = useRef(false);
   const mounted = useRef(true);
+  // Notifications this screen has seen go (declined, or a request that was withdrawn): a refresh
+  // that started before they went must not bring them back.
+  const removedRef = useRef(new Set<string>());
+  const refreshing = useRef(false);
+  const refreshAgain = useRef(false);
+  // Counts successful Mark all reads, so a page that was on its way when one landed is read too.
+  const markAllCount = useRef(0);
 
   const show = useCallback((next: ActivityItem[]) => {
     itemsRef.current = next;
@@ -93,6 +104,14 @@ export default function Activity() {
     setLoadingMore(false);
     setMoreError(null);
     setError(null);
+    getUnreadCount(getSupabase()).then(
+      (count) => {
+        if (mounted.current && id === loadId.current) setServerUnread(count);
+      },
+      () => {
+        // Without the count the button follows the rows that are loaded.
+      },
+    );
     try {
       const page = await getMyNotifications(getSupabase(), { limit: PAGE });
       if (!mounted.current || id !== loadId.current) return;
@@ -111,6 +130,7 @@ export default function Activity() {
       moreInFlight.current = true;
       moreErrorRef.current = false;
       const id = loadId.current;
+      const readAllsBefore = markAllCount.current;
       setLoadingMore(true);
       setMoreError(null);
       try {
@@ -121,8 +141,18 @@ export default function Activity() {
         if (!mounted.current || id !== loadId.current) return;
         syncFollowStates(page.map((n) => ({ id: n.actor.id, viewerFollow: n.viewerFollow })));
         const have = new Set((itemsRef.current ?? []).map((n) => n.id));
+        const added = page.filter((n) => !have.has(n.id) && !removedRef.current.has(n.id));
         nextRef.current = page.length >= PAGE ? (page[page.length - 1]?.at ?? null) : null;
-        show([...(itemsRef.current ?? []), ...page.filter((n) => !have.has(n.id))]);
+        // A Mark all read landed while this page was on its way: the server already read these.
+        if (markAllCount.current !== readAllsBefore) {
+          setReadIds((prev) =>
+            withIds(
+              prev,
+              added.map((n) => n.id),
+            ),
+          );
+        }
+        show([...(itemsRef.current ?? []), ...added]);
       } catch (e) {
         if (mounted.current && id === loadId.current) {
           moreErrorRef.current = true;
@@ -146,31 +176,65 @@ export default function Activity() {
     };
   }, [reload]);
 
-  // A new notification arrives: put anything newer than what is shown on top.
-  useEffect(() => {
-    if (!userId) return;
-    return subscribeToMyNotifications(getSupabase(), userId, () => {
-      void (async () => {
+  /**
+   * Looks at the newest notifications again and merges them in: new ones on top, ones that have
+   * gone dropped (the page replaces what it covers; older rows stay). One look at a time; arrivals
+   * during one cause a single further look.
+   */
+  const refresh = useCallback(async () => {
+    if (refreshing.current) {
+      refreshAgain.current = true;
+      return;
+    }
+    refreshing.current = true;
+    try {
+      do {
+        refreshAgain.current = false;
+        const id = loadId.current;
         try {
-          const page = await getMyNotifications(getSupabase(), { limit: PAGE });
+          const [page, count] = await Promise.all([
+            getMyNotifications(getSupabase(), { limit: PAGE }),
+            getUnreadCount(getSupabase()).catch(() => null),
+          ]);
           const current = itemsRef.current;
-          if (!mounted.current || current === null) return;
+          if (!mounted.current || id !== loadId.current || current === null) continue;
+          if (count !== null) setServerUnread(count);
           syncFollowStates(page.map((n) => ({ id: n.actor.id, viewerFollow: n.viewerFollow })));
-          const have = new Set(current.map((n) => n.id));
-          const fresh = page.filter((n) => !have.has(n.id));
-          if (fresh.length > 0) show([...fresh, ...current]);
+          const fresh = page.filter((n) => !removedRef.current.has(n.id));
+          if (page.length < PAGE) {
+            nextRef.current = null;
+            show(fresh);
+          } else {
+            const last = page[page.length - 1]!;
+            const inPage = new Set(page.map((n) => n.id));
+            const cutoff = Date.parse(last.at);
+            const older = current.filter(
+              (n) =>
+                !inPage.has(n.id) && !removedRef.current.has(n.id) && Date.parse(n.at) <= cutoff,
+            );
+            if (nextRef.current === null && older.length === 0) nextRef.current = last.at;
+            show([...fresh, ...older]);
+          }
         } catch {
           // The list stays as it is; the next arrival or a reopen looks again.
         }
-      })();
-    });
-  }, [userId, show]);
+      } while (refreshAgain.current && mounted.current);
+    } finally {
+      refreshing.current = false;
+    }
+  }, [show]);
+
+  useEffect(() => {
+    if (!userId) return;
+    return subscribeToMyNotifications(getSupabase(), userId, () => void refresh());
+  }, [userId, refresh]);
 
   const isUnread = useCallback(
     (item: ActivityItem) => item.readAt === null && !readIds.has(item.id),
     [readIds],
   );
-  const unreadCount = (items ?? []).filter(isUnread).length;
+  const loadedUnread = (items ?? []).filter(isUnread).length;
+  const canMarkAll = loadedUnread > 0 || (serverUnread ?? 0) > 0;
 
   const now = useMemo(() => new Date(), [items]);
   const sections = useMemo<Section[]>(() => {
@@ -184,15 +248,27 @@ export default function Activity() {
   }, [items, now]);
 
   async function markAllRead() {
+    if (!canMarkAll) return;
     const unread = (itemsRef.current ?? []).filter(isUnread).map((n) => n.id);
-    if (unread.length === 0) return;
+    const before = serverUnread;
     setMarkError(null);
     setReadIds((prev) => withIds(prev, unread));
+    setServerUnread(0);
     try {
       await markNotificationsRead(getSupabase());
+      if (!mounted.current) return;
+      markAllCount.current++;
+      // Rows that arrived while this was going are read now too.
+      setReadIds((prev) =>
+        withIds(
+          prev,
+          (itemsRef.current ?? []).map((n) => n.id),
+        ),
+      );
     } catch (e) {
       if (!mounted.current) return;
       setReadIds((prev) => without(prev, unread));
+      setServerUnread(before);
       setMarkError(friendlyMessage(e));
     }
   }
@@ -200,11 +276,17 @@ export default function Activity() {
   function open(item: ActivityItem) {
     if (isUnread(item)) {
       setReadIds((prev) => withIds(prev, [item.id]));
+      setServerUnread((n) => (n === null ? null : Math.max(0, n - 1)));
       // The dot is a hint: if this fails it comes back on the next look, and the tap still opens.
       markNotificationsRead(getSupabase(), [item.id]).catch(() => {});
     }
     const href = destinationOf(item);
     if (href) router.push(href as never);
+  }
+
+  function removeRow(id: string) {
+    removedRef.current.add(id);
+    show((itemsRef.current ?? []).filter((n) => n.id !== id));
   }
 
   async function respond(item: ActivityItem, accept: boolean) {
@@ -221,10 +303,13 @@ export default function Activity() {
       if (accept) {
         setApprovedIds((prev) => withIds(prev, [item.id]));
       } else {
-        show((itemsRef.current ?? []).filter((n) => n.id !== item.id));
+        removeRow(item.id);
       }
     } catch (e) {
-      if (mounted.current) setRowErrors((prev) => ({ ...prev, [item.id]: friendlyMessage(e) }));
+      if (!mounted.current) return;
+      // The person withdrew the request in the meantime: nothing is left to answer.
+      if (e instanceof ApiError && e.code === 'request_not_found') removeRow(item.id);
+      else setRowErrors((prev) => ({ ...prev, [item.id]: friendlyMessage(e) }));
     } finally {
       if (mounted.current) setRespondingIds((prev) => without(prev, [item.id]));
     }
@@ -241,14 +326,12 @@ export default function Activity() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Mark all read"
-            accessibilityState={{ disabled: unreadCount === 0 }}
-            disabled={unreadCount === 0}
+            accessibilityState={{ disabled: !canMarkAll }}
+            disabled={!canMarkAll}
             onPress={() => void markAllRead()}
             hitSlop={8}
           >
-            <Text style={[styles.markAll, unreadCount === 0 && styles.markAllOff]}>
-              Mark all read
-            </Text>
+            <Text style={[styles.markAll, !canMarkAll && styles.markAllOff]}>Mark all read</Text>
           </Pressable>
         }
       />

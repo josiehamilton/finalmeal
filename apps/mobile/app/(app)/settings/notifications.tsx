@@ -34,6 +34,8 @@ export default function NotificationSettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   // A switch saves on its own and is locked until its save ends; the others stay usable.
   const [saving, setSaving] = useState<ReadonlySet<keyof NotificationSettings>>(new Set());
+  // Keys with a save in flight, kept in a ref so two taps before a redraw cannot both pass.
+  const inFlight = useRef(new Set<keyof NotificationSettings>());
   const mounted = useRef(true);
 
   const load = useCallback(async () => {
@@ -55,7 +57,8 @@ export default function NotificationSettingsScreen() {
   }, [load]);
 
   async function change(key: keyof NotificationSettings, next: boolean) {
-    if (!settings || saving.has(key)) return;
+    if (!settings || inFlight.current.has(key)) return;
+    inFlight.current.add(key);
     const before = settings[key];
     setError(null);
     setSettings((prev) => (prev ? { ...prev, [key]: next } : prev));
@@ -69,6 +72,7 @@ export default function NotificationSettingsScreen() {
       setSettings((prev) => (prev ? { ...prev, [key]: before } : prev));
       setError(friendlyMessage(e));
     } finally {
+      inFlight.current.delete(key);
       if (mounted.current) {
         setSaving((prev) => {
           const rest = new Set(prev);

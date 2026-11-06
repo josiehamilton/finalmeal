@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import {
+  ApiError,
   getMyNotifications,
+  getUnreadCount,
   markNotificationsRead,
   respondToFollowRequest,
   subscribeToMyNotifications,
@@ -15,6 +17,7 @@ jest.mock('expo-router', () => ({ useRouter: () => mockRouter }));
 jest.mock('@finalmeal/api', () => ({
   ...jest.requireActual('@finalmeal/api'),
   getMyNotifications: jest.fn(),
+  getUnreadCount: jest.fn(),
   markNotificationsRead: jest.fn(),
   respondToFollowRequest: jest.fn(),
   subscribeToMyNotifications: jest.fn(),
@@ -33,6 +36,7 @@ jest.mock('../providers/SessionProvider', () => ({
 }));
 let mockProfile = makeProfile();
 const mockGet = jest.mocked(getMyNotifications);
+const mockUnread = jest.mocked(getUnreadCount);
 const mockRead = jest.mocked(markNotificationsRead);
 const mockRespond = jest.mocked(respondToFollowRequest);
 const mockSubscribe = jest.mocked(subscribeToMyNotifications);
@@ -72,6 +76,7 @@ describe('Activity', () => {
     resetFollowStore();
     mockProfile = makeProfile();
     mockGet.mockResolvedValue([]);
+    mockUnread.mockResolvedValue(0);
     mockRead.mockResolvedValue(undefined);
     mockRespond.mockResolvedValue(undefined);
     mockSubscribe.mockImplementation((_client, _id, onChange) => {
@@ -360,6 +365,128 @@ describe('Activity', () => {
       expect(screen.getAllByText('Mike Brennan saved your Pork Gyro.')).toHaveLength(1);
       expect(screen.getAllByLabelText('Unread')).toHaveLength(1);
     });
+  });
+
+  describe('Mark all read follows the unread count from the server', () => {
+    it('is enabled by an unread notification that is not loaded yet', async () => {
+      mockGet.mockResolvedValue([makeSaved()]);
+      mockUnread.mockResolvedValue(3);
+      await show();
+      expect(mockUnread).toHaveBeenCalledWith(client);
+      const markAll = screen.getByRole('button', { name: 'Mark all read' });
+      expect(markAll).toBeEnabled();
+      await fireEvent.press(markAll);
+      expect(mockRead).toHaveBeenCalledWith(client);
+      expect(screen.getByRole('button', { name: 'Mark all read' })).toBeDisabled();
+    });
+
+    it('falls back to the loaded rows when the count cannot be read', async () => {
+      mockGet.mockResolvedValue([makeActivity()]);
+      mockUnread.mockRejectedValue(new Error('offline'));
+      await show();
+      expect(screen.getByRole('button', { name: 'Mark all read' })).toBeEnabled();
+    });
+
+    it('is enabled again when it fails', async () => {
+      mockGet.mockResolvedValue([makeSaved()]);
+      mockUnread.mockResolvedValue(2);
+      mockRead.mockRejectedValue(new Error('offline'));
+      await show();
+      await fireEvent.press(screen.getByRole('button', { name: 'Mark all read' }));
+      await waitFor(() => expect(screen.getByRole('alert')).toBeOnTheScreen());
+      expect(screen.getByRole('button', { name: 'Mark all read' })).toBeEnabled();
+    });
+
+    it('also reads a next page that was on its way when it landed', async () => {
+      const first = many(20);
+      let land: (rows: ReturnType<typeof many>) => void = () => {};
+      mockGet
+        .mockResolvedValueOnce(first)
+        .mockReturnValueOnce(new Promise((resolve) => (land = resolve)));
+      await show();
+      await fireEvent(screen.getByTestId('activity-list'), 'endReached');
+      await fireEvent.press(screen.getByRole('button', { name: 'Mark all read' }));
+      await act(async () => {});
+      await act(async () => land(many(2, 21)));
+      expect(screen.queryAllByLabelText('Unread')).toHaveLength(0);
+      expect(heldIds()).toHaveLength(22);
+    });
+  });
+
+  describe('live updates keep up with changes', () => {
+    it('counts again when something arrives', async () => {
+      await show();
+      mockUnread.mockClear();
+      await act(async () => arrive());
+      expect(mockUnread).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops a row that has gone (an unfollow takes back its notification)', async () => {
+      mockGet.mockResolvedValue([makeFollowed(), makeSaved()]);
+      await show();
+      mockGet.mockResolvedValue([makeSaved()]);
+      await act(async () => arrive());
+      expect(screen.queryByText('Alli Mercer started following you.')).toBeNull();
+      expect(screen.getByText('Mike Brennan saved your Pork Gyro.')).toBeOnTheScreen();
+    });
+
+    it('with a full first page, replaces that page and keeps the older rows', async () => {
+      const first = many(20);
+      mockGet.mockResolvedValueOnce(first).mockResolvedValueOnce(many(3, 21));
+      await show();
+      await fireEvent(screen.getByTestId('activity-list'), 'endReached');
+      await act(async () => {});
+      const fresh = makeSaved({ id: 'new', readAt: null, at: new Date().toISOString() });
+      mockGet.mockResolvedValue([fresh, ...first.filter((n) => n.id !== 'm5').slice(0, 19)]);
+      // m5 is gone; the page is the newest 20, so m20 falls to the older rows.
+      await act(async () => arrive());
+      expect(heldIds()).toEqual([
+        'new',
+        ...first.filter((n) => n.id !== 'm5' && n.id !== 'm20').map((n) => n.id),
+        'm20',
+        'm21',
+        'm22',
+        'm23',
+      ]);
+    });
+
+    it('does not bring a declined row back from a refresh that was already under way', async () => {
+      mockGet.mockResolvedValue([makeRequest(), makeSaved()]);
+      await show();
+      let land: (rows: ReturnType<typeof many>) => void = () => {};
+      mockGet.mockReturnValueOnce(new Promise((resolve) => (land = resolve)));
+      await act(async () => arrive());
+      await fireEvent.press(screen.getByRole('button', { name: 'Decline Alli Mercer' }));
+      await waitFor(() =>
+        expect(screen.queryByText('Alli Mercer wants to follow you.')).toBeNull(),
+      );
+      mockGet.mockResolvedValue([makeSaved()]);
+      await act(async () => land([makeRequest(), makeSaved()]));
+      expect(screen.queryByText('Alli Mercer wants to follow you.')).toBeNull();
+    });
+
+    it('runs one more refresh, not several, when more arrive during one', async () => {
+      await show();
+      mockGet.mockClear();
+      let land: (rows: ReturnType<typeof many>) => void = () => {};
+      mockGet.mockReturnValueOnce(new Promise((resolve) => (land = resolve)));
+      await act(async () => arrive());
+      await act(async () => arrive());
+      await act(async () => arrive());
+      expect(mockGet).toHaveBeenCalledTimes(1);
+      mockGet.mockResolvedValue([]);
+      await act(async () => land([]));
+      expect(mockGet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('drops a request that is no longer there when answering it fails with request_not_found', async () => {
+    mockGet.mockResolvedValue([makeRequest(), makeSaved()]);
+    mockRespond.mockRejectedValue(new ApiError('gone', 'request_not_found'));
+    await show();
+    await fireEvent.press(screen.getByRole('button', { name: 'Approve Alli Mercer' }));
+    await waitFor(() => expect(screen.queryByText('Alli Mercer wants to follow you.')).toBeNull());
+    expect(screen.getByText('Mike Brennan saved your Pork Gyro.')).toBeOnTheScreen();
   });
 
   it('goes back', async () => {

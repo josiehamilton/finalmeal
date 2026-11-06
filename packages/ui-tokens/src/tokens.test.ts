@@ -15,6 +15,7 @@ const ALLOWED_HEX = [
   '#E6DFD5',
   '#FF7A6B',
   '#FFFFFF',
+  '#3A3530',
 ];
 
 describe('colors', () => {
@@ -40,6 +41,11 @@ describe('translucent colours', () => {
       .sort();
     expect(rgba).toEqual(['emberWash', 'line', 'lineStrong', 'scrim']);
     expect(colors.scrim).toBe('rgba(11,10,9,0.6)');
+  });
+
+  it('has the neutral off-track for switches, as a token and a css variable', () => {
+    expect(colors.switchOff).toBe('#3A3530');
+    expect(cssVariables()).toContain('--fm-switch-off:#3A3530');
   });
 
   it('exposes scrim as a css variable', () => {
