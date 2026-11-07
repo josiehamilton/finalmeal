@@ -28,6 +28,19 @@ async function geocode(token: string): Promise<Response> {
   });
 }
 
+/** A spot's geocode_status, which clients cannot read (service role only). */
+async function geocodeStatus(placeId: string): Promise<string | undefined> {
+  const key = serviceRoleKey();
+  const response = await fetch(
+    `${apiUrl()}/rest/v1/places?id=eq.${placeId}&select=geocode_status`,
+    {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    },
+  );
+  expect(response.status).toBe(200);
+  return ((await response.json()) as { geocode_status: string }[])[0]?.geocode_status;
+}
+
 /** Vancouver, BC (the dev seed has a Vancouver, WA too). */
 async function vancouver(client: FinalMealClient) {
   const found = (await searchCities(client, 'Vancouver')).find((c) => c.regionCode === 'BC');
@@ -70,12 +83,26 @@ describe('geocode-places (local Supabase)', () => {
     // Nothing is pinned until the function has run.
     expect(tacos.lat).toBeCloseTo(city.lat, 4);
 
-    const response = await geocode(serviceRoleKey());
-    expect(response.status, SKIP_HINT).toBe(200);
-    const body = (await response.json()) as GeocodeReply;
-    expect(body.geocoder).toBe('mock');
-    expect(body.found).toBeGreaterThanOrEqual(1);
-    expect(body.notFound).toBeGreaterThanOrEqual(1);
+    // Other pending spots may be older than ours (the queue is shared and a call takes 20), so
+    // call until the queue is empty.
+    let found = 0;
+    let notFound = 0;
+    let geocoder = '';
+    for (let call = 0; call < 25; call++) {
+      const response = await geocode(serviceRoleKey());
+      expect(response.status, SKIP_HINT).toBe(200);
+      const body = (await response.json()) as GeocodeReply;
+      geocoder = body.geocoder;
+      found += body.found;
+      notFound += body.notFound;
+      if (body.claimed === 0) break;
+    }
+    expect(geocoder).toBe('mock');
+    expect(found).toBeGreaterThanOrEqual(1);
+    expect(notFound).toBeGreaterThanOrEqual(1);
+    // The bookkeeping is server-side, so read it as the service role.
+    expect(await geocodeStatus(tacos.id)).toBe('done');
+    expect(await geocodeStatus(nowhere.id)).toBe('not_found');
 
     const placed = await getPlace(user, tacos.id);
     expect(placed).not.toBeNull();

@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(38);
+select plan(59);
 
 -- Uses the dev seed: Vancouver (BC), Josie (...0001) with a profile, and the 14 canvas places.
 
@@ -138,6 +138,113 @@ select is((select count(*)::int from public.claim_geocode_batch() where name = '
   'retry round 3: the spot is claimed');
 select is(public.finish_geocode((select id from public.places where name = 'Far Away Cafe'), 'retry'),
   'failed', 'retry round 3 ends failed');
+
+-- ---------------------------------------------------------------- the follow-up fixes
+-- (migration 20261105110000_geocode_queue_fixes.sql)
+reset role;
+
+-- The claim must be able to use the queue index (the real table holds the whole place extract).
+-- This is the claim's candidate query, word for word; keep it in sync with the function.
+create function public.test_claim_plan() returns text
+language plpgsql as $$
+declare
+  r record;
+  plan text := '';
+begin
+  for r in execute $q$explain
+    select q.id from public.places q
+    where q.geocode_status in ('pending', 'geocoding')
+      and (q.geocode_status = 'pending'
+           or (q.geocode_claimed_at < now() - interval '10 minutes' and q.geocode_attempts < 3))
+      and q.address is not null and not q.no_fixed_address
+    order by q.created_at, q.id
+    limit 20
+    for update skip locked$q$
+  loop
+    plan := plan || r."QUERY PLAN" || E'\n';
+  end loop;
+  return plan;
+end;
+$$;
+set local enable_seqscan = off;
+select matches(public.test_claim_plan(), 'Index.*places_geocode_queue',
+  'the claim query uses the places_geocode_queue index');
+reset enable_seqscan;
+
+-- Fixtures for the queue rules. The queue is emptied first so counts are exact.
+update public.places set geocode_status = 'not_needed' where geocode_status in ('pending', 'geocoding');
+insert into public.places (source, name, city, region, country, location, address, created_by,
+  location_precision, geocode_status, created_at)
+select 'custom', 'Queue Spot ' || g, 'Vancouver', 'BC', 'CA', 'SRID=4326;POINT(-123.11934 49.24966)',
+  g || ' Queue St', '00000000-0000-4000-8000-000000000001', 'city', 'pending',
+  now() - interval '1 hour' + g * interval '1 second'
+from generate_series(1, 25) g;
+-- Spots that must never be claimed: no address, and a flagged no-fixed-address spot.
+insert into public.places (source, name, city, region, country, location, address, no_fixed_address,
+  created_by, location_precision, geocode_status) values
+  ('custom', 'Unaddressed Spot', 'Vancouver', 'BC', 'CA', 'SRID=4326;POINT(-123.11934 49.24966)', null, false,
+   '00000000-0000-4000-8000-000000000001', 'city', 'pending'),
+  ('custom', 'Truck Spot', 'Vancouver', 'BC', 'CA', 'SRID=4326;POINT(-123.11934 49.24966)', null, true,
+   '00000000-0000-4000-8000-000000000001', 'city', 'pending');
+
+set local role anon;
+select throws_ok($$select * from public.claim_geocode_batch()$$, '42501', null,
+  'anon cannot claim a geocode batch');
+select throws_ok($$select public.finish_geocode(gen_random_uuid(), 'not_found')$$, '42501', null,
+  'anon cannot finish a geocode');
+reset role;
+set local role service_role;
+
+select is((select count(*)::int from public.claim_geocode_batch(100)), 20,
+  'p_limit is capped at 20');
+select is((select count(*)::int from public.claim_geocode_batch(0)), 0, 'p_limit 0 claims nothing');
+select is((select count(*)::int from public.places where name in ('Unaddressed Spot', 'Truck Spot')
+  and geocode_status = 'pending'), 2, 'spots without an address are never claimed');
+select is((select min(name) from (select name from public.places where geocode_status = 'geocoding'
+  order by created_at limit 1) o), 'Queue Spot 1', 'the oldest spots are claimed first');
+
+-- Bad answers.
+select throws_ok($$select public.finish_geocode(
+  (select id from public.places where name = 'Queue Spot 1'), 'maybe')$$,
+  'P0001', 'invalid_geocode_result', 'an unknown result raises invalid_geocode_result');
+select is(public.finish_geocode((select id from public.places where name = 'Queue Spot 1'), 'found'),
+  'not_found', 'found without coordinates is not found');
+select is(public.finish_geocode((select id from public.places where name = 'Queue Spot 2'), 'found', 91, -123.1),
+  'not_found', 'found with a latitude out of range is not found');
+select is(public.finish_geocode((select id from public.places where name = 'Queue Spot 3'), 'found', 49.25, 181),
+  'not_found', 'found with a longitude out of range is not found');
+select is(public.finish_geocode(gen_random_uuid(), 'not_found'), null, 'an unknown id returns null');
+
+-- A spot that is not geocoding is left alone, whatever the answer.
+select is(public.finish_geocode((select id from public.places where name = 'Queue Spot 25'), 'not_found'),
+  'pending', 'not_found on a pending spot is ignored');
+select is(public.finish_geocode((select id from public.places where name = 'Queue Spot 25'), 'retry'),
+  'pending', 'retry on a pending spot is ignored');
+select is(public.finish_geocode((select id from public.places where name = 'Queue Spot 25'),
+    'found', 49.25, -123.1, 'mock'),
+  'pending', 'found on a pending spot is ignored');
+
+-- release gives an unused claim back without charging the attempt.
+select is(public.finish_geocode((select id from public.places where name = 'Queue Spot 4'), 'release'),
+  'pending', 'release puts a claimed spot back to pending');
+select is((select geocode_attempts::int from public.places where name = 'Queue Spot 4'), 0,
+  'and refunds its attempt');
+select is(public.finish_geocode((select id from public.places where name = 'Queue Spot 4'), 'release'),
+  'pending', 'releasing a spot that is not claimed changes nothing');
+select is((select geocode_attempts::int from public.places where name = 'Queue Spot 4'), 0,
+  'and refunds nothing');
+
+-- A stale claim that already used its attempts is failed, not claimed again.
+reset role;
+update public.places set geocode_status = 'geocoding', geocode_attempts = 3,
+  geocode_claimed_at = now() - interval '11 minutes' where name = 'Queue Spot 10';
+update public.places set geocode_status = 'geocoding', geocode_attempts = 2,
+  geocode_claimed_at = now() - interval '11 minutes' where name = 'Queue Spot 11';
+set local role service_role;
+select is((select count(*)::int from public.claim_geocode_batch(20) where name in ('Queue Spot 10', 'Queue Spot 11')),
+  1, 'a stale claim with attempts left is claimed again; one with none left is not');
+select is((select geocode_status from public.places where name = 'Queue Spot 10'), 'failed',
+  'a stale claim that used all 3 attempts is marked failed');
 
 select * from finish();
 rollback;

@@ -14,6 +14,7 @@ let copy = 0;
 const load = () => import(`${shared('geocoder.ts')}?copy=${copy++}`);
 const { geoapifyGeocoder } = await import(shared('geocoder-geoapify.ts'));
 const { isServiceRequest } = await import(shared('service-auth.ts'));
+const { runGeocodeBatch } = await import(shared('geocode-batch.ts'));
 
 const LOCAL = 'http://kong:8000';
 const REMOTE = 'https://abc.supabase.co';
@@ -274,5 +275,101 @@ describe('isServiceRequest', () => {
     assert.equal(isServiceRequest(request('Bearer '), key), false);
     assert.equal(isServiceRequest(request('Bearer '), ''), false);
     assert.equal(isServiceRequest(request(`Bearer ${key}`), undefined), false);
+  });
+});
+
+describe('runGeocodeBatch', () => {
+  const spot = (n, extra = {}) => ({
+    place_id: `place-${n}`,
+    name: `Spot ${n}`,
+    address: `${n} Main St`,
+    postcode: null,
+    city: 'Vancouver',
+    region: 'BC',
+    country: 'CA',
+    city_lat: near.lat,
+    city_lng: near.lng,
+    ...extra,
+  });
+
+  /** A fake PostgREST: claim returns `rows`; finish_geocode answers like the database would. */
+  function fakeRpc(rows, { failOn } = {}) {
+    const calls = [];
+    const rpc = async (name, args) => {
+      calls.push({ name, args });
+      if (name === 'claim_geocode_batch') return rows;
+      if (failOn && failOn(name, args)) throw new Error('finish_geocode failed: 500');
+      if (args.p_result === 'found') return args.p_lat > 50 ? 'not_found' : 'done';
+      return args.p_result === 'retry' ? 'pending' : args.p_result;
+    };
+    return { rpc, calls };
+  }
+  const fixed = (result, name = 'fixed') => ({ name, geocode: async () => result });
+
+  test('with the none geocoder nothing is claimed', async () => {
+    const { noneGeocoder } = await load();
+    const { rpc, calls } = fakeRpc([spot(1)]);
+    const reply = await runGeocodeBatch(rpc, noneGeocoder);
+    assert.deepEqual(reply, { claimed: 0, found: 0, notFound: 0, retried: 0, geocoder: 'none' });
+    assert.deepEqual(calls, []);
+  });
+
+  test('counts found, not found, retried, and an answer the database refuses as not found', async () => {
+    const { mockGeocoder } = await load();
+    const rows = [spot(1), spot(2, { address: 'Nowhere Rd' })];
+    const { rpc, calls } = fakeRpc(rows);
+    const reply = await runGeocodeBatch(rpc, mockGeocoder);
+    assert.deepEqual(reply, { claimed: 2, found: 1, notFound: 1, retried: 0, geocoder: 'mock' });
+    const finishes = calls.filter((c) => c.name === 'finish_geocode');
+    assert.equal(finishes[0].args.p_result, 'found');
+    assert.equal(finishes[0].args.p_geocoder, 'mock');
+    assert.equal(finishes[1].args.p_result, 'not_found');
+
+    const far = fakeRpc([spot(3)]);
+    const farReply = await runGeocodeBatch(far.rpc, fixed({ status: 'found', lat: 60, lng: 0 }));
+    assert.equal(farReply.found, 0);
+    assert.equal(farReply.notFound, 1);
+
+    const retry = fakeRpc([spot(4)]);
+    const retryReply = await runGeocodeBatch(retry.rpc, fixed({ status: 'retry', reason: 'busy' }));
+    assert.equal(retryReply.retried, 1);
+  });
+
+  test('a geocoder that throws is a retry and does not stop the batch', async () => {
+    const { rpc, calls } = fakeRpc([spot(1), spot(2)]);
+    let n = 0;
+    const geocoder = {
+      name: 'flaky',
+      geocode: async () => {
+        if (n++ === 0) throw new Error('boom');
+        return { status: 'found', lat: 49.3, lng: -123.1 };
+      },
+    };
+    const reply = await runGeocodeBatch(rpc, geocoder);
+    assert.deepEqual(reply, { claimed: 2, found: 1, notFound: 0, retried: 1, geocoder: 'flaky' });
+    assert.equal(calls.filter((c) => c.name === 'finish_geocode').length, 2);
+  });
+
+  test('when a finish fails, the spots not yet finished are released and the error is thrown', async () => {
+    const rows = [spot(1), spot(2), spot(3)];
+    const { rpc, calls } = fakeRpc(rows, {
+      failOn: (name, args) => args.p_place_id === 'place-2' && args.p_result !== 'release',
+    });
+    await assert.rejects(
+      runGeocodeBatch(rpc, fixed({ status: 'found', lat: 49.3, lng: -123.1 })),
+      /finish_geocode failed/,
+    );
+    const released = calls
+      .filter((c) => c.name === 'finish_geocode' && c.args.p_result === 'release')
+      .map((c) => c.args.p_place_id);
+    assert.deepEqual(released, ['place-2', 'place-3']);
+  });
+
+  test('a release that fails does not hide the original error', async () => {
+    const { rpc } = fakeRpc([spot(1), spot(2)], { failOn: () => true });
+    await assert.rejects(
+      runGeocodeBatch(rpc, fixed({ status: 'found', lat: 49.3, lng: -123.1 })),
+      /finish_geocode failed/,
+    );
   });
 });

@@ -10,7 +10,7 @@
     "bootstrap": "pnpm install && pnpm db:start && pnpm env:local",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test && node --test scripts/*.test.mjs",
+    "test": "turbo run test && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/*.test.mjs",
     "test:integration": "turbo run test:integration",
     "test:e2e": "turbo run test:e2e",
     "db:start": "supabase start",
