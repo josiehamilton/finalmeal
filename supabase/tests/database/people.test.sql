@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(61);
+select plan(62);
 
 -- Runs on top of the dev seed (Josie ...0001 follows Mike, Ari and Dev; Alli is in Saskatoon;
 -- Sam is a new account), plus the fixtures below. Rolled back at the end.
@@ -225,6 +225,8 @@ select is((select count(*)::int from public.search_people('   ')), 0, 'a blank q
 select is((select count(*)::int from public.search_people(null)), 0, 'a null query returns nothing');
 select is((select string_agg(username, ',') from public.search_people('zed')), 'zed_o',
   'search_people matches Zed');
+select is((select followers_count from public.search_people('zed')), 2,
+  'search_people returns the active follower count (Zed has two)');
 
 -- ================================================================ suggested_people
 -- Josie follows Mike, Ari and Dev. Left: Alli (Saskatoon), Sam (new), Priya (private), Vera
