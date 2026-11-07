@@ -46,6 +46,7 @@ A running list, newest needs added as they come up. Nothing here blocks today's 
 | 25 | Activity and notification settings: a new neutral colour token for a switch that's off (`switchOff` #3A3530, from the board); Follow back in Activity uses the shared 36 px pill (board shows 34); the empty Activity state has no board, so Claude styled it (Newsreader italic title, centred body); Log out waits at most 3 seconds to forget the phone's push token. | Any time | As listed |
 | 26 | "Popular near <city>" (Find people) can include people who aren't actually near; and opening a private account's pick after losing access shows the same "That pick isn’t there any more." as a removed pick. | Any time | As described |
 | 27 | **Phase 5 Discover choices** (built with these defaults; plan `docs/superpowers/plans/2026-11-05-phase-5-discover.md`, "Decisions for Josie"): the map runs in a web view until the test builds; distance is measured from the map's centre (starts at "Any"); the map shows trusted accounts, people you follow and you; private members are never named on Discover; food trucks and pop-ups never get a pin; filters combine "any of these food types" and "any of these dietary tags"; one Search screen replaces Find people; plus new copy listed in the plan. | Any time | As listed |
+| 28 | Map callouts (the label under a selected pin) use the phone's system font instead of Manrope until the test builds bundle the map library. | Phase 8 | System font for now |
 
 ## Done
 
