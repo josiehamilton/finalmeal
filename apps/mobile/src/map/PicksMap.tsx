@@ -57,6 +57,10 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
   const ready = useRef(false);
   const queue = useRef<MapCommand[]>([]);
   const fitted = useRef(false);
+  /** Set once this WebView has reported a failure: nothing it says afterwards (a late `ready`) counts. */
+  const failed = useRef(false);
+  /** The pins last sent, as JSON: a new array with the same contents is not sent again. */
+  const sentPins = useRef<string | null>(null);
   const latest = useRef({ ...props, pins, selectedId });
   latest.current = { ...props, pins, selectedId };
   /** Where the map was last looking, so "Try again" opens it there instead of back at the start. */
@@ -95,13 +99,24 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
   }, [insetTop, insetBottom, send]);
 
   useEffect(() => {
-    send({ type: 'setPins', pins });
+    const key = JSON.stringify(pins);
+    if (key !== sentPins.current) {
+      sentPins.current = key;
+      send({ type: 'setPins', pins });
+    }
     fitIfFirst();
   }, [pins, send, fitIfFirst]);
 
   useEffect(() => {
     send({ type: 'select', id: selectedId });
   }, [selectedId, send]);
+
+  /** The page failed, or the WebView died: show "The map didn’t load." until Try again. */
+  const fail = useCallback(() => {
+    failed.current = true;
+    ready.current = false;
+    setStatus('error');
+  }, []);
 
   const onMessage = useCallback(
     (event: WebViewMessageEvent) => {
@@ -110,6 +125,7 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
       const { onRegionChange, onPinPress, onMapPress, pins: current } = latest.current;
       switch (message.type) {
         case 'ready': {
+          if (failed.current) break;
           ready.current = true;
           setStatus('ready');
           const waiting = queue.current;
@@ -133,32 +149,36 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
           onMapPress?.();
           break;
         case 'error':
-          ready.current = false;
-          setStatus('error');
+          fail();
           break;
       }
     },
-    [fitIfFirst],
+    [fitIfFirst, fail],
   );
 
-  const onError = useCallback(() => {
-    ready.current = false;
-    setStatus('error');
-  }, []);
-
-  /** The page itself may load; any link in it (the attribution) goes to the system browser. */
-  const onShouldStartLoadWithRequest = useCallback((request: { url: string }) => {
-    const { url } = request;
-    if (/^https?:/i.test(url)) {
-      Linking.openURL(url).catch(() => {});
+  /**
+   * Only the initial `about:blank` page loads in the WebView. A link the person taps (the
+   * attribution) opens in the system browser; any other navigation, whether from a script, a
+   * redirect or a subframe, or to another kind of URL, is refused. iOS says how a navigation
+   * started (`click`); Android does not, so a top-frame request there counts as the tap.
+   */
+  const onShouldStartLoadWithRequest = useCallback(
+    (request: { url: string; isTopFrame?: boolean; navigationType?: string }) => {
+      const { url, isTopFrame, navigationType } = request;
+      if (url === 'about:blank') return true;
+      const tapped = navigationType === undefined || navigationType === 'click';
+      if (/^https?:/i.test(url) && isTopFrame !== false && tapped) {
+        Linking.openURL(url).catch(() => {});
+      }
       return false;
-    }
-    return url === 'about:blank' || url.startsWith('about:') || url.startsWith('data:');
-  }, []);
+    },
+    [],
+  );
 
   function tryAgain() {
     const { insets: currentInsets, pins: currentPins, selectedId: currentSelected } = latest.current;
     ready.current = false;
+    failed.current = false;
     queue.current = [];
     if (currentInsets) {
       queue.current.push({ type: 'setInsets', top: currentInsets.top, bottom: currentInsets.bottom });
@@ -172,6 +192,7 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
 
   return (
     <View style={styles.fill} testID={testID}>
+      {/* `<unknown>`: the package types `WebView<P = undefined>`, which turns every JSX prop into `never`. */}
       <WebView<unknown>
         key={attempt}
         ref={web}
@@ -189,7 +210,9 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
         onMessage={onMessage}
-        onError={onError}
+        onError={fail}
+        onContentProcessDidTerminate={fail}
+        onRenderProcessGone={fail}
         onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
       />
       {status === 'loading' ? (

@@ -168,24 +168,106 @@ describe('PicksMap', () => {
     expect(screen.getByText('Try again')).toBeTruthy();
   });
 
-  it('opens a link in the system browser and keeps the WebView on its own page', async () => {
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
-    await setup();
-    const { onShouldStartLoadWithRequest } = currentWebView();
-    expect(onShouldStartLoadWithRequest?.({ url: 'https://maplibre.org/' })).toBe(false);
-    expect(open).toHaveBeenCalledWith('https://maplibre.org/');
-    expect(onShouldStartLoadWithRequest?.({ url: 'http://openstreetmap.org/copyright' })).toBe(false);
-    expect(open).toHaveBeenCalledTimes(2);
+  describe('navigation', () => {
+    it('opens a tapped link in the system browser and keeps the WebView on its own page', async () => {
+      const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+      await setup();
+      const { onShouldStartLoadWithRequest } = currentWebView();
+      expect(
+        onShouldStartLoadWithRequest?.({ url: 'https://maplibre.org/', isTopFrame: true, navigationType: 'click' }),
+      ).toBe(false);
+      expect(open).toHaveBeenCalledWith('https://maplibre.org/');
+      expect(
+        onShouldStartLoadWithRequest?.({ url: 'http://openstreetmap.org/copyright', isTopFrame: true, navigationType: 'click' }),
+      ).toBe(false);
+      expect(open).toHaveBeenCalledTimes(2);
+    });
+
+    it('opens a link on Android, which reports no navigation type, when it is the top frame', async () => {
+      const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+      await setup();
+      const { onShouldStartLoadWithRequest } = currentWebView();
+      expect(onShouldStartLoadWithRequest?.({ url: 'https://maplibre.org/', isTopFrame: true })).toBe(false);
+      expect(open).toHaveBeenCalledWith('https://maplibre.org/');
+    });
+
+    it('never opens a script-started, redirected or subframe navigation', async () => {
+      const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+      await setup();
+      const { onShouldStartLoadWithRequest } = currentWebView();
+      for (const request of [
+        { url: 'https://evil.example/', isTopFrame: true, navigationType: 'other' },
+        { url: 'https://evil.example/', isTopFrame: true, navigationType: 'formsubmit' },
+        { url: 'https://evil.example/', isTopFrame: false, navigationType: 'click' },
+        { url: 'https://evil.example/', isTopFrame: false },
+      ]) {
+        expect(onShouldStartLoadWithRequest?.(request)).toBe(false);
+      }
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    it('allows exactly the initial about:blank page and refuses every other URL', async () => {
+      const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+      await setup();
+      const { onShouldStartLoadWithRequest } = currentWebView();
+      expect(onShouldStartLoadWithRequest?.({ url: 'about:blank' })).toBe(true);
+      for (const url of [
+        'data:text/html,<script>window.ReactNativeWebView.postMessage("x")</script>',
+        'about:srcdoc',
+        'about:blank#x',
+        'javascript:alert(1)',
+        'intent://scan',
+        'file:///etc/passwd',
+        'blob:null/abc',
+      ]) {
+        expect(onShouldStartLoadWithRequest?.({ url })).toBe(false);
+      }
+      expect(open).not.toHaveBeenCalled();
+    });
   });
 
-  it('lets the page itself load and refuses every other scheme', async () => {
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+  describe('a dead WebView', () => {
+    it('shows the error and Try again when iOS ends the web content process', async () => {
+      await setup();
+      await emitMapEvent({ type: 'ready' });
+      await act(async () => currentWebView().onContentProcessDidTerminate?.());
+      expect(screen.getByText('The map didn’t load.')).toBeTruthy();
+      await fireEvent.press(screen.getByText('Try again'));
+      expect(webViewMounts()).toBe(2);
+    });
+
+    it('shows the error and Try again when Android’s renderer is gone', async () => {
+      await setup();
+      await emitMapEvent({ type: 'ready' });
+      await act(async () => currentWebView().onRenderProcessGone?.());
+      expect(screen.getByText('The map didn’t load.')).toBeTruthy();
+      await fireEvent.press(screen.getByText('Try again'));
+      expect(webViewMounts()).toBe(2);
+    });
+
+    it('shows the error when the page itself fails to load', async () => {
+      await setup();
+      await act(async () => currentWebView().onError?.());
+      expect(screen.getByText('The map didn’t load.')).toBeTruthy();
+    });
+  });
+
+  it('keeps showing the error when a ready arrives after it', async () => {
     await setup();
-    const { onShouldStartLoadWithRequest } = currentWebView();
-    expect(onShouldStartLoadWithRequest?.({ url: 'about:blank' })).toBe(true);
-    expect(onShouldStartLoadWithRequest?.({ url: 'javascript:alert(1)' })).toBe(false);
-    expect(onShouldStartLoadWithRequest?.({ url: 'intent://scan' })).toBe(false);
-    expect(open).not.toHaveBeenCalled();
+    await emitMapEvent({ type: 'error', reason: 'load' });
+    await emitMapEvent({ type: 'ready' });
+    expect(screen.getByText('The map didn’t load.')).toBeTruthy();
+    expect(sentCommands()).toEqual([]);
+  });
+
+  it('does not re-send pins whose contents did not change', async () => {
+    const { rerender, props } = await setup();
+    await emitMapEvent({ type: 'ready' });
+    const before = sentCommands().length;
+    await rerender(<PicksMap {...props} pins={PINS.map((p) => ({ ...p }))} />);
+    expect(sentCommands().length).toBe(before);
+    await rerender(<PicksMap {...props} pins={[PINS[0]!]} />);
+    expect(sentCommands().slice(before)).toEqual([{ type: 'setPins', pins: [PINS[0]] }]);
   });
 
   describe('fitOnFirstPins', () => {

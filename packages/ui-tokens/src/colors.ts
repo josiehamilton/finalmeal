@@ -17,7 +17,7 @@ export const colors = Object.freeze({
   /** The off track of a switch (NotificationSettings board). A neutral, not an accent. */
   switchOff: '#3A3530',
   honorable: '#E6DFD5',
-  /** The map's floating controls (the zoom buttons, the attribution panel). */
+  /** The map's floating controls (the attribution panel). */
   glass: 'rgba(23,21,19,0.94)',
   /** The ring around a selected Final Meal pin on the map. */
   emberRing: 'rgba(232,105,63,0.35)',

@@ -10,6 +10,8 @@ export class FakeElement {
   readonly attributes: Record<string, string> = {};
   children: FakeElement[] = [];
   textContent = '';
+  /** How many times a child was added or removed: tells a restyle from a rebuild. */
+  childOps = 0;
   private listeners: Record<string, Handler[]> = {};
 
   constructor(readonly tag: string) {}
@@ -23,11 +25,13 @@ export class FakeElement {
   }
 
   appendChild(child: FakeElement) {
+    this.childOps += 1;
     this.children.push(child);
     return child;
   }
 
   removeChild(child: FakeElement) {
+    this.childOps += 1;
     this.children = this.children.filter((c) => c !== child);
     return child;
   }
@@ -198,6 +202,8 @@ export function runMapPage(opts: MapPageEnvOptions = {}): MapPageEnv {
   const layers = opts.layers ?? [];
 
   const win: Record<string, unknown> = {
+    setTimeout: (fn: () => void, ms: number) => setTimeout(fn, ms),
+    clearTimeout: (id: unknown) => clearTimeout(id as ReturnType<typeof setTimeout>),
     FM_CONFIG:
       opts.config ??
       mapPageConfig({ camera: { lat: 49.2827, lng: -123.1207, zoom: 12 }, interactive: true }),

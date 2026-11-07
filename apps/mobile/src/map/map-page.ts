@@ -13,6 +13,9 @@ export const MAPLIBRE_GL_CSS_SRI =
 
 export const OPENFREEMAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
 
+/** How long the page waits for the map's first `load` before it reports `error`/`load`. */
+export const MAP_LOAD_TIMEOUT_MS = 20_000;
+
 /**
  * The page's program: plain ES2017 in a string, because `Function.toString` is stripped by Hermes.
  * It reads `window.FM_CONFIG` (colours, camera, style URL: see `buildMapHtml`) and the global
@@ -186,7 +189,21 @@ export const MAP_PAGE_SCRIPT: string = String.raw`
     delete entries[id];
   }
 
-  function setPins(pins) {
+  function validPin(pin) {
+    return (
+      pin &&
+      typeof pin.id === 'string' &&
+      (pin.tier === 'final' || pin.tier === 'honorable') &&
+      typeof pin.label === 'string' &&
+      typeof pin.lat === 'number' &&
+      isFinite(pin.lat) &&
+      typeof pin.lng === 'number' &&
+      isFinite(pin.lng)
+    );
+  }
+
+  function setPins(all) {
+    var pins = all.filter(validPin);
     var next = {};
     pins.forEach(function (pin) {
       next[pin.id] = pin;
@@ -216,9 +233,10 @@ export const MAP_PAGE_SCRIPT: string = String.raw`
   }
 
   function select(id) {
+    var previous = selectedId;
     selectedId = id;
-    Object.keys(entries).forEach(function (key) {
-      styleEntry(entries[key]);
+    [previous, id].forEach(function (key) {
+      if (key !== null && entries[key]) styleEntry(entries[key]);
     });
   }
 
@@ -231,16 +249,28 @@ export const MAP_PAGE_SCRIPT: string = String.raw`
       map.easeTo({ center: [pins[0].lng, pins[0].lat], zoom: maxZoom });
       return;
     }
-    var west = 180;
-    var east = -180;
     var south = 90;
     var north = -90;
+    var lngs = [];
     pins.forEach(function (pin) {
-      west = Math.min(west, pin.lng);
-      east = Math.max(east, pin.lng);
       south = Math.min(south, pin.lat);
       north = Math.max(north, pin.lat);
+      lngs.push(pin.lng);
     });
+    lngs.sort(function (x, y) {
+      return x - y;
+    });
+    /* The box leaves out the widest empty stretch of longitude, so pins either side of 180 fit the short way round. */
+    var west = lngs[0];
+    var east = lngs[lngs.length - 1];
+    var widestGap = 360 - (east - west);
+    for (var i = 0; i < lngs.length - 1; i += 1) {
+      if (lngs[i + 1] - lngs[i] > widestGap) {
+        widestGap = lngs[i + 1] - lngs[i];
+        west = lngs[i + 1];
+        east = lngs[i] + 360;
+      }
+    }
     map.fitBounds(
       [
         [west, south],
@@ -327,11 +357,15 @@ export const MAP_PAGE_SCRIPT: string = String.raw`
       return;
     }
     if (map.touchZoomRotate && map.touchZoomRotate.disableRotation) map.touchZoomRotate.disableRotation();
+    var loadTimer = window.setTimeout(function () {
+      if (!ready) fail('load');
+    }, cfg.loadTimeoutMs);
     map.on('style.load', function () {
       styleLoaded = true;
       recolour();
     });
     map.on('load', function () {
+      window.clearTimeout(loadTimer);
       ready = true;
       post({ type: 'ready' });
       postRegion();
@@ -341,6 +375,9 @@ export const MAP_PAGE_SCRIPT: string = String.raw`
     });
     map.on('click', function () {
       post({ type: 'mapPress' });
+    });
+    map.on('webglcontextlost', function () {
+      fail('load');
     });
     map.on('error', function () {
       /* tile errors after the style is in are the tile server's business; before it, the style failed */
@@ -372,6 +409,7 @@ export function mapPageConfig(opts: MapPageOptions) {
     styleUrl: OPENFREEMAP_STYLE_URL,
     camera: opts.camera,
     interactive: opts.interactive,
+    loadTimeoutMs: MAP_LOAD_TIMEOUT_MS,
     map: mapTokens,
     colors: {
       night: colors.night,

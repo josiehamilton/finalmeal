@@ -8,6 +8,8 @@ import {
   MAPLIBRE_GL_CSS_SRI,
   MAPLIBRE_GL_JS_SRI,
   MAPLIBRE_GL_VERSION,
+  MAP_LOAD_TIMEOUT_MS,
+  mapPageConfig,
   OPENFREEMAP_STYLE_URL,
 } from './map-page';
 
@@ -331,6 +333,91 @@ describe('MAP_PAGE_SCRIPT', () => {
     const env = runMapPage({ webglFails: true });
     expect(env.posted).toEqual([{ type: 'error', reason: 'load' }]);
     expect(() => env.receive({ type: 'setPins', pins: PINS })).not.toThrow();
+  });
+
+  it('restyles only the pins whose selection changed', () => {
+    const { env } = started();
+    const three: MapPin[] = [...PINS, { id: 'c', lat: 49.27, lng: -123.11, tier: 'final', label: 'Third' }];
+    env.receive({ type: 'setPins', pins: three });
+    env.receive({ type: 'select', id: 'a' });
+    const [a, b, c] = env.markers.map((m) => m.element);
+    const ops = () => [a, b, c].map((el) => el!.childOps);
+    const afterFirst = ops();
+    env.receive({ type: 'select', id: 'b' });
+    const afterSecond = ops();
+    expect(afterSecond[0]).toBeGreaterThan(afterFirst[0]!);
+    expect(afterSecond[1]).toBeGreaterThan(afterFirst[1]!);
+    expect(afterSecond[2]).toBe(afterFirst[2]);
+    env.receive({ type: 'select', id: null });
+    expect(ops()[2]).toBe(afterFirst[2]);
+  });
+
+  it('posts error/load when the WebGL context is lost', () => {
+    const { env, map } = started();
+    map.fire('load');
+    env.posted.length = 0;
+    map.fire('webglcontextlost');
+    map.fire('webglcontextlost');
+    expect(env.posted).toEqual([{ type: 'error', reason: 'load' }]);
+  });
+
+  describe('the load timeout', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+    const withTimeout = (ms: number) => ({
+      config: { ...mapPageConfig({ camera: CAMERA, interactive: true }), loadTimeoutMs: ms },
+    });
+
+    it('has a generous default in the config', () => {
+      expect(mapPageConfig({ camera: CAMERA, interactive: true }).loadTimeoutMs).toBe(MAP_LOAD_TIMEOUT_MS);
+      expect(MAP_LOAD_TIMEOUT_MS).toBeGreaterThanOrEqual(15000);
+    });
+
+    it('posts error/load if the map has not loaded in time', () => {
+      const { env } = started(withTimeout(1000));
+      jest.advanceTimersByTime(999);
+      expect(env.posted).toEqual([]);
+      jest.advanceTimersByTime(2);
+      expect(env.posted).toEqual([{ type: 'error', reason: 'load' }]);
+    });
+
+    it('stays quiet once the map has loaded', () => {
+      const { env, map } = started(withTimeout(1000));
+      map.fire('load');
+      env.posted.length = 0;
+      jest.advanceTimersByTime(5000);
+      expect(env.posted).toEqual([]);
+    });
+  });
+
+  it('fits pins either side of the antimeridian the short way round', () => {
+    const { env, map } = started();
+    env.receive({
+      type: 'setPins',
+      pins: [
+        { id: 'w', lat: -17.7, lng: 179, tier: 'final', label: 'W' },
+        { id: 'e', lat: -16.5, lng: -179, tier: 'final', label: 'E' },
+      ],
+    });
+    env.receive({ type: 'fitPins', maxZoom: 14 });
+    expect(map.lastCall('fitBounds')?.args[0]).toEqual([
+      [179, -17.7],
+      [181, -16.5],
+    ]);
+  });
+
+  it('skips a pin with a missing or non-finite point instead of failing the rest', () => {
+    const { env } = started();
+    env.receive({
+      type: 'setPins',
+      pins: [
+        { id: 'bad', lat: null, lng: -123, tier: 'final', label: 'Bad' } as unknown as MapPin,
+        { id: 'worse', lat: 49, lng: 'x', tier: 'final', label: 'Worse' } as unknown as MapPin,
+        PINS[0]!,
+      ],
+    });
+    expect(env.liveMarkers()).toHaveLength(1);
+    expect(env.markers[0]?.lngLat).toEqual([-123.12, 49.28]);
   });
 
   it('never touches the phone’s position', () => {

@@ -7,7 +7,14 @@ interface WebViewMockState {
   instances: Array<{
     props: {
       onMessage?: (event: { nativeEvent: { data: string } }) => void;
-      onShouldStartLoadWithRequest?: (request: { url: string; isTopFrame?: boolean }) => boolean;
+      onShouldStartLoadWithRequest?: (request: {
+        url: string;
+        isTopFrame?: boolean;
+        navigationType?: string;
+      }) => boolean;
+      onContentProcessDidTerminate?: () => void;
+      onRenderProcessGone?: () => void;
+      onError?: () => void;
       source?: { html?: string };
     };
   }>;

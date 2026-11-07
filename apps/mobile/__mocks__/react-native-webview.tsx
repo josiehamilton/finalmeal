@@ -9,7 +9,14 @@ import type { ViewProps } from 'react-native';
 export interface MockWebViewProps extends ViewProps {
   source?: { html?: string; uri?: string };
   onMessage?: (event: { nativeEvent: { data: string } }) => void;
-  onShouldStartLoadWithRequest?: (request: { url: string; isTopFrame?: boolean }) => boolean;
+  onShouldStartLoadWithRequest?: (request: {
+    url: string;
+    isTopFrame?: boolean;
+    navigationType?: string;
+  }) => boolean;
+  onContentProcessDidTerminate?: () => void;
+  onRenderProcessGone?: () => void;
+  onError?: () => void;
 }
 
 interface Instance {

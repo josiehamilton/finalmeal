@@ -30,7 +30,11 @@ export type MapCommand =
   | { type: 'fitPins'; maxZoom: number }
   | { type: 'setInsets'; top: number; bottom: number };
 
-/** Map to app. */
+/**
+ * Map to app. Regions are latest-wins: the page posts one right after `ready` (the first
+ * `moveend` never fires for the initial camera), and the `setInsets` sent after `ready` moves the
+ * camera and posts a second one a moment later. Treat each as the current view, never as a count.
+ */
 export type MapEvent =
   | { type: 'ready' }
   | { type: 'region'; region: MapRegion }

@@ -58,6 +58,7 @@ Each item names the phase that closes it.
 - Replace the placeholder skull icon and splash with Josie's final designs (re-run `pnpm brand:assets` from new source art).
 - Use development builds instead of Expo Go.
 - Switch the map to `@maplibre/maplibre-react-native` once the app moves to development builds (keep the bridge's `MapPin`/`MapRegion` shapes in `apps/mobile/src/map/bridge.ts`); bundle maplibre-gl with the app instead of loading it from jsDelivr; native pins get accessibility labels (the WebView's markers are not reachable by VoiceOver/TalkBack: Discover's List view is the accessible path until then).
+- Map callouts use `system-ui` because Manrope isn't loaded inside the WebView; inline Manrope 700 as an `@font-face` when maplibre-gl is bundled with the app.
 - Check OpenFreeMap's terms and capacity before launch; self-hosted Protomaps is the fallback (spec §7).
 - Verify the splash background colour on real devices.
 - Work through the production configuration checklist in `docs/ops/supabase.md` ("Before the first production push").
