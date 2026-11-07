@@ -335,6 +335,29 @@ export const MAP_PAGE_SCRIPT: string = String.raw`
     });
   }
 
+  /* A tap on a link never navigates the page: the app opens the link in the system browser. */
+  document.addEventListener(
+    'click',
+    function (event) {
+      var link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+      if (!link) return;
+      event.preventDefault();
+      if (event.isTrusted) post({ type: 'openLink', url: link.href });
+    },
+    true,
+  );
+
+  function stopMap() {
+    try {
+      map.remove();
+    } catch (e) {
+      /* already gone */
+    }
+    map = null;
+    entries = {};
+    pinsById = {};
+  }
+
   function start() {
     if (typeof maplibregl === 'undefined') {
       fail('load');
@@ -358,7 +381,9 @@ export const MAP_PAGE_SCRIPT: string = String.raw`
     }
     if (map.touchZoomRotate && map.touchZoomRotate.disableRotation) map.touchZoomRotate.disableRotation();
     var loadTimer = window.setTimeout(function () {
-      if (!ready) fail('load');
+      if (ready) return;
+      fail('load');
+      stopMap();
     }, cfg.loadTimeoutMs);
     map.on('style.load', function () {
       styleLoaded = true;

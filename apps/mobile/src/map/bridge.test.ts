@@ -78,6 +78,43 @@ describe('parseMapEvent', () => {
     expect(parse({ type: 'pinPress', id: null })).toBeNull();
   });
 
+  describe('openLink', () => {
+    it.each([
+      'https://maplibre.org/',
+      'https://openfreemap.org',
+      'https://www.openfreemap.org/about?x=1#y',
+      'https://www.openstreetmap.org/copyright',
+      'https://maplibre.org/maplibre-gl-js/docs/',
+    ])('accepts %s', (url) => {
+      expect(parse({ type: 'openLink', url })).toEqual({ type: 'openLink', url });
+    });
+
+    it.each([
+      'http://maplibre.org/',
+      'https://evil.example/',
+      'https://openstreetmap.org.evil.example/',
+      'https://evil-openstreetmap.org/',
+      'https://maplibre.org@evil.example/',
+      'https://user:pw@maplibre.org/',
+      'https://maplibre.org:8443/',
+      'https://maplibre.org/a b',
+      'javascript:alert(1)',
+      'data:text/html,hi',
+      'intent://scan',
+      'https://',
+      '//maplibre.org/',
+      '',
+    ])('rejects %s', (url) => {
+      expect(parse({ type: 'openLink', url })).toBeNull();
+    });
+
+    it('rejects a missing, non-string or very long url', () => {
+      expect(parse({ type: 'openLink' })).toBeNull();
+      expect(parse({ type: 'openLink', url: 7 })).toBeNull();
+      expect(parse({ type: 'openLink', url: `https://maplibre.org/${'a'.repeat(3000)}` })).toBeNull();
+    });
+  });
+
   it('rejects an error without a known reason', () => {
     expect(parse({ type: 'error' })).toBeNull();
     expect(parse({ type: 'error', reason: 'tiles' })).toBeNull();

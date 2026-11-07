@@ -7,7 +7,7 @@ import { fontFamily } from '../lib/fonts';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { commandScript, parseMapEvent } from './bridge';
 import type { MapCamera, MapCommand, MapPin, MapRegion } from './bridge';
-import { buildMapHtml } from './map-page';
+import { buildMapHtml, MAP_LOAD_TIMEOUT_MS } from './map-page';
 
 /** How far `fitOnFirstPins` zooms in: close enough to read the street, never tighter than that. */
 const FIT_MAX_ZOOM = 14;
@@ -34,6 +34,13 @@ export interface PicksMapProps {
 }
 
 type Status = 'loading' | 'ready' | 'error';
+
+/**
+ * How long the app waits for `ready` before it gives up on a page. The page has its own timer
+ * (`MAP_LOAD_TIMEOUT_MS`), but that only starts once maplibre-gl has loaded: a stalled CDN, or a
+ * page that never runs, would otherwise leave the placeholder up for good.
+ */
+const WATCHDOG_MS = MAP_LOAD_TIMEOUT_MS + 5000;
 
 /** The commands whose latest value replaces an older, unsent one. */
 const LATEST_WINS: ReadonlySet<MapCommand['type']> = new Set(['setPins', 'select', 'setInsets']);
@@ -71,6 +78,8 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
   const [html, setHtml] = useState(() => buildMapHtml({ camera: initialCamera, interactive }));
 
   const send = useCallback((cmd: MapCommand) => {
+    // While the error shows, a camera move would only replay on a map that has since been reset.
+    if (failed.current && (cmd.type === 'flyTo' || cmd.type === 'fitPins')) return;
     if (ready.current && web.current) {
       web.current.injectJavaScript(commandScript(cmd));
       return;
@@ -115,6 +124,7 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
   const fail = useCallback(() => {
     failed.current = true;
     ready.current = false;
+    queue.current = queue.current.filter((cmd) => cmd.type !== 'flyTo' && cmd.type !== 'fitPins');
     setStatus('error');
   }, []);
 
@@ -148,6 +158,9 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
         case 'mapPress':
           onMapPress?.();
           break;
+        case 'openLink':
+          Linking.openURL(message.url).catch(() => {});
+          break;
         case 'error':
           fail();
           break;
@@ -157,23 +170,22 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
   );
 
   /**
-   * Only the initial `about:blank` page loads in the WebView. A link the person taps (the
-   * attribution) opens in the system browser; any other navigation, whether from a script, a
-   * redirect or a subframe, or to another kind of URL, is refused. iOS says how a navigation
-   * started (`click`); Android does not, so a top-frame request there counts as the tap.
+   * Only the initial `about:blank` page ever loads in the WebView. Links never navigate it: the
+   * page turns a real tap on one into an `openLink` event (checked in `parseMapEvent`), so every
+   * http(s) request seen here is a script or a redirect and is refused. This matters on Android,
+   * where react-native-webview reports no `isTopFrame` or `navigationType`, so a request there
+   * cannot be told apart from a tap.
    */
-  const onShouldStartLoadWithRequest = useCallback(
-    (request: { url: string; isTopFrame?: boolean; navigationType?: string }) => {
-      const { url, isTopFrame, navigationType } = request;
-      if (url === 'about:blank') return true;
-      const tapped = navigationType === undefined || navigationType === 'click';
-      if (/^https?:/i.test(url) && isTopFrame !== false && tapped) {
-        Linking.openURL(url).catch(() => {});
-      }
-      return false;
-    },
-    [],
-  );
+  const onShouldStartLoadWithRequest = useCallback((request: { url: string }) => {
+    return request.url === 'about:blank';
+  }, []);
+
+  // The watchdog: waiting for the first `ready` (or a failure) never lasts longer than this.
+  useEffect(() => {
+    if (status !== 'loading') return;
+    const timer = setTimeout(fail, WATCHDOG_MS);
+    return () => clearTimeout(timer);
+  }, [status, attempt, fail]);
 
   function tryAgain() {
     const { insets: currentInsets, pins: currentPins, selectedId: currentSelected } = latest.current;

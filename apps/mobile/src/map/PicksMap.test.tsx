@@ -10,6 +10,7 @@ import {
   webViewMounts,
 } from '../test-support/map';
 import type { MapPin, MapRegion } from './bridge';
+import { MAP_LOAD_TIMEOUT_MS } from './map-page';
 import { PicksMap } from './PicksMap';
 import type { PicksMapHandle, PicksMapProps } from './PicksMap';
 
@@ -169,43 +170,6 @@ describe('PicksMap', () => {
   });
 
   describe('navigation', () => {
-    it('opens a tapped link in the system browser and keeps the WebView on its own page', async () => {
-      const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
-      await setup();
-      const { onShouldStartLoadWithRequest } = currentWebView();
-      expect(
-        onShouldStartLoadWithRequest?.({ url: 'https://maplibre.org/', isTopFrame: true, navigationType: 'click' }),
-      ).toBe(false);
-      expect(open).toHaveBeenCalledWith('https://maplibre.org/');
-      expect(
-        onShouldStartLoadWithRequest?.({ url: 'http://openstreetmap.org/copyright', isTopFrame: true, navigationType: 'click' }),
-      ).toBe(false);
-      expect(open).toHaveBeenCalledTimes(2);
-    });
-
-    it('opens a link on Android, which reports no navigation type, when it is the top frame', async () => {
-      const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
-      await setup();
-      const { onShouldStartLoadWithRequest } = currentWebView();
-      expect(onShouldStartLoadWithRequest?.({ url: 'https://maplibre.org/', isTopFrame: true })).toBe(false);
-      expect(open).toHaveBeenCalledWith('https://maplibre.org/');
-    });
-
-    it('never opens a script-started, redirected or subframe navigation', async () => {
-      const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
-      await setup();
-      const { onShouldStartLoadWithRequest } = currentWebView();
-      for (const request of [
-        { url: 'https://evil.example/', isTopFrame: true, navigationType: 'other' },
-        { url: 'https://evil.example/', isTopFrame: true, navigationType: 'formsubmit' },
-        { url: 'https://evil.example/', isTopFrame: false, navigationType: 'click' },
-        { url: 'https://evil.example/', isTopFrame: false },
-      ]) {
-        expect(onShouldStartLoadWithRequest?.(request)).toBe(false);
-      }
-      expect(open).not.toHaveBeenCalled();
-    });
-
     it('allows exactly the initial about:blank page and refuses every other URL', async () => {
       const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
       await setup();
@@ -222,6 +186,43 @@ describe('PicksMap', () => {
       ]) {
         expect(onShouldStartLoadWithRequest?.({ url })).toBe(false);
       }
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    it('refuses every http(s) navigation outright, whatever the platform says about it', async () => {
+      const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+      await setup();
+      const { onShouldStartLoadWithRequest } = currentWebView();
+      const url = 'https://maplibre.org/';
+      for (const request of [
+        // iOS: a tap, a script, a form, a subframe
+        { url, isTopFrame: true, navigationType: 'click' },
+        { url, isTopFrame: true, navigationType: 'other' },
+        { url, isTopFrame: true, navigationType: 'formsubmit' },
+        { url, isTopFrame: false, navigationType: 'click' },
+        // Android sends only the url (react-native-webview 14 adds no isTopFrame or navigationType)
+        { url },
+        { url: 'http://openstreetmap.org/copyright' },
+      ]) {
+        expect(onShouldStartLoadWithRequest?.(request)).toBe(false);
+      }
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    it('opens a link the page reports from a real tap, in the system browser', async () => {
+      const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+      await setup();
+      await emitMapEvent({ type: 'openLink', url: 'https://www.openstreetmap.org/copyright' });
+      expect(open).toHaveBeenCalledTimes(1);
+      expect(open).toHaveBeenCalledWith('https://www.openstreetmap.org/copyright');
+    });
+
+    it('ignores a link from a host it does not know, or a malformed one', async () => {
+      const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+      await setup();
+      await emitRawMapMessage('{"type":"openLink","url":"https://evil.example/"}');
+      await emitRawMapMessage('{"type":"openLink","url":"javascript:alert(1)"}');
+      await emitRawMapMessage('{"type":"openLink"}');
       expect(open).not.toHaveBeenCalled();
     });
   });
@@ -250,6 +251,54 @@ describe('PicksMap', () => {
       await act(async () => currentWebView().onError?.());
       expect(screen.getByText('The map didn’t load.')).toBeTruthy();
     });
+  });
+
+  describe('the load watchdog', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+    const patience = MAP_LOAD_TIMEOUT_MS + 5000;
+
+    it('gives up on a page that never says anything, and Try again waits for it afresh', async () => {
+      await setup();
+      await act(async () => jest.advanceTimersByTime(patience - 1));
+      expect(screen.queryByText('The map didn’t load.')).toBeNull();
+      await act(async () => jest.advanceTimersByTime(2));
+      expect(screen.getByText('The map didn’t load.')).toBeTruthy();
+
+      await fireEvent.press(screen.getByText('Try again'));
+      expect(screen.queryByText('The map didn’t load.')).toBeNull();
+      await act(async () => jest.advanceTimersByTime(patience + 1));
+      expect(screen.getByText('The map didn’t load.')).toBeTruthy();
+    });
+
+    it('stays quiet once the page is ready', async () => {
+      await setup();
+      await emitMapEvent({ type: 'ready' });
+      await act(async () => jest.advanceTimersByTime(patience * 3));
+      expect(screen.queryByText('The map didn’t load.')).toBeNull();
+    });
+
+    it('stops waiting when the map is unmounted', async () => {
+      const started = jest.spyOn(globalThis, 'setTimeout');
+      const cleared = jest.spyOn(globalThis, 'clearTimeout');
+      const { unmount } = await setup();
+      const index = started.mock.calls.findIndex(([, ms]) => ms === patience);
+      expect(index).toBeGreaterThanOrEqual(0);
+      const watchdog = started.mock.results[index]?.value as unknown;
+      await unmount();
+      expect(cleared).toHaveBeenCalledWith(watchdog);
+    });
+  });
+
+  it('drops flyTo commands while the error shows, so Try again does not fly somewhere stale', async () => {
+    const ref = createRef<PicksMapHandle>();
+    await render(<PicksMap ref={ref} initialCamera={CAMERA} pins={[]} selectedId={null} />);
+    await act(async () => ref.current?.flyTo({ lat: 1, lng: 2, zoom: 15 }));
+    await emitMapEvent({ type: 'error', reason: 'load' });
+    await act(async () => ref.current?.flyTo({ lat: 3, lng: 4, zoom: 15 }));
+    await fireEvent.press(screen.getByText('Try again'));
+    await emitMapEvent({ type: 'ready' });
+    expect(sentCommands().some((c) => c.type === 'flyTo')).toBe(false);
   });
 
   it('keeps showing the error when a ready arrives after it', async () => {

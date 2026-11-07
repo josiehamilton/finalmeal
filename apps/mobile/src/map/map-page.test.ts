@@ -352,6 +352,44 @@ describe('MAP_PAGE_SCRIPT', () => {
     expect(ops()[2]).toBe(afterFirst[2]);
   });
 
+  describe('links', () => {
+    it('turns a trusted click on a link into an openLink event and never lets it navigate', () => {
+      const { env } = started();
+      const result = env.clickLink('https://maplibre.org/', true);
+      expect(result.prevented).toBe(true);
+      expect(env.posted).toEqual([{ type: 'openLink', url: 'https://maplibre.org/' }]);
+    });
+
+    it('swallows a click a script made, without asking the app to open anything', () => {
+      const { env } = started();
+      const result = env.clickLink('https://evil.example/', false);
+      expect(result.prevented).toBe(true);
+      expect(env.posted).toEqual([]);
+    });
+
+    it('leaves a click that is not on a link alone', () => {
+      const { env } = started();
+      expect(env.clickNonLink().prevented).toBe(false);
+      expect(env.posted).toEqual([]);
+    });
+  });
+
+  it('stops the map when the load times out, so tiles do not keep loading behind the error', () => {
+    jest.useFakeTimers();
+    try {
+      const { env, map } = started({
+        config: { ...mapPageConfig({ camera: CAMERA, interactive: true }), loadTimeoutMs: 1000 },
+      });
+      jest.advanceTimersByTime(1001);
+      expect(env.posted).toEqual([{ type: 'error', reason: 'load' }]);
+      expect(map.removed).toBe(true);
+      expect(() => env.receive({ type: 'setPins', pins: PINS })).not.toThrow();
+      expect(env.markers).toHaveLength(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('posts error/load when the WebGL context is lost', () => {
     const { env, map } = started();
     map.fire('load');

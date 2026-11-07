@@ -40,6 +40,8 @@ export type MapEvent =
   | { type: 'region'; region: MapRegion }
   | { type: 'pinPress'; id: string }
   | { type: 'mapPress' }
+  /** A tap on a link in the page (the attribution). Only https links to the allowed hosts get through. */
+  | { type: 'openLink'; url: string }
   | { type: 'error'; reason: 'load' | 'style' };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -79,6 +81,20 @@ function parseRegion(v: unknown): MapRegion | null {
   };
 }
 
+/** The attribution links the map shows: OpenFreeMap, OpenStreetMap and MapLibre, and their subdomains. */
+const LINK_HOSTS = ['openfreemap.org', 'openstreetmap.org', 'maplibre.org'];
+const MAX_LINK_LENGTH = 2048;
+const LINK_PATTERN = /^https:\/\/([a-z0-9][a-z0-9.-]*)(\/[^\s]*)?$/i;
+
+/** An https URL on an allowed host, without a port or userinfo; anything else is null. */
+function parseLink(url: unknown): string | null {
+  if (typeof url !== 'string' || url.length > MAX_LINK_LENGTH) return null;
+  const match = LINK_PATTERN.exec(url);
+  const host = match?.[1]?.toLowerCase();
+  if (!host) return null;
+  return LINK_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`)) ? url : null;
+}
+
 /** Reads a message from the map page. Anything that is not exactly an event is null. */
 export function parseMapEvent(data: string): MapEvent | null {
   let raw: unknown;
@@ -95,6 +111,10 @@ export function parseMapEvent(data: string): MapEvent | null {
       return { type: 'mapPress' };
     case 'pinPress':
       return typeof raw.id === 'string' ? { type: 'pinPress', id: raw.id } : null;
+    case 'openLink': {
+      const url = parseLink(raw.url);
+      return url ? { type: 'openLink', url } : null;
+    }
     case 'error':
       return raw.reason === 'load' || raw.reason === 'style'
         ? { type: 'error', reason: raw.reason }

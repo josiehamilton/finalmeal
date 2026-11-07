@@ -97,6 +97,7 @@ export class FakeMap {
   center = { lat: 49.25, lng: -123.1 };
   zoom = 12;
   touchZoomRotate = { disableRotation: () => {} };
+  removed = false;
 
   constructor(
     options: Record<string, unknown>,
@@ -143,6 +144,10 @@ export class FakeMap {
     this.calls.push({ method, args });
   }
 
+  remove() {
+    this.removed = true;
+  }
+
   flyTo(...args: unknown[]) {
     this.record('flyTo', args);
   }
@@ -181,6 +186,10 @@ export interface MapPageEnv {
   tapMarker(marker: FakeMarker): void;
   /** A tap on the bare map. */
   tapMap(): void;
+  /** A click on a link in the page (the attribution); `trusted` is false for a script-made click. */
+  clickLink(href: string, trusted: boolean): { prevented: boolean };
+  /** A click on something that is not a link. */
+  clickNonLink(): { prevented: boolean };
 }
 
 export interface MapPageEnvOptions {
@@ -211,7 +220,12 @@ export function runMapPage(opts: MapPageEnvOptions = {}): MapPageEnv {
       postMessage: (data: string) => posted.push(JSON.parse(data) as Record<string, unknown>),
     },
   };
+  const documentListeners: Record<string, Handler[]> = {};
   const doc = {
+    addEventListener: (type: string, handler: Handler, capture?: boolean) => {
+      // The page must listen in the capture phase to see a link click before anything else does.
+      if (capture === true) (documentListeners[type] ??= []).push(handler);
+    },
     createElement: (tag: string) => new FakeElement(tag),
     createElementNS: (_ns: string, tag: string) => new FakeElement(tag),
     querySelector: (selector: string) =>
@@ -238,6 +252,18 @@ export function runMapPage(opts: MapPageEnvOptions = {}): MapPageEnv {
   const receive = (cmd: MapCommand) => {
     (win.__fm as { receive(c: MapCommand): void }).receive(JSON.parse(JSON.stringify(cmd)));
   };
+  const dispatchDocumentClick = (target: { closest(selector: string): unknown }, trusted: boolean) => {
+    const result = { prevented: false };
+    const event = {
+      isTrusted: trusted,
+      target,
+      preventDefault: () => {
+        result.prevented = true;
+      },
+    };
+    for (const handler of documentListeners.click ?? []) handler(event);
+    return result;
+  };
   return {
     posted,
     markers,
@@ -252,5 +278,7 @@ export function runMapPage(opts: MapPageEnvOptions = {}): MapPageEnv {
     tapMap() {
       created?.fire('click');
     },
+    clickLink: (href, trusted) => dispatchDocumentClick({ closest: () => ({ href }) }, trusted),
+    clickNonLink: () => dispatchDocumentClick({ closest: () => null }, true),
   };
 }
