@@ -17,6 +17,7 @@ A running list, newest needs added as they come up. Nothing here blocks today's 
 | 7 | **Expo account** | Cloud builds for iPhone and Android | Phase 8 | Sign up at expo.dev. |
 | 8 | **Email sending service** (e.g. Resend) | Sending real sign-in codes from your domain | Phase 8 (needs the domain) | Sign up when we get there; Claude walks you through it. |
 | 9 | **Sentry account** (free tier) | Crash reports from the app and web | Phase 8 | Sign up at sentry.io. |
+| 9b | **Geocoding service** (recommended: Geoapify, free tier; alternative: OpenCage) | Puts custom spots (added by address) on the map in production. Locally a mock geocoder is used. | Before launch (Phase 8) | Sign up and put the key in the production settings when we get there; Claude will say exactly where. Never paste it in chat. |
 
 ## Design
 
@@ -44,6 +45,7 @@ A running list, newest needs added as they come up. Nothing here blocks today's 
 | 24 | Saved tab details: the "Remove from Saved" alert has a title only; Nearby with no home city shows a "Choose home city" button; the filter chips hide when nothing is saved; long-press remove is also an accessibility action. | Any time | As listed |
 | 25 | Activity and notification settings: a new neutral colour token for a switch that's off (`switchOff` #3A3530, from the board); Follow back in Activity uses the shared 36 px pill (board shows 34); the empty Activity state has no board, so Claude styled it (Newsreader italic title, centred body); Log out waits at most 3 seconds to forget the phone's push token. | Any time | As listed |
 | 26 | "Popular near <city>" (Find people) can include people who aren't actually near; and opening a private account's pick after losing access shows the same "That pick isn’t there any more." as a removed pick. | Any time | As described |
+| 27 | **Phase 5 Discover choices** (built with these defaults; plan `docs/superpowers/plans/2026-11-05-phase-5-discover.md`, "Decisions for Josie"): the map runs in a web view until the test builds; distance is measured from the map's centre (starts at "Any"); the map shows trusted accounts, people you follow and you; private members are never named on Discover; food trucks and pop-ups never get a pin; filters combine "any of these food types" and "any of these dietary tags"; one Search screen replaces Find people; plus new copy listed in the plan. | Any time | As listed |
 
 ## Done
 
