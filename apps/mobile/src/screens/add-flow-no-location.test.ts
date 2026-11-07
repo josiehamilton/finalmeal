@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
+import { buildMapHtml, MAP_PAGE_SCRIPT } from '../map/map-page';
 
 /** The post-meal diary never uses the phone's position: nothing in the add flow may touch it. */
 const root = join(__dirname, '..', '..');
@@ -62,4 +63,37 @@ describe('the add flow and the current location', () => {
       expect(text).not.toMatch(/requestForegroundPermissions|getCurrentPosition|nearestCity/);
     },
   );
+});
+
+/** The map and its page: every `src/map` file except the tests (which name what they forbid). */
+const MAP_FILES = sources('src/map').filter((f) => !/\.test\.tsx?$/.test(f));
+
+describe('the map and the current location', () => {
+  it('covers the map’s files', () => {
+    const names = MAP_FILES.map((f) => f.replace(root + '/', ''));
+    for (const expected of ['src/map/PicksMap.tsx', 'src/map/map-page.ts', 'src/map/bridge.ts']) {
+      expect(names).toContain(expected);
+    }
+  });
+
+  it.each(MAP_FILES.map((f) => [f.replace(root + '/', ''), f]))(
+    '%s never imports expo-location or asks for a permission',
+    (_name, file) => {
+      const text = readFileSync(file as string, 'utf8');
+      expect(text).not.toMatch(/expo-location/);
+      expect(text).not.toMatch(/requestForegroundPermissions|getCurrentPosition|nearestCity/);
+    },
+  );
+
+  it('keeps geolocation out of the page: no navigator.geolocation, no GeolocateControl', () => {
+    const html = buildMapHtml({ camera: { lat: 0, lng: 0, zoom: 1 }, interactive: true });
+    for (const text of [html, MAP_PAGE_SCRIPT]) {
+      expect(text).not.toMatch(/geolocation|GeolocateControl|getCurrentPosition|watchPosition/i);
+    }
+  });
+
+  it('turns the WebView’s own geolocation off', () => {
+    const text = readFileSync(join(root, 'src/map/PicksMap.tsx'), 'utf8');
+    expect(text).toContain('geolocationEnabled={false}');
+  });
 });

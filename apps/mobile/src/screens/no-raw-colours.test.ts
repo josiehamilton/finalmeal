@@ -20,6 +20,19 @@ describe('colours', () => {
     expect(files.length).toBeGreaterThan(50);
   });
 
+  it('covers the map, its page script and its test support', () => {
+    const names = files.map((f) => f.replace(root + '/', ''));
+    for (const expected of [
+      'src/map/PicksMap.tsx',
+      'src/map/map-page.ts',
+      'src/map/bridge.ts',
+      'src/map/pins.ts',
+      'src/test-support/fake-maplibre.ts',
+    ]) {
+      expect(names).toContain(expected);
+    }
+  });
+
   it('has no raw hex colour outside the tokens', () => {
     const offenders = files.filter((file) => /#[0-9A-Fa-f]{6}\b/.test(readFileSync(file, 'utf8')));
     expect(offenders).toEqual([]);

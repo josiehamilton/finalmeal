@@ -39,7 +39,15 @@ describe('translucent colours', () => {
       .filter(([, v]) => v.startsWith('rgba('))
       .map(([name]) => name)
       .sort();
-    expect(rgba).toEqual(['emberWash', 'line', 'lineStrong', 'scrim']);
+    expect(rgba).toEqual([
+      'emberRing',
+      'emberWash',
+      'glass',
+      'honorableRing',
+      'line',
+      'lineStrong',
+      'scrim',
+    ]);
     expect(colors.scrim).toBe('rgba(11,10,9,0.6)');
   });
 
@@ -91,9 +99,33 @@ describe('contrast', () => {
 
 describe('map', () => {
   it('has the canvas map-art tones, apart from the brand colours', () => {
-    expect(map).toEqual({ land: '#141210', water: '#0F1A1F', park: '#16201A' });
-    for (const hex of Object.values(map)) {
+    expect(map).toEqual({
+      land: '#141210',
+      water: '#0F1A1F',
+      park: '#16201A',
+      road: 'rgba(243,237,228,0.07)',
+      roadMajor: 'rgba(243,237,228,0.12)',
+      label: '#8C847A',
+      labelHalo: '#0B0A09',
+    });
+  });
+
+  it('keeps the map-art fills apart from the brand colours', () => {
+    for (const hex of [map.land, map.water, map.park]) {
       expect(Object.values(colors)).not.toContain(hex);
     }
+  });
+
+  it('has the map’s label tones from the palette, not new colours', () => {
+    expect(map.label).toBe(colors.dim);
+    expect(map.labelHalo).toBe(colors.night);
+  });
+});
+
+describe('map controls and pin rings', () => {
+  it('has the glass panel and the selected-pin rings', () => {
+    expect(colors.glass).toBe('rgba(23,21,19,0.94)');
+    expect(colors.emberRing).toBe('rgba(232,105,63,0.35)');
+    expect(colors.honorableRing).toBe('rgba(230,223,213,0.3)');
   });
 });

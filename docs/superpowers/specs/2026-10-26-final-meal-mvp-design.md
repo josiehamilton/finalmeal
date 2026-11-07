@@ -192,7 +192,7 @@ Decided by Josie on 2026-10-27.
 
 ## 7. Maps
 
-- MapLibre (`@maplibre/maplibre-react-native` in the app, `maplibre-gl` on the web) with a dark style tuned to the canvas palette.
+- MapLibre with a dark style tuned to the canvas palette. The MVP app runs `maplibre-gl` inside a `react-native-webview` (so it works in Expo Go, behind a typed bridge for pins, selection and bounds); native `@maplibre/maplibre-react-native` arrives with development builds (Phase 8). The web uses `maplibre-gl` directly.
 - Tiles come from OpenFreeMap during development and the MVP; self-hosted Protomaps on object storage is the fallback if usage or terms require it.
 - Pins are custom markers: a skull for Final Meal, a bone dot for Honorable, and a ring for the selected state.
 
