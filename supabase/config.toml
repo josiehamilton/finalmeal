@@ -406,6 +406,10 @@ deno_version = 2
 [functions.push-dispatch]
 verify_jwt = true
 
+# Gives custom spots a map point. Only the service role may call it (the function also checks the role).
+[functions.geocode-places]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

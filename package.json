@@ -20,6 +20,7 @@
     "db:import-cities": "node scripts/import-cities.mjs",
     "db:import-places": "node scripts/import-places.mjs",
     "push:dispatch": "node scripts/push-dispatch.mjs",
+    "geocode": "node scripts/geocode-places.mjs",
     "env:local": "node scripts/write-local-env.mjs",
     "brand:assets": "node scripts/generate-brand-assets.mjs"
   },

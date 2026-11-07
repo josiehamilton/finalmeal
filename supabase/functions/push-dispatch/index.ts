@@ -3,6 +3,7 @@
 // the `log` sender; see _shared/push-sender.ts. Talks to the database through PostgREST with
 // plain fetch, so it has no imports from the network.
 import { senderFromEnv } from '../_shared/push-sender.ts';
+import { isServiceRequest } from '../_shared/service-auth.ts';
 import type { PushMessage } from '../_shared/push-sender.ts';
 
 interface OutboxRow {
@@ -16,33 +17,13 @@ interface OutboxRow {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-/** Compares two strings in time that depends only on their length. */
-function sameSecret(given: string, expected: string): boolean {
-  if (given.length !== expected.length) return false;
-  let difference = 0;
-  for (let i = 0; i < given.length; i++) {
-    difference |= given.charCodeAt(i) ^ expected.charCodeAt(i);
-  }
-  return difference === 0;
-}
-
-/**
- * Only the service key itself is accepted (an exact match), not any token that claims the
- * service role, so this stays safe even if the gateway's verify_jwt check is ever switched off.
- */
-function isServiceRole(request: Request, serviceKey: string): boolean {
-  const header = request.headers.get('Authorization') ?? '';
-  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  return token !== '' && sameSecret(token, serviceKey);
-}
-
 Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   const url = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!url || !serviceKey) return json({ error: 'not_configured' }, 500);
-  if (!isServiceRole(request, serviceKey)) return json({ error: 'unauthorized' }, 401);
+  if (!isServiceRequest(request, serviceKey)) return json({ error: 'unauthorized' }, 401);
 
   const headers = {
     apikey: serviceKey,

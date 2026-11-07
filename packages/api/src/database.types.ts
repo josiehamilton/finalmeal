@@ -514,8 +514,14 @@ export type Database = {
           country: string;
           created_at: string;
           created_by: string | null;
+          geocode_attempts: number;
+          geocode_claimed_at: string | null;
+          geocode_status: string;
+          geocoded_at: string | null;
+          geocoder: string | null;
           id: string;
           location: unknown;
+          location_precision: string;
           merged_into_id: string | null;
           name: string;
           no_fixed_address: boolean;
@@ -535,8 +541,14 @@ export type Database = {
             country: string;
             created_at: string;
             created_by: string | null;
+            geocode_attempts: number;
+            geocode_claimed_at: string | null;
+            geocode_status: string;
+            geocoded_at: string | null;
+            geocoder: string | null;
             id: string;
             location: unknown;
+            location_precision: string;
             merged_into_id: string | null;
             name: string;
             no_fixed_address: boolean;
@@ -559,8 +571,14 @@ export type Database = {
           country: string;
           created_at?: string;
           created_by?: string | null;
+          geocode_attempts?: number;
+          geocode_claimed_at?: string | null;
+          geocode_status?: string;
+          geocoded_at?: string | null;
+          geocoder?: string | null;
           id?: string;
           location: unknown;
+          location_precision?: string;
           merged_into_id?: string | null;
           name: string;
           no_fixed_address?: boolean;
@@ -581,8 +599,14 @@ export type Database = {
           country?: string;
           created_at?: string;
           created_by?: string | null;
+          geocode_attempts?: number;
+          geocode_claimed_at?: string | null;
+          geocode_status?: string;
+          geocoded_at?: string | null;
+          geocoder?: string | null;
           id?: string;
           location?: unknown;
+          location_precision?: string;
           merged_into_id?: string | null;
           name?: string;
           no_fixed_address?: boolean;
@@ -1127,6 +1151,20 @@ export type Database = {
         };
         Returns: string;
       };
+      claim_geocode_batch: {
+        Args: { p_limit?: number };
+        Returns: {
+          address: string;
+          city: string;
+          city_lat: number;
+          city_lng: number;
+          country: string;
+          name: string;
+          place_id: string;
+          postcode: string;
+          region: string;
+        }[];
+      };
       claim_push_batch: {
         Args: { p_limit?: number };
         Returns: {
@@ -1166,8 +1204,14 @@ export type Database = {
           country: string;
           created_at: string;
           created_by: string | null;
+          geocode_attempts: number;
+          geocode_claimed_at: string | null;
+          geocode_status: string;
+          geocoded_at: string | null;
+          geocoder: string | null;
           id: string;
           location: unknown;
+          location_precision: string;
           merged_into_id: string | null;
           name: string;
           no_fixed_address: boolean;
@@ -1252,6 +1296,16 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      finish_geocode: {
+        Args: {
+          p_geocoder?: string;
+          p_lat?: number;
+          p_lng?: number;
+          p_place_id: string;
+          p_result: string;
+        };
+        Returns: string;
       };
       finish_onboarding: {
         Args: Record<PropertyKey, never>;
@@ -1384,8 +1438,14 @@ export type Database = {
           country: string;
           created_at: string;
           created_by: string | null;
+          geocode_attempts: number;
+          geocode_claimed_at: string | null;
+          geocode_status: string;
+          geocoded_at: string | null;
+          geocoder: string | null;
           id: string;
           location: unknown;
+          location_precision: string;
           merged_into_id: string | null;
           name: string;
           no_fixed_address: boolean;
@@ -1465,8 +1525,14 @@ export type Database = {
           country: string;
           created_at: string;
           created_by: string | null;
+          geocode_attempts: number;
+          geocode_claimed_at: string | null;
+          geocode_status: string;
+          geocoded_at: string | null;
+          geocoder: string | null;
           id: string;
           location: unknown;
+          location_precision: string;
           merged_into_id: string | null;
           name: string;
           no_fixed_address: boolean;
