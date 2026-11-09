@@ -1,5 +1,5 @@
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { friendlyMessage, getMySaves, unsaveDish } from '@finalmeal/api';
@@ -7,9 +7,13 @@ import type { SavedDish } from '@finalmeal/api';
 import { filterSaves } from '@finalmeal/core';
 import type { SaveFilter } from '@finalmeal/core';
 import { colors } from '@finalmeal/ui-tokens';
+import { Icon } from '../../../src/components/Icon';
+import { PlacePicksCard } from '../../../src/components/PlacePicksCard';
 import { PrimaryButton } from '../../../src/components/PrimaryButton';
+import { PinMapCard } from '../../../src/components/ProfileMapPanel';
 import { SavedGrid } from '../../../src/components/SavedGrid';
 import { fontFamily } from '../../../src/lib/fonts';
+import { pinsForSaves } from '../../../src/map/pins';
 import { getSupabase } from '../../../src/lib/supabase';
 import { useSession } from '../../../src/providers/SessionProvider';
 import { announceSavesChanged, setSavedState, useSavesVersion } from '../../../src/state/save';
@@ -30,6 +34,8 @@ export default function Saved() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [filter, setFilter] = useState<SaveFilter>('all');
+  const [mapView, setMapView] = useState(false);
+  const [tapped, setTapped] = useState<string | null>(null);
   // Only the newest reload may set the list, so a slow old answer never overwrites a newer one.
   const latest = useRef(0);
 
@@ -95,8 +101,12 @@ export default function Saved() {
     }
   }
 
-  const shown = saves ? filterSaves(saves, filter) : [];
+  const shown = useMemo(() => (saves ? filterSaves(saves, filter) : []), [saves, filter]);
   const needsCity = filter === 'nearby' && !hasHomeCity;
+  const pins = useMemo(() => pinsForSaves(shown), [shown]);
+  // A filter or a removal can take the tapped place away.
+  const selectedId = tapped && pins.some((p) => p.id === tapped) ? tapped : null;
+  const here = selectedId ? shown.filter((s) => s.place.id === selectedId) : [];
 
   let body;
   if (saves === null) {
@@ -138,6 +148,36 @@ export default function Saved() {
         <Text style={styles.emptyBody}>Nothing here with this filter.</Text>
       </View>
     );
+  } else if (mapView) {
+    body =
+      pins.length === 0 ? (
+        <View style={styles.center}>
+          <Text style={styles.emptyBody}>Nothing here with this filter.</Text>
+        </View>
+      ) : (
+        <View style={styles.mapSlot}>
+          <PinMapCard
+            testID="saved-map"
+            pins={pins}
+            selectedId={selectedId}
+            onPinPress={setTapped}
+            onMapPress={() => setTapped(null)}
+            overlay={
+              selectedId && here[0] ? (
+                <PlacePicksCard
+                  placeName={here[0].place.name}
+                  rows={here.map((save) => ({
+                    key: save.dish.id,
+                    dishName: save.dish.name,
+                    suffix: save.via ? ` · via @${save.via.username}` : '',
+                    onPress: save.viaPickId ? () => open(save) : undefined,
+                  }))}
+                />
+              ) : null
+            }
+          />
+        </View>
+      );
   } else {
     body = <SavedGrid saves={shown} onOpen={open} onRemove={confirmRemove} />;
   }
@@ -148,6 +188,19 @@ export default function Saved() {
         <Text style={styles.title} accessibilityRole="header">
           Saved to try
         </Text>
+        {saves && saves.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={mapView ? 'Grid view' : 'Map view'}
+            onPress={() => {
+              setMapView((on) => !on);
+              setTapped(null);
+            }}
+            style={styles.viewButton}
+          >
+            <Icon name={mapView ? 'grid' : 'map'} size={21} color={colors.bone} />
+          </Pressable>
+        ) : null}
       </View>
       {saves && saves.length > 0 ? (
         <View style={styles.chips}>
@@ -183,7 +236,22 @@ export default function Saved() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.night },
-  header: { height: 60, justifyContent: 'center', paddingHorizontal: 20 },
+  header: {
+    height: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  viewButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.line,
+  },
+  mapSlot: { flex: 1, paddingBottom: 12 },
   title: { fontFamily: fontFamily.display, fontSize: 32, color: colors.bone },
   chips: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 6, paddingBottom: 16 },
   chip: {

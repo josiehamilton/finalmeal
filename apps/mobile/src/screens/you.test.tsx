@@ -2,9 +2,13 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react-n
 import { getMyPicks } from '@finalmeal/api';
 import You from '../../app/(app)/(tabs)/you';
 import { makeProfile } from '../test-support/profile';
-import { seedPicks } from '../test-support/seed-picks';
+import { SEED_PLACES, seedPicks } from '../test-support/seed-picks';
 import { makeFinals, makePick } from '../test-support/picks';
 import { announcePicksChanged, resetPickChanges } from '../state/pick-changes';
+import { pinsForPicks } from '../map/pins';
+import { filterPicks } from '@finalmeal/core';
+import { emitMapEvent, resetMapMock, sentCommands } from '../test-support/map';
+import type { MapPin } from '../map/bridge';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), navigate: jest.fn() };
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter, usePathname: () => '/you' }));
@@ -31,6 +35,7 @@ jest.mock('../providers/SessionProvider', () => ({
 describe('You tab', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetMapMock();
     resetPickChanges();
     mockRefresh.mockResolvedValue(null);
     mockGetPicks.mockResolvedValue([]);
@@ -231,12 +236,79 @@ describe('You tab', () => {
       expect(screen.queryByText('No honorable mentions yet.')).toBeNull();
     });
 
-    it('hides the chip row on the Map tab, which keeps its Phase 2 copy', async () => {
+    it('shows the chip row on the Map tab, with the filtered summary and footer', async () => {
       await render(<You />);
       await screen.findByText('Pork Gyro');
       await fireEvent.press(screen.getByRole('tab', { name: 'Map' }));
-      expect(screen.getByText('Your map fills in as you add dishes.')).toBeOnTheScreen();
-      expect(screen.queryByTestId('filter-chips')).toBeNull();
+      expect(screen.getByTestId('filter-chips')).toBeOnTheScreen();
+      expect(screen.getByText('17 picks in 7 cities')).toBeOnTheScreen();
+      await fireEvent.press(chip('Sushi'));
+      expect(screen.getByText('Sushi · 4 picks in 3 cities')).toBeOnTheScreen();
+      // Tokyo has two of the four, so it leads; the board's order is sample copy.
+      expect(screen.getByTestId('profile-map-footer')).toHaveTextContent(
+        /^Sushi · Tokyo, Vancouver, New York/,
+      );
+      expect(screen.getByText('Final')).toBeOnTheScreen();
+      expect(screen.getByText('Honorable')).toBeOnTheScreen();
+      expect(screen.queryByText('Share these')).toBeNull();
+    });
+
+    it('footer says All picks without a chip', async () => {
+      await render(<You />);
+      await screen.findByText('Pork Gyro');
+      await fireEvent.press(screen.getByRole('tab', { name: 'Map' }));
+      expect(screen.getByTestId('profile-map-footer')).toHaveTextContent(/^All picks · Vancouver/);
+    });
+
+    it('sends the pins of the filtered picks, and a pin tap shows that place’s picks', async () => {
+      await render(<You />);
+      await screen.findByText('Pork Gyro');
+      await fireEvent.press(screen.getByRole('tab', { name: 'Map' }));
+      await fireEvent.press(chip('Sushi'));
+      await emitMapEvent({ type: 'ready' });
+      const sushi = filterPicks(seedPicks(), { tagSlug: 'sushi' });
+      const sent = sentCommands().filter((c) => c.type === 'setPins');
+      const last = sent[sent.length - 1] as { pins: MapPin[] };
+      expect(last.pins).toEqual(pinsForPicks(sushi));
+      expect(last.pins).toHaveLength(4);
+
+      await emitMapEvent({ type: 'pinPress', id: 'pl-sushi-itto' });
+      const card = screen.getByTestId('place-picks-card');
+      expect(within(card).getByText('Sushi Itto')).toBeOnTheScreen();
+      expect(screen.queryByTestId('profile-map-footer')).toBeNull();
+      await fireEvent.press(within(card).getByRole('button', { name: /Nigiri Set/ }));
+      expect(mockRouter.push).toHaveBeenLastCalledWith('/pick/h9');
+
+      await emitMapEvent({ type: 'mapPress' });
+      expect(screen.queryByTestId('place-picks-card')).toBeNull();
+      expect(screen.getByTestId('profile-map-footer')).toBeOnTheScreen();
+    });
+
+    it('lists Final Meals first on a place, three at most, then how many more', async () => {
+      const here = SEED_PLACES.marutama;
+      mockGetPicks.mockResolvedValue([
+        ...makeFinals(1).map((p) => ({ ...p, place: here, dish: { id: 'x1', name: 'Gyoza' } })),
+        ...[2, 3, 4].map((n) =>
+          makePick({
+            id: `h${n}`,
+            tier: 'honorable',
+            slot: null,
+            place: here,
+            dish: { id: `x${n}`, name: `Ramen ${n}` },
+          }),
+        ),
+      ]);
+      await render(<You />);
+      await screen.findByText('Gyoza');
+      await fireEvent.press(screen.getByRole('tab', { name: 'Map' }));
+      await emitMapEvent({ type: 'pinPress', id: here.id });
+      const card = screen.getByTestId('place-picks-card');
+      expect(within(card).getAllByRole('button').map((b) => b.props.accessibilityLabel)).toEqual([
+        'Gyoza · Final Meal',
+        'Ramen 2 · Honorable',
+        'Ramen 3 · Honorable',
+      ]);
+      expect(within(card).getByText('+ 1 more')).toBeOnTheScreen();
     });
 
     it('drops a filter whose chip is gone after the picks change', async () => {

@@ -237,9 +237,19 @@ export function FirstLanding() {
         )}
         {picks !== null && homeCityName && nearby.length > 0 ? (
           <>
-            <Text style={styles.nearbyTitle} accessibilityRole="header">
-              {`Nearby in ${homeCityName}`}
-            </Text>
+            <View style={styles.nearbyHeader}>
+              <Text style={styles.nearbyTitle} accessibilityRole="header">
+                {`Nearby in ${homeCityName}`}
+              </Text>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel="See the map"
+                onPress={() => router.navigate('/discover')}
+                hitSlop={8}
+              >
+                <Text style={styles.seeMap}>See the map</Text>
+              </Pressable>
+            </View>
             {nearby.map((item) => (
               <FeedCard key={item.key} item={item} photoHeight={NEARBY_PHOTO_HEIGHT} />
             ))}
@@ -340,9 +350,15 @@ const styles = StyleSheet.create({
   seatNumberOn: { color: colors.emberGlow },
   seatsLeft: { flex: 1, fontFamily: fontFamily.ui, fontSize: 13, color: colors.smoke },
   cta: { padding: 16 },
-  nearbyTitle: {
+  nearbyHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
     paddingHorizontal: 6,
     paddingTop: 6,
+  },
+  seeMap: { fontFamily: fontFamily.uiBold, fontSize: 13, color: colors.emberGlow },
+  nearbyTitle: {
     fontFamily: fontFamily.display,
     fontSize: 24,
     color: colors.bone,

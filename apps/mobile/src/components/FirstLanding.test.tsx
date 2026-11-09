@@ -192,7 +192,14 @@ describe('First landing', () => {
         expect(screen.getByText('Nearby in Vancouver')).toBeOnTheScreen();
         expect(screen.getByText('@near1')).toBeOnTheScreen();
         expect(screen.getByText('Nearby dish 3')).toBeOnTheScreen();
-        expect(screen.queryByText('See the map')).toBeNull();
+        expect(screen.getByText('See the map')).toBeOnTheScreen();
+      });
+
+      it('takes See the map to the Discover tab', async () => {
+        mockNearby.mockResolvedValue({ items: nearby(3), nextOffset: 3 });
+        await show();
+        await fireEvent.press(screen.getByText('See the map'));
+        expect(mockRouter.navigate).toHaveBeenCalledWith('/discover');
       });
 
       it('shows no more than three, even if more come back', async () => {

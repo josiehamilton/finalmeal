@@ -27,6 +27,7 @@ import { Icon } from '../../../src/components/Icon';
 import { PhotoNotice } from '../../../src/components/PhotoNotice';
 import { PrimaryButton } from '../../../src/components/PrimaryButton';
 import { ProfileHeader } from '../../../src/components/ProfileHeader';
+import { ProfileMapPanel } from '../../../src/components/ProfileMapPanel';
 import { fontFamily } from '../../../src/lib/fonts';
 import { getSupabase } from '../../../src/lib/supabase';
 import { useSession } from '../../../src/providers/SessionProvider';
@@ -218,10 +219,10 @@ export default function You() {
             );
           })}
         </View>
-        {tab !== 'map' && options.length > 0 ? (
+        {options.length > 0 ? (
           <View style={styles.filters}>
             <FilterChips options={options} selected={chip} onSelect={setChosenChip} />
-            {summary ? (
+            {summary && tab !== 'map' ? (
               <View style={styles.summaryRow}>
                 {/* "Share these" joins this row in Phase 6, when sharing lists exists. */}
                 <Text style={styles.summary}>{summary}</Text>
@@ -230,14 +231,19 @@ export default function You() {
           </View>
         ) : null}
         <View style={styles.panel}>
-          {tab === 'map' ? (
-            <Text style={styles.empty}>Your map fills in as you add dishes.</Text>
-          ) : picks === null ? (
+          {picks === null ? (
             picksLoading || refreshing ? (
               <ActivityIndicator testID="picks-loading" color={colors.emberGlow} />
             ) : (
               <PrimaryButton label="Try again" onPress={refresh} />
             )
+          ) : tab === 'map' ? (
+            <ProfileMapPanel
+              picks={matching}
+              chipLabel={chip?.label ?? null}
+              emptyText="Your map fills in as you add dishes."
+              onOpenPick={(id) => router.push(`/pick/${id}`)}
+            />
           ) : tab === 'final' ? (
             <FinalMealList picks={finals} dimmedIds={dimmedIds} onOpen={openPick} onAdd={addFinal} />
           ) : groups.length > 0 ? (

@@ -100,6 +100,20 @@ const GLYPHS = {
     </>
   ),
   directions: <Path d="m3 11 19-9-9 19-2-8z" />,
+  map: (
+    <>
+      <Path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z" />
+      <Path d="M8 2v16M16 6v16" />
+    </>
+  ),
+  grid: (
+    <>
+      <Rect x={3} y={3} width={7} height={7} rx={1} />
+      <Rect x={14} y={3} width={7} height={7} rx={1} />
+      <Rect x={3} y={14} width={7} height={7} rx={1} />
+      <Rect x={14} y={14} width={7} height={7} rx={1} />
+    </>
+  ),
   swap: (
     <>
       <Path d="M17 1l4 4-4 4" />

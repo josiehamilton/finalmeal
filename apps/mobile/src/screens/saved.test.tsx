@@ -4,6 +4,8 @@ import { ApiError, getMySaves, unsaveDish } from '@finalmeal/api';
 import Saved from '../../app/(app)/(tabs)/saved';
 import { makeSavedBoard } from '../test-support/saves';
 import { makeProfile } from '../test-support/profile';
+import { emitMapEvent, resetMapMock, sentCommands } from '../test-support/map';
+import { pinsForSaves } from '../map/pins';
 import { announceSavesChanged, getSavesVersion, clearSaveStates, useSave } from '../state/save';
 
 const mockRouter = { push: jest.fn() };
@@ -36,13 +38,14 @@ const chip = (name: string) => screen.getByRole('button', { name });
 describe('Saved tab', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetMapMock();
     clearSaveStates();
     mockProfile = makeProfile();
     mockGet.mockResolvedValue(makeSavedBoard());
     mockUnsave.mockResolvedValue(undefined);
   });
 
-  it('renders the Saved board: header, chips, four cards and no Map view', async () => {
+  it('renders the Saved board: header, chips, four cards and a Map view button', async () => {
     await show();
     expect(screen.getByText('Saved to try')).toBeOnTheScreen();
     for (const name of ['All', 'Final Meals', 'Honorable', 'Nearby']) {
@@ -53,7 +56,55 @@ describe('Saved tab', () => {
     expect(screen.getByText('via @allimercer')).toBeOnTheScreen();
     expect(screen.getByText('via @arimitchell')).toBeOnTheScreen();
     expect(screen.getByText('via @devpatel')).toBeOnTheScreen();
-    expect(screen.queryByRole('button', { name: 'Map view' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Map view' })).toBeOnTheScreen();
+    expect(screen.queryByTestId('saved-map')).toBeNull();
+  });
+
+  describe('Map view', () => {
+    const lastPins = () => {
+      const set = sentCommands().filter((c) => c.type === 'setPins');
+      return (set[set.length - 1] as { pins: unknown }).pins;
+    };
+
+    it('swaps the grid for a map, and back', async () => {
+      await show();
+      await fireEvent.press(screen.getByRole('button', { name: 'Map view' }));
+      expect(screen.getByTestId('saved-map')).toBeOnTheScreen();
+      expect(screen.queryByText('via @mikebrennan')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Map view' })).toBeNull();
+      await emitMapEvent({ type: 'ready' });
+      expect(lastPins()).toEqual(pinsForSaves(makeSavedBoard()));
+      await fireEvent.press(screen.getByRole('button', { name: 'Grid view' }));
+      expect(screen.queryByTestId('saved-map')).toBeNull();
+      expect(screen.getByText('via @mikebrennan')).toBeOnTheScreen();
+    });
+
+    it('filters the pins with the chips', async () => {
+      await show();
+      await fireEvent.press(screen.getByRole('button', { name: 'Map view' }));
+      await fireEvent.press(chip('Honorable'));
+      await emitMapEvent({ type: 'ready' });
+      expect(lastPins()).toEqual(pinsForSaves(makeSavedBoard().filter((s) => s.viaTier === 'honorable')));
+    });
+
+    it('opens the via pick from a pin’s card', async () => {
+      await show();
+      await fireEvent.press(screen.getByRole('button', { name: 'Map view' }));
+      await emitMapEvent({ type: 'pinPress', id: 'p-itto' });
+      await fireEvent.press(screen.getByRole('button', { name: 'Wagyu Beef Don · via @mikebrennan' }));
+      expect(mockRouter.push).toHaveBeenLastCalledWith('/pick/pk-mike');
+      await emitMapEvent({ type: 'mapPress' });
+      expect(screen.queryByTestId('place-picks-card')).toBeNull();
+    });
+
+    it('shows Nothing saved yet, and no view button, once the last save is gone', async () => {
+      await show();
+      await fireEvent.press(screen.getByRole('button', { name: 'Map view' }));
+      mockGet.mockResolvedValue([]);
+      await act(async () => announceSavesChanged());
+      expect(screen.getByText('Nothing saved yet.')).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'Grid view' })).toBeNull();
+    });
   });
 
   it('filters to Final Meals and Honorable by the tier it was saved from', async () => {

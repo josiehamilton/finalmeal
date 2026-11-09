@@ -9,6 +9,8 @@ import { makeProfile } from '../test-support/profile';
 import { makeAlli } from '../test-support/people';
 import { makePick } from '../test-support/picks';
 import { SEED_PLACES } from '../test-support/seed-picks';
+import { emitMapEvent, resetMapMock, sentCommands, webViewMounts } from '../test-support/map';
+import { pinsForPicks } from '../map/pins';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), navigate: jest.fn() };
 const mockRedirect = jest.fn();
@@ -88,6 +90,7 @@ describe('Other profile', () => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
     clearFollowStates();
+    resetMapMock();
     mockParams = { id: 'u4' };
     mockGetProfile.mockResolvedValue(makeAlli());
     mockGetProfilePicks.mockResolvedValue(alliPicks());
@@ -115,14 +118,45 @@ describe('Other profile', () => {
     expect(mockGetProfilePicks).toHaveBeenCalledWith({ fake: 'client' }, 'u4');
   });
 
-  it('has no empty seats, no Map tab, no Share and no More options before their phases', async () => {
+  it('has no empty seats, no Share and no More options before their phases', async () => {
     await render(<OtherProfile />);
     await screen.findByText('Plain Biryani');
     expect(screen.queryByText('Add a dish')).toBeNull();
     expect(screen.queryByTestId('seat-4')).toBeNull();
-    expect(screen.queryByRole('tab', { name: 'Map' })).toBeNull();
     expect(screen.queryByText('Share')).toBeNull();
+    expect(screen.queryByText('Share these')).toBeNull();
     expect(screen.queryByRole('button', { name: 'More options' })).toBeNull();
+  });
+
+  it('adds a Map tab after Honorable, with her pins and a card for a tapped place', async () => {
+    await render(<OtherProfile />);
+    await screen.findByText('Plain Biryani');
+    const tabs = screen.getAllByRole('tab').map((t) => t.props.accessibilityLabel);
+    expect(tabs).toEqual(['Final Meal 3', 'Honorable 1', 'Map']);
+    await fireEvent.press(screen.getByRole('tab', { name: 'Map' }));
+    expect(screen.getByText('4 picks in 3 cities')).toBeOnTheScreen();
+    await emitMapEvent({ type: 'ready' });
+    const set = sentCommands().filter((c) => c.type === 'setPins');
+    expect((set[set.length - 1] as { pins: unknown }).pins).toEqual(pinsForPicks(alliPicks()));
+    await emitMapEvent({ type: 'pinPress', id: SEED_PLACES.kinKao.id });
+    await fireEvent.press(screen.getByRole('button', { name: 'Khao Soi · Final Meal' }));
+    expect(mockRouter.push).toHaveBeenLastCalledWith('/pick/a2');
+  });
+
+  it('says so on the Map tab when none of their picks can be pinned', async () => {
+    mockGetProfilePicks.mockResolvedValue([]);
+    await render(<OtherProfile />);
+    await fireEvent.press(await screen.findByRole('tab', { name: 'Map' }));
+    expect(screen.getByText('No picks on the map yet.')).toBeOnTheScreen();
+  });
+
+  it('leaves out places without an exact point', async () => {
+    mockGetProfilePicks.mockResolvedValue(
+      alliPicks().map((p) => ({ ...p, place: { ...p.place, onMap: false } })),
+    );
+    await render(<OtherProfile />);
+    await fireEvent.press(await screen.findByRole('tab', { name: 'Map' }));
+    expect(screen.getByText('No picks on the map yet.')).toBeOnTheScreen();
   });
 
   it('leaves out whichever of the city and bio is missing', async () => {
@@ -243,6 +277,7 @@ describe('Other profile', () => {
       expect(screen.getByText('12 followers')).toBeOnTheScreen();
       expect(screen.getByRole('button', { name: 'Follow' })).toBeOnTheScreen();
       expect(screen.queryByRole('tab')).toBeNull();
+      expect(webViewMounts()).toBe(0);
       expect(screen.queryByTestId('filter-chips')).toBeNull();
       expect(mockGetProfilePicks).not.toHaveBeenCalled();
       expect(mockGetMyPicks).not.toHaveBeenCalled();

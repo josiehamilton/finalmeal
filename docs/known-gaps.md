@@ -28,7 +28,8 @@ Each item names the phase that closes it.
 ## Phase 3 carry-forward: places
 
 - **Pending Josie:** generate the real Metro Vancouver extract. It needs her Hugging Face token (`HF_TOKEN` in the root `.env.local`) and the `duckdb` program: `pnpm db:import-places -- --bbox vancouver`, then commit `supabase/seed/places_vancouver.sql`. Until then that file is an empty placeholder and dev search shows only the 14 canvas places. The DuckDB path has never run against the live dataset (no token yet); check its first run (release folder, categories file, column names).
-- **Phase 5 (partly done):** custom spots are now geocoded into real map pins (Phase 5 Task 1: `geocode-places`, mock locally, off in production). Still open: the map must never pin a spot that is still at `location_precision = 'city'` (waiting, not found, failed, or no fixed address; Discover Task 2 filters them out); and in Phase 8 Josie chooses a production geocoder (the Geoapify adapter is built but off), the `GEOCODER` / `GEOAPIFY_API_KEY` secrets are set, and a schedule calls `geocode-places`. Until then every custom spot in production stays on its city's point and has no pin. Spots flagged `no_fixed_address` (food trucks, pop-ups) are never geocoded and have no pin.
+- **Decision (Phase 5):** a custom spot flagged `no_fixed_address` (food trucks, pop-ups) is never geocoded and has no map pin; it still appears in lists. A spot still at `location_precision = 'city'` (waiting, not found or failed) is never pinned either.
+- **Phase 8:** Josie chooses a production geocoder (the Geoapify adapter is built but off), the `GEOCODER` / `GEOAPIFY_API_KEY` secrets are set, and a schedule calls `geocode-places`. Until then every custom spot in production stays on its city's point and has no pin.
 - **Later:** merge custom places into Foursquare ones when the same restaurant exists in both (the dev canvas "Marutama" and a Foursquare "Marutama" appear side by side).
 - **Phase 8:** closed places stay in the table (with `closed_at`) so a re-import can mark closures; nothing yet hides picks at a place that closed.
 
@@ -48,7 +49,6 @@ Each item names the phase that closes it.
 
 ## Later phases: Phase 4 leftovers
 
-- **Phase 5:** other people's profiles get a Map tab.
 - **Later:** a people list behind "On n Final Meals" (the row is not tappable yet); milestone ("Your Pork Gyro is now on 8 Final Meals") and invite ("joined from your invite") notifications; a Trending tab on the Feed.
 
 ## Phase 6: sharing

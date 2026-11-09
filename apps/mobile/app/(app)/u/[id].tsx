@@ -19,6 +19,7 @@ import { FilterChips, chipKey } from '../../../src/components/FilterChips';
 import { FinalMealList } from '../../../src/components/FinalMealList';
 import { HonorableList } from '../../../src/components/HonorableList';
 import { OtherProfileHeader } from '../../../src/components/OtherProfileHeader';
+import { ProfileMapPanel } from '../../../src/components/ProfileMapPanel';
 import { PrimaryButton } from '../../../src/components/PrimaryButton';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
 import { SharedTaste } from '../../../src/components/SharedTaste';
@@ -28,12 +29,12 @@ import { useSession } from '../../../src/providers/SessionProvider';
 import { useFollow } from '../../../src/state/follow';
 import { syncFollowStates } from '../../../src/state/follow-store';
 
-type ProfileTab = 'final' | 'honorable';
+type ProfileTab = 'final' | 'honorable' | 'map';
 
-// No Map tab on other people's profiles until Phase 5 builds the map.
 const TABS: { key: ProfileTab; label: string }[] = [
   { key: 'final', label: 'Final Meal' },
   { key: 'honorable', label: 'Honorable' },
+  { key: 'map', label: 'Map' },
 ];
 
 /** The chip as the `filterPicks` filter it stands for. Others' personal tags never reach it. */
@@ -177,19 +178,20 @@ function OtherProfileBody({ view, refreshing, refreshError, onRefresh, onReload 
           <View accessibilityRole="tablist" style={styles.tabs}>
             {TABS.map(({ key, label }) => {
               const on = tab === key;
-              const count = key === 'final' ? matchingFinals : matchingHonorables.length;
+              const count =
+                key === 'final' ? matchingFinals : key === 'honorable' ? matchingHonorables.length : null;
               return (
                 <Pressable
                   key={key}
                   accessibilityRole="tab"
-                  accessibilityLabel={`${label} ${count}`}
+                  accessibilityLabel={count === null ? label : `${label} ${count}`}
                   accessibilityState={{ selected: on }}
                   onPress={() => setTab(key)}
                   style={[styles.tab, on && styles.tabOn]}
                 >
                   <Text style={[styles.tabText, on && styles.tabTextOn]}>
                     {label}
-                    <Text style={styles.tabCount}>{` ${count}`}</Text>
+                    {count === null ? null : <Text style={styles.tabCount}>{` ${count}`}</Text>}
                   </Text>
                 </Pressable>
               );
@@ -212,6 +214,13 @@ function OtherProfileBody({ view, refreshing, refreshError, onRefresh, onReload 
               ) : (
                 <ActivityIndicator testID="picks-loading" color={colors.emberGlow} />
               )
+            ) : tab === 'map' ? (
+              <ProfileMapPanel
+                picks={matching}
+                chipLabel={chip?.label ?? null}
+                emptyText="No picks on the map yet."
+                onOpenPick={(id) => router.push(`/pick/${id}`)}
+              />
             ) : tab === 'final' ? (
               finals.length > 0 ? (
                 <FinalMealList picks={finals} dimmedIds={dimmedIds} onOpen={openPick} />
