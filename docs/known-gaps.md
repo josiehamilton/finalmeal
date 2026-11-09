@@ -8,6 +8,10 @@ Things that are deliberately unfinished or must be revisited, with the phase tha
 - Enforce private profiles and blocks in the read policies. Phase 4's new functions already hide private accounts and blocked people, but the table policies for `picks`, `profiles` and `activities` still allow reading private accounts' rows directly; tighten them in Phase 7 (a `get_profile_picks(p_user_id)` function that applies `_can_see` itself would also replace `getProfilePicks`' check-then-read and its extra round trips).
 - Decide what happens to tag ownership when a personal tag is changed after it is attached to picks.
 
+## Phase 7: Discover polish
+
+- A profile load error leaves the session's `profile` null, so Discover shows "Set your home city to start the map there." to someone who has a home city. It needs a session error state (Phase 7 polish).
+
 ## Phase 2 carry-forward
 
 Each item names the phase that closes it.

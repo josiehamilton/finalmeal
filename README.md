@@ -115,6 +115,11 @@ Not yet run on a device. Maps inside scrolling screens (You, other profiles, Sav
 2. Pick a chip on the Map tab: the map re-frames to those pins. Pick All: it frames them all again.
 3. Do the same on a public profile's Map tab and on Saved's Map view.
 
+Discover, extra checks:
+
+4. Sheet-height shifts: each time the in-view sheet changes height (the "Zoom in to see every pick." note appears, or it switches between picks, empty and error), the map is re-padded and the view can shift by half the change. Confirm it is not jarring.
+5. Tap a pin near the bottom of the map: the selected-spot sheet is taller than the map's padding, so the pin can sit under it. Confirm it stays visible or decide how to lift it.
+
 ## Everyday commands
 
 | Command | What it does |

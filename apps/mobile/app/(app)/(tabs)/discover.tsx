@@ -88,7 +88,10 @@ function DiscoverScreen({ home, hasHomeCity }: DiscoverScreenProps) {
   const [listOpen, setListOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   /** A place to select once its pin has loaded (Search sent us here). */
-  const [focus, setFocus] = useState<{ id: string; at: LatLng | null } | null>(null);
+  const [focus, setFocus] = useState<{ id: string; from: LatLng | null } | null>(null);
+  // Where the map looked before Search sent us to a place; distances are measured from there.
+  const centreRef = useRef<LatLng | null>(null);
+  centreRef.current = d.region?.center ?? null;
 
   const pins = useMemo(() => pinsForDiscover(d.places), [d.places]);
   const insets = useMemo(() => ({ top: topHeight, bottom: sheetHeight }), [topHeight, sheetHeight]);
@@ -102,15 +105,15 @@ function DiscoverScreen({ home, hasHomeCity }: DiscoverScreenProps) {
     const ln = parseFloat(lng ?? '');
     const at = Number.isFinite(la) && Number.isFinite(ln) ? { lat: la, lng: ln } : null;
     if (at) mapRef.current?.flyTo({ ...at, zoom: FOCUS_ZOOM });
-    setFocus({ id: placeId, at });
+    setFocus({ id: placeId, from: centreRef.current ?? home });
     setParams({ placeId: undefined, lat: undefined, lng: undefined });
-  }, [placeId, lat, lng, setParams]);
+  }, [placeId, lat, lng, setParams, home]);
 
   const { select } = d;
   useEffect(() => {
     if (focus && d.places.some((p) => p.id === focus.id)) {
-      // Distances come from where the map is flying to, not from where it was.
-      select(focus.id, focus.at ?? undefined);
+      // Distances come from where the map was, not from the place it flies to (that would read 0 m).
+      select(focus.id, focus.from ?? undefined);
       setFocus(null);
     }
   }, [focus, d.places, select]);

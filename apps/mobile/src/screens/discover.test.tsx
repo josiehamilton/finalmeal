@@ -238,6 +238,10 @@ describe('Discover tab: selected spot, zoom and session', () => {
 
   it('does not reload the view or move the map’s padding when a pin is tapped', async () => {
     await show();
+    // The map's first real view loads (it is not the synthesised start).
+    const first = { ...VANCOUVER_REGION, center: { lat: 49.2827, lng: -123.1207 }, zoom: 12 };
+    await emitMapEvent({ type: 'region', region: first });
+    await settle(250);
     const insetsBefore = sentCommands().filter((c) => c.type === 'setInsets');
     const loads = mockPicks.mock.calls.length;
     await emitMapEvent({ type: 'pinPress', id: 'pl-kinkao' });
@@ -246,10 +250,7 @@ describe('Discover tab: selected spot, zoom and session', () => {
       nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 360 } },
     });
     // The map answers the padding change with a region at the same centre and zoom.
-    await emitMapEvent({
-      type: 'region',
-      region: { ...VANCOUVER_REGION, center: { lat: 49.2827, lng: -123.1207 }, zoom: 12 },
-    });
+    await emitMapEvent({ type: 'region', region: first });
     await settle(250);
     expect(mockPicks.mock.calls.length).toBe(loads);
     expect(sentCommands().filter((c) => c.type === 'setInsets')).toEqual(insetsBefore);
@@ -321,6 +322,14 @@ describe('Discover tab: the chip row, search and focus', () => {
       placeId: 'pl-kinkao',
     });
     expect(screen.getByText('Kin Kao · Main St · 1.8 km')).toBeOnTheScreen();
+    // Distances come from where the map was, never from the focused place itself.
+    expect(mockDishes).toHaveBeenLastCalledWith(
+      client,
+      null,
+      DEFAULT_DISCOVER_FILTERS,
+      { lat: 49.2827, lng: -123.1207 },
+      { placeId: 'pl-kinkao' },
+    );
   });
 });
 
