@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(82);
+select plan(100);
 
 -- Runs on top of the dev seed (Vancouver box -123.3, 49.1, -122.9, 49.4 holds six places:
 -- Skewers, Marutama, Kin Kao, Miku, Lotus Noodle Bar and Hearth Bakery), plus the fixtures
@@ -368,6 +368,27 @@ select is(
   'East Roll,West Roll', 'dishes_in_view handles the antimeridian too');
 
 -- ---------------------------------------------------------------- blocks, both ways
+-- A place with two dishes: Top A is picked by Ari, Alli and Mike (3 lists); Top B by Josie, Dev and
+-- Priya (3 lists). A ties and wins by name until Josie blocks Ari.
+reset role;
+insert into public.places (id, source, name, city, region, country, location) values
+  ('c0000000-0000-4000-8000-0000000000b1', 'custom', 'Top Dish Test', 'Vancouver', 'BC', 'CA',
+   'SRID=4326;POINT(-123.0 49.35)');
+insert into public.dishes (id, place_id, name) values
+  ('d0000000-0000-4000-8000-0000000000b1', 'c0000000-0000-4000-8000-0000000000b1', 'Top A'),
+  ('d0000000-0000-4000-8000-0000000000b2', 'c0000000-0000-4000-8000-0000000000b1', 'Top B');
+insert into public.picks (user_id, dish_id, tier, original_dish_name) values
+  ('00000000-0000-4000-8000-000000000003', 'd0000000-0000-4000-8000-0000000000b1', 'honorable', 'Top A'),
+  ('00000000-0000-4000-8000-000000000004', 'd0000000-0000-4000-8000-0000000000b1', 'honorable', 'Top A'),
+  ('00000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-0000000000b1', 'honorable', 'Top A'),
+  ('00000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-0000000000b2', 'honorable', 'Top B'),
+  ('00000000-0000-4000-8000-000000000005', 'd0000000-0000-4000-8000-0000000000b2', 'honorable', 'Top B'),
+  ('00000000-0000-4000-8000-000000000007', 'd0000000-0000-4000-8000-0000000000b2', 'honorable', 'Top B');
+set local role authenticated;
+select public.test_login('00000000-0000-4000-8000-000000000001');
+select is(
+  (select top_dish_name from public.picks_in_view(-123.3, 49.1, -122.9, 49.4) where name = 'Top Dish Test'),
+  'Top A', 'before any block, Top A (3 lists, first by name) is the top dish');
 reset role;
 insert into public.blocks (blocker_id, blocked_id)
 values ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000003');
@@ -384,6 +405,19 @@ select is(
   (select count(*)::int from public.picks_in_view(-123.3, 49.1, -122.9, 49.4, p_following_only => true)
    where name = 'Skewers'),
   0, 'and the Following filter leaves out a blocked person''s picks');
+select is(
+  (select list_count from public.picks_in_view(-123.3, 49.1, -122.9, 49.4) where name = 'Skewers'),
+  1, 'the Skewers pin counts one list');
+select is(
+  (select list_count || '|' || final_count || '|' || honorable_count
+   from public.dishes_in_view(-123.3, 49.1, -122.9, 49.4) where dish_name = 'Pork Gyro'),
+  '1|1|0', 'and the Pork Gyro card agrees (Ari left out of its counts too)');
+select is(
+  (select top_dish_name from public.picks_in_view(-123.3, 49.1, -122.9, 49.4) where name = 'Top Dish Test'),
+  'Top B', 'the top dish ranking leaves the blocked person out as well (Top A drops to 2 lists)');
+select is(
+  (select count(*)::int from public.search_dishes('karaage')),
+  0, 'dish search does not find a dish only the blocked person picked');
 select public.test_login('00000000-0000-4000-8000-000000000003');
 select is(
   (select pick_count from public.picks_in_view(-123.3, 49.1, -122.9, 49.4) where name = 'Skewers'),
@@ -395,6 +429,95 @@ select is(
 select is(
   (select count(*)::int from public.picks_in_view(-123.3, 49.1, -122.9, 49.4) where name = 'Kin Kao'),
   1, 'he still sees other people (Kin Kao via Alli and Dev)');
+
+-- ---------------------------------------------------------------- new accounts you follow
+-- Sam (public, new): once Mike follows him, his Sushi Dai pick appears for Mike. Quill is a
+-- private new account; Mike's pending request shows nothing, an accepted one does.
+reset role;
+insert into auth.users (id) values ('00000000-0000-0000-0000-0000000000b9');
+insert into public.profiles (id, username, display_name, visibility, trust_level)
+values ('00000000-0000-0000-0000-0000000000b9', 'quill_q', 'Quill Quade', 'private', 'new');
+insert into public.picks (user_id, dish_id, tier, original_dish_name)
+select '00000000-0000-0000-0000-0000000000b9', d.id, 'honorable', d.name
+from public.dishes d where d.name = 'Cardamom Bun';
+insert into public.follows (follower_id, followee_id, status)
+values ('00000000-0000-4000-8000-000000000002', '00000000-0000-0000-0000-0000000000b9', 'requested');
+set local role authenticated;
+select public.test_login('00000000-0000-4000-8000-000000000002');
+select is(
+  (select pick_count from public.picks_in_view(139.6, 35.5, 139.9, 35.8) where name = 'Sushi Dai'),
+  1, 'Mike does not see Sam''s pick before following');
+select is(public.follow_user('00000000-0000-4000-8000-000000000006'), 'active'::public.follow_status,
+  'Mike follows Sam (a public account, so at once)');
+select is(
+  (select pick_count || '|' || list_count from public.picks_in_view(139.6, 35.5, 139.9, 35.8) where name = 'Sushi Dai'),
+  '2|1', 'now Sam''s pick appears and counts as a pick, but not as a trusted list');
+select is(
+  (select pick_count from public.picks_in_view(-123.3, 49.1, -122.9, 49.4) where name = 'Hearth Bakery'),
+  2, 'a pending request to a private new account shows nothing');
+reset role;
+update public.follows set status = 'active'
+where follower_id = '00000000-0000-4000-8000-000000000002' and followee_id = '00000000-0000-0000-0000-0000000000b9';
+set local role authenticated;
+select public.test_login('00000000-0000-4000-8000-000000000002');
+select is(
+  (select pick_count from public.picks_in_view(-123.3, 49.1, -122.9, 49.4) where name = 'Hearth Bakery'),
+  3, 'once accepted, the private new account''s pick appears');
+select is(
+  (select count(*)::int from public.dishes_in_view(p_place_id => (select id from public.places where name = 'Hearth Bakery')) d
+   where d.people::text ~* 'quill'),
+  0, 'but it is not named');
+
+-- ---------------------------------------------------------------- flagged accounts
+-- Dev is followed by Josie. Flagged, his picks stop counting for her and stop showing; his own
+-- map still shows his picks to him.
+reset role;
+update public.profiles set trust_level = 'flagged' where id = '00000000-0000-4000-8000-000000000005';
+set local role authenticated;
+select public.test_login('00000000-0000-4000-8000-000000000001');
+select is(
+  (select pick_count from public.picks_in_view(-123.3, 49.1, -122.9, 49.4) where name = 'Kin Kao'),
+  3, 'a followed flagged account''s picks do not count (Kin Kao: Josie 2, Alli 1)');
+select is(
+  (select count(*)::int from public.dishes_in_view(p_place_id => (select kin_kao from ids)) where dish_name = 'Pad See Ew'),
+  0, 'and a dish only he picked has no card');
+select public.test_login('00000000-0000-4000-8000-000000000005');
+select is(
+  (select pick_count from public.picks_in_view(-123.3, 49.1, -122.9, 49.4) where name = 'Kin Kao'),
+  5, 'but he still sees his own picks');
+
+-- ---------------------------------------------------------------- closed and merged
+reset role;
+insert into public.places (id, source, name, city, region, country, location, closed_at, merged_into_id) values
+  ('c0000000-0000-4000-8000-0000000000c1', 'custom', 'Closed Test', 'Vancouver', 'BC', 'CA',
+   'SRID=4326;POINT(-123.05 49.31)', '2026-01-01', null),
+  ('c0000000-0000-4000-8000-0000000000c2', 'custom', 'Merged Test', 'Vancouver', 'BC', 'CA',
+   'SRID=4326;POINT(-123.06 49.31)', null, (select kin_kao from ids));
+insert into public.dishes (id, place_id, name, merged_into_id) values
+  ('d0000000-0000-4000-8000-0000000000c1', 'c0000000-0000-4000-8000-0000000000c1', 'Closed Dish', null),
+  ('d0000000-0000-4000-8000-0000000000c2', 'c0000000-0000-4000-8000-0000000000c2', 'Merged Place Dish', null);
+insert into public.dishes (id, place_id, name, merged_into_id)
+select 'd0000000-0000-4000-8000-0000000000c3', p.id, 'Merged Dish Copy', d.id
+from public.places p, public.dishes d where p.name = 'Skewers' and d.name = 'Pork Gyro';
+insert into public.picks (user_id, dish_id, tier, original_dish_name)
+select '00000000-0000-4000-8000-000000000001', d.id, 'honorable', d.name
+from public.dishes d where d.id in ('d0000000-0000-4000-8000-0000000000c1', 'd0000000-0000-4000-8000-0000000000c2',
+                                    'd0000000-0000-4000-8000-0000000000c3');
+set local role authenticated;
+select public.test_login('00000000-0000-4000-8000-000000000002');
+select is(
+  (select count(*)::int from public.picks_in_view(-123.3, 49.1, -122.9, 49.4) where name in ('Closed Test', 'Merged Test')),
+  0, 'a closed place and a merged place have no pin');
+select is(
+  (select count(*)::int from public.dishes_in_view(-123.3, 49.1, -122.9, 49.4)
+   where dish_name in ('Closed Dish', 'Merged Place Dish', 'Merged Dish Copy')),
+  0, 'and no cards, and a merged dish at an open place has none either');
+select is(
+  (select count(*)::int from public.search_dishes('closed') ) + (select count(*)::int from public.search_dishes('merged')),
+  0, 'dish search skips them too');
+select is(
+  (select pick_count from public.picks_in_view(-123.3, 49.1, -122.9, 49.4) where name = 'Skewers'),
+  2, 'and a pick on a merged dish adds nothing to its place');
 
 -- ---------------------------------------------------------------- limits and anon
 reset role;
