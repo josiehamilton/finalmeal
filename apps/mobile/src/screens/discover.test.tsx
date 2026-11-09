@@ -38,11 +38,12 @@ jest.mock('@finalmeal/api', () => ({
   searchTags: jest.fn(),
 }));
 let mockProfile = makeProfile();
+let mockSessionLoading = false;
 jest.mock('../providers/SessionProvider', () => ({
   useSession: () => ({
     session: {},
     profile: mockProfile,
-    loading: false,
+    loading: mockSessionLoading,
     error: null,
     refreshProfile: jest.fn().mockResolvedValue(null),
   }),
@@ -79,6 +80,7 @@ beforeEach(() => {
   resetMapMock();
   mockParams = {};
   mockProfile = makeProfile();
+  mockSessionLoading = false;
   jest.mocked(getCity).mockResolvedValue({ id: 'c1', lat: 49.2827, lng: -123.1207 } as never);
   jest.mocked(nearestCity).mockResolvedValue({ id: 'c1', name: 'Vancouver' } as never);
   mockPicks.mockImplementation(async (_c, _b, filters) => ({
@@ -213,6 +215,75 @@ describe('Discover tab: the map and the in-view sheet', () => {
   });
 });
 
+describe('Discover tab: selected spot, zoom and session', () => {
+  it('closes the selected spot with a visible Close button, back to the in-view sheet and List view', async () => {
+    await show();
+    await emitMapEvent({ type: 'pinPress', id: 'pl-kinkao' });
+    await settle();
+    await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.getByText('12 picks near Vancouver')).toBeOnTheScreen();
+    expect(sentCommands().filter((c) => c.type === 'select').pop()).toEqual({ type: 'select', id: null });
+    await fireEvent.press(screen.getByRole('link', { name: 'List view' }));
+    await settle();
+    expect(screen.getByTestId('discover-list')).toBeOnTheScreen();
+  });
+
+  it('closes the selected spot on an accessibility escape', async () => {
+    await show();
+    await emitMapEvent({ type: 'pinPress', id: 'pl-kinkao' });
+    await settle();
+    await fireEvent(screen.getByLabelText('Selected pick'), 'accessibilityEscape');
+    expect(screen.getByText('12 picks near Vancouver')).toBeOnTheScreen();
+  });
+
+  it('does not reload the view or move the map’s padding when a pin is tapped', async () => {
+    await show();
+    const insetsBefore = sentCommands().filter((c) => c.type === 'setInsets');
+    const loads = mockPicks.mock.calls.length;
+    await emitMapEvent({ type: 'pinPress', id: 'pl-kinkao' });
+    await settle();
+    await fireEvent(screen.getByLabelText('Selected pick'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 360 } },
+    });
+    // The map answers the padding change with a region at the same centre and zoom.
+    await emitMapEvent({
+      type: 'region',
+      region: { ...VANCOUVER_REGION, center: { lat: 49.2827, lng: -123.1207 }, zoom: 12 },
+    });
+    await settle(250);
+    expect(mockPicks.mock.calls.length).toBe(loads);
+    expect(sentCommands().filter((c) => c.type === 'setInsets')).toEqual(insetsBefore);
+  });
+
+  it('names no city when zoomed out', async () => {
+    await show();
+    await emitMapEvent({ type: 'region', region: { ...VANCOUVER_REGION, zoom: 6 } });
+    await settle(250);
+    expect(screen.getByText('12 picks here')).toBeOnTheScreen();
+  });
+
+  it('waits for the session before it starts the map', async () => {
+    mockSessionLoading = true;
+    await render(<Discover />);
+    await settle();
+    expect(getCity).not.toHaveBeenCalled();
+    expect(mockPicks).not.toHaveBeenCalled();
+    expect(screen.queryByText('Set your home city to start the map there.')).toBeNull();
+  });
+
+  it('keeps List view and Filters working when the map did not load', async () => {
+    await render(<Discover />);
+    await settle();
+    await emitMapEvent({ type: 'error', reason: 'load' });
+    await fireEvent.press(screen.getByRole('link', { name: 'List view' }));
+    await settle();
+    expect(screen.getByTestId('discover-list')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Filters' }));
+    await settle();
+    expect(screen.getByRole('button', { name: 'Close filters' })).toBeOnTheScreen();
+  });
+});
+
 describe('Discover tab: the chip row, search and focus', () => {
   it('sets the tier from the chips and toggles Following on its own', async () => {
     await show();
@@ -233,7 +304,7 @@ describe('Discover tab: the chip row, search and focus', () => {
   it('opens Search from the map’s centre', async () => {
     await show();
     await emitMapEvent({ type: 'region', region: VANCOUVER_REGION });
-    await fireEvent.press(screen.getByRole('search', { name: 'Search dishes, spots, people' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Search dishes, spots, people' }));
     expect(mockRouter.push).toHaveBeenCalledWith('/search?from=discover&lat=49.275&lng=-123.1');
     await settle(250);
   });

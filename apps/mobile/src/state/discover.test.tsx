@@ -222,4 +222,103 @@ describe('useDiscover', () => {
     await moveTo(35.68, 139.69);
     expect(mockCity).toHaveBeenCalledTimes(2);
   });
+
+  it('retries the view load, not a stale selection, after a view error', async () => {
+    mockPicks.mockRejectedValueOnce(new ApiError('x', 'network'));
+    const { result } = await mount();
+    expect(result.current.status).toBe('error');
+    await act(async () => {
+      result.current.select('pl-kinkao');
+    });
+    await settle();
+    await act(async () => {
+      result.current.select(null);
+    });
+    expect(result.current.status).toBe('error');
+    mockPicks.mockClear();
+    await act(async () => result.current.retry());
+    await settle();
+    expect(mockPicks).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('ready');
+    expect(result.current.places).toHaveLength(3);
+  });
+
+  it('retries a failed selection', async () => {
+    const { result } = await mount();
+    mockDishes.mockRejectedValueOnce(new ApiError('x', 'network'));
+    await act(async () => {
+      result.current.select('pl-kinkao');
+    });
+    await settle();
+    expect(result.current.status).toBe('error');
+    mockDishes.mockResolvedValueOnce(makeKinKaoSelection());
+    await act(async () => result.current.retry());
+    await settle();
+    expect(result.current.status).toBe('ready');
+    expect(result.current.selected).toHaveLength(1);
+  });
+
+  it('does not reload when the view has the same centre and zoom (only its padding changed)', async () => {
+    const { result } = await mount();
+    mockPicks.mockClear();
+    await act(async () => {
+      result.current.onRegionChange({
+        ...region(-123.1),
+        center: { lat: HOME.lat, lng: HOME.lng },
+        zoom: 12,
+      });
+    });
+    await settle(250);
+    expect(mockPicks).not.toHaveBeenCalled();
+    await act(async () => {
+      result.current.onRegionChange({ ...region(-123.1), center: { lat: HOME.lat, lng: HOME.lng }, zoom: 13 });
+    });
+    await settle(250);
+    expect(mockPicks).toHaveBeenCalledTimes(1);
+  });
+
+  it('names no city below zoom 9, and does not ask for one', async () => {
+    const { result } = await mount();
+    mockCity.mockClear();
+    await act(async () => {
+      result.current.onRegionChange({ ...VANCOUVER_REGION, center: { lat: 10, lng: 10 }, zoom: 6 });
+    });
+    await settle(250);
+    expect(result.current.cityName).toBeNull();
+    expect(mockCity).not.toHaveBeenCalled();
+  });
+
+  it('shows the new city only together with the view it labels', async () => {
+    const { result } = await mount();
+    const slow = deferred<{ id: string; name: string }>();
+    mockCity.mockReturnValueOnce(slow.promise as never);
+    const fresh = makeDiscoverPlaces().slice(0, 1);
+    mockPicks.mockResolvedValueOnce({ places: fresh, truncated: false });
+    await act(async () => {
+      result.current.onRegionChange({ ...VANCOUVER_REGION, center: { lat: 35.68, lng: 139.69 } });
+    });
+    await settle(250);
+    expect(result.current.cityName).toBe('Vancouver');
+    expect(result.current.places).toHaveLength(3);
+    await act(async () => slow.resolve({ id: 'c2', name: 'Tokyo' }));
+    expect(result.current.cityName).toBe('Tokyo');
+    expect(result.current.places).toEqual(fresh);
+  });
+
+  it('measures a selection from the point it is given, and clears one with no dishes', async () => {
+    const { result } = await mount();
+    await act(async () => {
+      result.current.select('pl-kinkao', { lat: 1, lng: 2 });
+    });
+    await settle();
+    expect(mockDishes).toHaveBeenLastCalledWith(client, null, DEFAULT_DISCOVER_FILTERS, { lat: 1, lng: 2 }, {
+      placeId: 'pl-kinkao',
+    });
+    mockDishes.mockResolvedValueOnce([]);
+    await act(async () => {
+      result.current.select('pl-skewers');
+    });
+    await settle();
+    expect(result.current.selectedId).toBeNull();
+  });
 });

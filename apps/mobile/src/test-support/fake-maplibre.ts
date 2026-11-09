@@ -211,7 +211,12 @@ export function runMapPage(opts: MapPageEnvOptions = {}): MapPageEnv {
   const layers = opts.layers ?? [];
 
   const win: Record<string, unknown> = {
-    setTimeout: (fn: () => void, ms: number) => setTimeout(fn, ms),
+    // Unref'd: the page's load timer must not keep a Jest worker alive after its test ends.
+    setTimeout: (fn: () => void, ms: number) => {
+      const timer = setTimeout(fn, ms);
+      (timer as { unref?: () => void }).unref?.();
+      return timer;
+    },
     clearTimeout: (id: unknown) => clearTimeout(id as ReturnType<typeof setTimeout>),
     FM_CONFIG:
       opts.config ??

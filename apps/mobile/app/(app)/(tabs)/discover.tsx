@@ -34,11 +34,13 @@ const WORLD_VIEW_MAX_ZOOM = 3;
  * A different home city mounts it afresh, at the new city.
  */
 export default function Discover() {
-  const { profile } = useSession();
+  const { profile, loading } = useSession();
   const homeId = profile?.homeCity?.id ?? null;
   const [start, setStart] = useState<{ id: string | null; point: LatLng | null } | null>(null);
 
   useEffect(() => {
+    // Until the profile has loaded, nobody knows whether there is a home city.
+    if (loading) return;
     if (homeId === null) {
       setStart({ id: null, point: null });
       return;
@@ -56,9 +58,9 @@ export default function Discover() {
     return () => {
       cancelled = true;
     };
-  }, [homeId]);
+  }, [homeId, loading]);
 
-  if (!start || start.id !== homeId) return <View style={styles.screen} />;
+  if (loading || !start || start.id !== homeId) return <View style={styles.screen} />;
   return <DiscoverScreen key={homeId ?? 'none'} home={start.point} hasHomeCity={homeId !== null} />;
 }
 
@@ -86,7 +88,7 @@ function DiscoverScreen({ home, hasHomeCity }: DiscoverScreenProps) {
   const [listOpen, setListOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   /** A place to select once its pin has loaded (Search sent us here). */
-  const [focusId, setFocusId] = useState<string | null>(null);
+  const [focus, setFocus] = useState<{ id: string; at: LatLng | null } | null>(null);
 
   const pins = useMemo(() => pinsForDiscover(d.places), [d.places]);
   const insets = useMemo(() => ({ top: topHeight, bottom: sheetHeight }), [topHeight, sheetHeight]);
@@ -98,20 +100,20 @@ function DiscoverScreen({ home, hasHomeCity }: DiscoverScreenProps) {
     if (!placeId) return;
     const la = parseFloat(lat ?? '');
     const ln = parseFloat(lng ?? '');
-    if (Number.isFinite(la) && Number.isFinite(ln)) {
-      mapRef.current?.flyTo({ lat: la, lng: ln, zoom: FOCUS_ZOOM });
-    }
-    setFocusId(placeId);
+    const at = Number.isFinite(la) && Number.isFinite(ln) ? { lat: la, lng: ln } : null;
+    if (at) mapRef.current?.flyTo({ ...at, zoom: FOCUS_ZOOM });
+    setFocus({ id: placeId, at });
     setParams({ placeId: undefined, lat: undefined, lng: undefined });
   }, [placeId, lat, lng, setParams]);
 
   const { select } = d;
   useEffect(() => {
-    if (focusId && d.places.some((p) => p.id === focusId)) {
-      select(focusId);
-      setFocusId(null);
+    if (focus && d.places.some((p) => p.id === focus.id)) {
+      // Distances come from where the map is flying to, not from where it was.
+      select(focus.id, focus.at ?? undefined);
+      setFocus(null);
     }
-  }, [focusId, d.places, select]);
+  }, [focus, d.places, select]);
 
   const total = d.places.reduce((sum, p) => sum + p.pickCount, 0);
   const title = picksNearLabel(total, d.cityName);
@@ -125,7 +127,7 @@ function DiscoverScreen({ home, hasHomeCity }: DiscoverScreenProps) {
   }
 
   function changeFilters(next: DiscoverFilters) {
-    setFocusId(null);
+    setFocus(null);
     d.setFilters(next);
   }
 
@@ -139,6 +141,8 @@ function DiscoverScreen({ home, hasHomeCity }: DiscoverScreenProps) {
   }
 
   const openPick = (pickId: string) => router.push(`/pick/${pickId}`);
+  // The map is padded by the in-view sheet only. The selected spot's sheet is taller, and following it
+  // would shift the map under the finger that just tapped a pin.
   const sheetLayout = (event: LayoutChangeEvent) => setSheetHeight(event.nativeEvent.layout.height);
   const showSelected = d.selectedId !== null && d.selected !== null && d.selected.length > 0;
 
@@ -154,18 +158,23 @@ function DiscoverScreen({ home, hasHomeCity }: DiscoverScreenProps) {
           insets={insets}
           onRegionChange={d.onRegionChange}
           onPinPress={(id) => {
-            setFocusId(null);
+            setFocus(null);
             d.select(id);
           }}
           onMapPress={() => {
-            setFocusId(null);
+            setFocus(null);
             d.select(null);
           }}
         />
       </View>
       <MapLegend top={topHeight + 12} />
       {showSelected ? (
-        <SelectedPlaceSheet dishes={d.selected ?? []} onOpenPick={openPick} onLayout={sheetLayout} />
+        <SelectedPlaceSheet
+          dishes={d.selected ?? []}
+          onOpenPick={openPick}
+          onClose={() => d.select(null)}
+          onLayout={() => {}}
+        />
       ) : (
         <DiscoverSheet
           mode={mode}

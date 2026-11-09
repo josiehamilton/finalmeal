@@ -5,12 +5,15 @@ import { formatDistance, tierCountsLabel } from '@finalmeal/core';
 import { colors, radii } from '@finalmeal/ui-tokens';
 import { fontFamily } from '../lib/fonts';
 import { Avatar } from './Avatar';
+import { Icon } from './Icon';
 import { DishPhoto } from './DishPhoto';
 import { SkullMark } from './SkullMark';
 
 interface SelectedPlaceSheetProps {
   dishes: DiscoverDish[];
   onOpenPick: (pickId: string) => void;
+  /** Leaves the selected spot, back to the picks in view. */
+  onClose: () => void;
   onLayout: (event: LayoutChangeEvent) => void;
 }
 
@@ -33,7 +36,7 @@ function DishBlock({ dish, onOpenPick }: { dish: DiscoverDish; onOpenPick: (pick
       onPress={pickId ? () => onOpenPick(pickId) : undefined}
       style={styles.block}
     >
-      <View style={styles.top}>
+      <View style={styles.photoRow}>
         <DishPhoto uri={dish.photoUrl} size={84} radius={14} />
         <View style={styles.text}>
           <View style={[styles.badge, !isFinal && styles.badgeHonorable]}>
@@ -70,11 +73,28 @@ function DishBlock({ dish, onOpenPick }: { dish: DiscoverDish; onOpenPick: (pick
 }
 
 /** Replaces the in-view sheet while a pin is selected: every dish picked at that place. */
-export function SelectedPlaceSheet({ dishes, onOpenPick, onLayout }: SelectedPlaceSheetProps) {
+export function SelectedPlaceSheet({ dishes, onOpenPick, onClose, onLayout }: SelectedPlaceSheetProps) {
   const { height } = useWindowDimensions();
   return (
-    <View accessibilityLabel="Selected pick" style={styles.sheet} onLayout={onLayout}>
-      <View accessible={false} style={styles.handle} />
+    <View
+      accessibilityLabel="Selected pick"
+      // A screen reader's escape gesture (two-finger Z) leaves the spot, like the Close button.
+      onAccessibilityEscape={onClose}
+      style={styles.sheet}
+      onLayout={onLayout}
+    >
+      <View style={styles.top}>
+        <View accessible={false} style={styles.handle} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          onPress={onClose}
+          hitSlop={8}
+          style={styles.close}
+        >
+          <Icon name="close" size={16} color={colors.smoke} />
+        </Pressable>
+      </View>
       <ScrollView style={{ maxHeight: height / 2 }} contentContainerStyle={styles.blocks}>
         {dishes.map((dish) => (
           <DishBlock key={dish.dishId} dish={dish} onOpenPick={onOpenPick} />
@@ -109,7 +129,19 @@ const styles = StyleSheet.create({
   },
   blocks: { gap: 20 },
   block: { gap: 12 },
-  top: { flexDirection: 'row', gap: 14 },
+  photoRow: { flexDirection: 'row', gap: 14 },
+  top: { height: 28, alignItems: 'center', justifyContent: 'center' },
+  close: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.ashRaised,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   text: { flex: 1, gap: 5, minWidth: 0 },
   badge: {
     alignSelf: 'flex-start',

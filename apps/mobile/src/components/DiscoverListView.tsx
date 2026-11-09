@@ -86,7 +86,7 @@ export function DiscoverListView({
           </View>
         </View>
       ) : dishes === null ? (
-        <ActivityIndicator color={colors.dim} style={styles.spinner} />
+        <ActivityIndicator accessibilityLabel="Loading" color={colors.dim} style={styles.spinner} />
       ) : (
         <ScrollView contentContainerStyle={styles.rows}>
           {dishes.length === 0 ? <Text style={styles.empty}>No picks here yet.</Text> : null}

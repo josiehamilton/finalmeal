@@ -54,7 +54,7 @@ export function DiscoverSheet({
       <View accessible={false} style={styles.handle} />
       {mode === 'picks' ? (
         loading ? (
-          <ActivityIndicator color={colors.dim} style={styles.spinner} />
+          <ActivityIndicator accessibilityLabel="Loading" color={colors.dim} style={styles.spinner} />
         ) : (
           <>
             <View style={styles.titleRow}>

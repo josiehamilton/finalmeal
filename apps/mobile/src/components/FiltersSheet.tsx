@@ -90,6 +90,8 @@ export function FiltersSheet({ visible, filters, region, onApply, onClose }: Fil
       KINDS.map(({ kind }) => searchTags(getSupabase(), kind, '').catch((): Tag[] => [])),
     ).then(([food, dietary]) => {
       if (!mounted.current) return;
+      // Offline on the first open: ask again the next time it opens.
+      if ((food ?? []).length === 0 && (dietary ?? []).length === 0) loaded.current = false;
       for (const tag of [...(food ?? []), ...(dietary ?? [])]) known.current.set(tag.id, tag);
       setPopular({ food_type: (food ?? []).slice(0, POPULAR), dietary: (dietary ?? []).slice(0, POPULAR) });
     });
@@ -191,7 +193,7 @@ function FiltersBody({ filters, region, popular, known, onApply, onClose }: Body
         </View>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.section}>
-            <Text style={styles.label}>Pick type</Text>
+            <Text style={styles.label} accessibilityRole="header">Pick type</Text>
             <View style={styles.chips}>
               {TIERS.map(({ tier, label }) => (
                 <TagChip
@@ -205,7 +207,7 @@ function FiltersBody({ filters, region, popular, known, onApply, onClose }: Body
           </View>
           <View style={styles.section}>
             <View style={styles.labelRow}>
-              <Text style={styles.label}>Distance</Text>
+              <Text style={styles.label} accessibilityRole="header">Distance</Text>
               <Text style={styles.distance}>{radiusLabel(draft.radiusKm)}</Text>
             </View>
             <Slider
@@ -297,7 +299,7 @@ function TagGroup({ kind, title, searchLabel, popular, chosen, known, onToggle }
 
   return (
     <View style={styles.section}>
-      <Text style={styles.label}>{title}</Text>
+      <Text style={styles.label} accessibilityRole="header">{title}</Text>
       <View style={styles.chips}>
         {shown.map((tag) => (
           <TagChip
@@ -307,7 +309,10 @@ function TagGroup({ kind, title, searchLabel, popular, chosen, known, onToggle }
             onPress={() => onToggle(tag)}
           />
         ))}
-        <TagChip variant="own" label="More" onPress={() => setSearching((s) => !s)} />
+        <TagChip variant="own" label="More" onPress={() => {
+            setSearching((s) => !s);
+            setQuery('');
+          }} />
       </View>
       {searching ? (
         <View style={styles.search}>

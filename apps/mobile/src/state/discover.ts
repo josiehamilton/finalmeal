@@ -11,6 +11,10 @@ import type { MapRegion } from '../map/bridge';
 export const REGION_DEBOUNCE_MS = 250;
 /** The sheet shows this many dish cards; the full list view asks for more. */
 const SHEET_DISHES = 20;
+/** Below this zoom the view spans too much to be "near" one city: the title says "here". */
+export const CITY_NAME_MIN_ZOOM = 9;
+/** Two centres closer than this (degrees) are the same place. */
+const SAME_CENTRE = 1e-5;
 
 /** Whether any filter is off its default (so an empty map may be the filters' doing). */
 export function hasActiveFilters(f: DiscoverFilters): boolean {
@@ -38,7 +42,8 @@ export interface DiscoverState {
   /** The friendly message while `status` is `error`. */
   error: string | null;
   selectedId: string | null;
-  select: (id: string | null) => void;
+  /** `from` is where distances are measured; the map's centre when not given. */
+  select: (id: string | null, from?: LatLng) => void;
   /** The selected place's dishes, or null while none is selected (or they are still loading). */
   selected: DiscoverDish[] | null;
   onRegionChange: (region: MapRegion) => void;
@@ -99,11 +104,13 @@ export function useDiscover(home: LatLng | null): DiscoverState {
   const selectedIdRef = useRef<string | null>(null);
   const viewRequest = useRef(0);
   const selectRequest = useRef(0);
-  const cityRequest = useRef(0);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
-  /** What `retry` repeats: the last load, view or selection. */
-  const lastLoad = useRef<() => void>(() => {});
+  /** What `retry` repeats: the last view load and the last selection load, kept apart. */
+  const lastView = useRef<() => void>(() => {});
+  const lastSelection = useRef<() => void>(() => {});
+  /** The view the last load asked for; a region with the same centre and zoom is not reloaded. */
+  const loadedView = useRef<MapRegion | null>(null);
   /** Which kind of load the error on screen came from. */
   const errorSource = useRef<'view' | 'selection' | null>(null);
   const cityCache = useRef(new Map<string, string | null>());
@@ -114,23 +121,43 @@ export function useDiscover(home: LatLng | null): DiscoverState {
     setStatus('error');
   }, []);
 
+  /** The city a view is "near", or null when the view is too wide to name one (or the lookup fails). */
+  const cityFor = useCallback(async (view: MapRegion): Promise<string | null> => {
+    if (view.zoom < CITY_NAME_MIN_ZOOM) return null;
+    const key = cityKey(view.center);
+    const cached = cityCache.current.get(key);
+    if (cached !== undefined) return cached;
+    try {
+      const city = await nearestCity(getSupabase(), view.center.lat, view.center.lng);
+      cityCache.current.set(key, city?.name ?? null);
+      return city?.name ?? null;
+    } catch {
+      // The title falls back to "picks here"; a missing city name is not worth an error.
+      return null;
+    }
+  }, []);
+
   const loadView = useCallback(
     (view: MapRegion, using: DiscoverFilters) => {
       const request = ++viewRequest.current;
-      lastLoad.current = () => loadView(view, using);
+      loadedView.current = view;
+      lastView.current = () => loadView(view, using);
       setStatus('loading');
       setError(null);
       errorSource.current = null;
       const client = getSupabase();
+      // The city comes with the view it labels, so the title never pairs it with another view's count.
       Promise.all([
         getPicksInView(client, view.bounds, using, view.center),
         getDishesInView(client, view.bounds, using, view.center, { limit: SHEET_DISHES }),
+        cityFor(view),
       ]).then(
-        ([picks, cards]) => {
+        ([picks, cards, city]) => {
           if (!mounted.current || request !== viewRequest.current) return;
           setPlaces(picks.places);
           setTruncated(picks.truncated);
           setDishes(cards);
+          setCityName(city);
           setStatus('ready');
         },
         (e: unknown) => {
@@ -139,22 +166,28 @@ export function useDiscover(home: LatLng | null): DiscoverState {
         },
       );
     },
-    [showError],
+    [showError, cityFor],
   );
 
   const loadSelection = useCallback(
-    (id: string, using: DiscoverFilters) => {
+    (id: string, using: DiscoverFilters, from?: LatLng) => {
       const request = ++selectRequest.current;
-      lastLoad.current = () => loadSelection(id, using);
+      lastSelection.current = () => loadSelection(id, using, from);
       if (errorSource.current === 'selection') {
         errorSource.current = null;
         setError(null);
         setStatus('ready');
       }
-      const center = regionRef.current?.center ?? home;
+      const center = from ?? regionRef.current?.center ?? home;
       getDishesInView(getSupabase(), null, using, center, { placeId: id }).then(
         (cards) => {
           if (!mounted.current || request !== selectRequest.current) return;
+          if (cards.length === 0) {
+            // Nothing to show for this place: do not leave an invisible selection behind.
+            selectedIdRef.current = null;
+            setSelectedId(null);
+            return;
+          }
           setSelected(cards);
         },
         (e: unknown) => {
@@ -166,25 +199,6 @@ export function useDiscover(home: LatLng | null): DiscoverState {
     [home, showError],
   );
 
-  const updateCity = useCallback((center: LatLng) => {
-    const key = cityKey(center);
-    const request = ++cityRequest.current;
-    const cached = cityCache.current.get(key);
-    if (cached !== undefined) {
-      setCityName(cached);
-      return;
-    }
-    nearestCity(getSupabase(), center.lat, center.lng).then(
-      (city) => {
-        cityCache.current.set(key, city?.name ?? null);
-        if (mounted.current && request === cityRequest.current) setCityName(city?.name ?? null);
-      },
-      () => {
-        // The title falls back to "picks here"; a missing city name is not worth an error.
-      },
-    );
-  }, []);
-
   // The first load comes from the starting view, so the sheet works even if the map never reports.
   useEffect(() => {
     mounted.current = true;
@@ -192,7 +206,6 @@ export function useDiscover(home: LatLng | null): DiscoverState {
     regionRef.current = start;
     setRegion(start);
     loadView(start, filtersRef.current);
-    updateCity(start.center);
     return () => {
       mounted.current = false;
       if (debounce.current) clearTimeout(debounce.current);
@@ -209,15 +222,22 @@ export function useDiscover(home: LatLng | null): DiscoverState {
         debounce.current = null;
         const current = regionRef.current;
         if (!current) return;
-        loadView(current, filtersRef.current);
-        updateCity(current.center);
+        // A sheet changing height only pads the map: same centre and zoom, nothing new to read.
+        const last = loadedView.current;
+        const same =
+          last !== null &&
+          errorSource.current !== 'view' &&
+          current.zoom === last.zoom &&
+          Math.abs(current.center.lat - last.center.lat) < SAME_CENTRE &&
+          Math.abs(current.center.lng - last.center.lng) < SAME_CENTRE;
+        if (!same) loadView(current, filtersRef.current);
       }, REGION_DEBOUNCE_MS);
     },
-    [loadView, updateCity],
+    [loadView],
   );
 
   const select = useCallback(
-    (id: string | null) => {
+    (id: string | null, from?: LatLng) => {
       selectedIdRef.current = id;
       setSelectedId(id);
       setSelected(null);
@@ -230,7 +250,7 @@ export function useDiscover(home: LatLng | null): DiscoverState {
         }
         return;
       }
-      loadSelection(id, filtersRef.current);
+      loadSelection(id, filtersRef.current, from);
     },
     [loadSelection],
   );
@@ -254,7 +274,8 @@ export function useDiscover(home: LatLng | null): DiscoverState {
   );
 
   const retry = useCallback(() => {
-    lastLoad.current();
+    if (errorSource.current === 'selection') lastSelection.current();
+    else lastView.current();
   }, []);
 
   return {

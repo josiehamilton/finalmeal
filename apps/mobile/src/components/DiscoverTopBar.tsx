@@ -61,7 +61,7 @@ export function DiscoverTopBar({
       <View style={styles.inner} pointerEvents="box-none">
         <View style={styles.searchRow}>
           <Pressable
-            accessibilityRole="search"
+            accessibilityRole="button"
             accessibilityLabel="Search dishes, spots, people"
             onPress={onSearch}
             style={styles.pill}
