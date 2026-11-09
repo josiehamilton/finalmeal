@@ -97,3 +97,48 @@ describe('the map and the current location', () => {
     expect(text).toContain('geolocationEnabled={false}');
   });
 });
+
+/**
+ * Discover: the screen, its state and every component it uses. The map starts at the home city and
+ * distances come from the map’s centre, so nothing here may touch the phone’s position.
+ * `nearestCity` is allowed only in `state/discover.ts`, where it names the map’s centre.
+ */
+const DISCOVER_FILES = [
+  'app/(app)/(tabs)/discover.tsx',
+  'src/state/discover.ts',
+  ...readdirSync(join(root, 'src/components'))
+    .filter(
+      (name: string) =>
+        /^(Discover.*|FiltersSheet|MapLegend|SelectedPlaceSheet|DishResultRow|DishPhoto)\.tsx$/.test(name),
+    )
+    .map((name: string) => join('src/components', name)),
+].filter((f) => !/\.test\.tsx?$/.test(f));
+
+describe('Discover and the current location', () => {
+  it('covers the screen, its state and its components', () => {
+    for (const expected of [
+      'app/(app)/(tabs)/discover.tsx',
+      'src/state/discover.ts',
+      'src/components/DiscoverTopBar.tsx',
+      'src/components/DiscoverSheet.tsx',
+      'src/components/DiscoverDishCard.tsx',
+      'src/components/DiscoverListView.tsx',
+      'src/components/SelectedPlaceSheet.tsx',
+      'src/components/FiltersSheet.tsx',
+      'src/components/MapLegend.tsx',
+      'src/components/DishResultRow.tsx',
+    ]) {
+      expect(DISCOVER_FILES).toContain(expected);
+    }
+  });
+
+  it.each(DISCOVER_FILES.map((f) => [f]))(
+    '%s never imports expo-location or asks for a permission',
+    (file) => {
+      const text = readFileSync(join(root, file), 'utf8');
+      expect(text).not.toMatch(/expo-location/);
+      expect(text).not.toMatch(/requestForegroundPermissions|getCurrentPosition|watchPosition|geolocation/i);
+      if (file !== 'src/state/discover.ts') expect(text).not.toMatch(/nearestCity/);
+    },
+  );
+});
