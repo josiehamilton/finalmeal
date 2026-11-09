@@ -49,6 +49,7 @@ A running list, newest needs added as they come up. Nothing here blocks today's 
 | 28 | Map callouts (the label under a selected pin) use the phone's system font instead of Manrope until the test builds bundle the map library. | Phase 8 | System font for now |
 | 29 | Discover details: the selected-spot sheet has a small × close button (the board has none; needed when the map fails or with a screen reader); zoomed far out (below city zoom), the title says "N picks here" instead of naming a city; new labels "Show picks", "Loading", "Close", and "No picks here yet." in List view. | Any time | As described |
 | 30 | Search details: a spot with no fixed point (a food truck, or an address not yet found) shows its city instead of a distance and moves Discover to that city; Dishes and Spots show no hint text before you type. | Any time | As described |
+| 31 | Profile and Saved maps: the footer lists cities busiest first (e.g. "Sushi · Tokyo, Vancouver, New York"); Saved's map says "None of these spots are on the map yet." when none of your saves has an exact spot. | Any time | As described |
 
 ## Done
 
