@@ -18,7 +18,14 @@ import {
   searchPeople,
   searchPlaces,
 } from '@finalmeal/api';
-import type { DiscoverDish, LatLng, PersonSearchRow, Place, SuggestedPerson } from '@finalmeal/api';
+import type {
+  DiscoverDish,
+  LatLng,
+  PersonSearchRow,
+  Place,
+  PlaceHit,
+  SuggestedPerson,
+} from '@finalmeal/api';
 import { followersLabel } from '@finalmeal/core';
 import { colors, typeScale } from '@finalmeal/ui-tokens';
 import { DishResultRow } from '../../src/components/DishResultRow';
@@ -27,7 +34,6 @@ import { PersonRow } from '../../src/components/PersonRow';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { SEARCH_DEBOUNCE_MS } from '../../src/components/SearchField';
 import { SpotResultRow } from '../../src/components/SpotResultRow';
-import { metresBetween } from '../../src/lib/distance';
 import { fontFamily } from '../../src/lib/fonts';
 import { getSupabase } from '../../src/lib/supabase';
 import { useSession } from '../../src/providers/SessionProvider';
@@ -49,7 +55,7 @@ const SUGGESTED_WITH_TEXT = 5;
 
 interface Results {
   dishes: DiscoverDish[];
-  spots: Place[];
+  spots: PlaceHit[];
   found: PersonSearchRow[];
   suggested: SuggestedPerson[];
 }
@@ -91,7 +97,7 @@ export default function Search() {
   const [focused, setFocused] = useState(false);
   const [tab, setTab] = useState<Tab>('people');
   const [tries, setTries] = useState(0);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('ready');
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<Results>(NONE);
 
@@ -117,6 +123,10 @@ export default function Search() {
     };
   }, [discover, homeId]);
   const near = discover ? centre : homePoint;
+  // People never uses the point, so it neither waits for the home city nor reloads when it arrives.
+  const usesNear = discover || tab !== 'people';
+  const rankNear = usesNear ? near : undefined;
+  const ready = !usesNear || homeReady;
 
   useEffect(() => {
     const timer = setTimeout(
@@ -128,7 +138,10 @@ export default function Search() {
 
   // Only the newest request may set the results: changing anything cancels the one before.
   useEffect(() => {
-    if (!homeReady) return;
+    if (!ready) {
+      setStatus('loading');
+      return;
+    }
     const peopleTab = !discover && tab === 'people';
     if (query === '' && !peopleTab) {
       setResults(NONE);
@@ -144,17 +157,17 @@ export default function Search() {
     const load = async (): Promise<Results> => {
       if (discover) {
         const [dishes, spots, found] = await Promise.all([
-          searchDishes(client, query, near, DISCOVER_DISHES),
-          searchPlaces(client, query, near, DISCOVER_SPOTS),
+          searchDishes(client, query, rankNear, DISCOVER_DISHES),
+          searchPlaces(client, query, rankNear, DISCOVER_SPOTS),
           searchPeople(client, query, DISCOVER_PEOPLE),
         ]);
         return { dishes, spots, found, suggested: [] };
       }
       if (tab === 'dishes') {
-        return { ...NONE, dishes: await searchDishes(client, query, near, FEED_LIMIT) };
+        return { ...NONE, dishes: await searchDishes(client, query, rankNear, FEED_LIMIT) };
       }
       if (tab === 'spots') {
-        return { ...NONE, spots: await searchPlaces(client, query, near, FEED_LIMIT) };
+        return { ...NONE, spots: await searchPlaces(client, query, rankNear, FEED_LIMIT) };
       }
       if (query === '') return { ...NONE, suggested: await getSuggestedPeople(client, FEED_LIMIT) };
       const [found, suggested] = await Promise.all([
@@ -179,7 +192,7 @@ export default function Search() {
     return () => {
       cancelled = true;
     };
-  }, [query, tab, discover, near, homeReady, tries]);
+  }, [query, tab, discover, rankNear, ready, tries]);
 
   function openPlace(place: Place) {
     router.navigate({
@@ -194,7 +207,6 @@ export default function Search() {
   }
 
   const openPerson = (id: string) => router.push(`/u/${id}`);
-  const distanceTo = (place: Place) => (near && place.onMap ? metresBetween(near, place) : null);
 
   const found = results.found;
   const foundIds = new Set(found.map((p) => p.id));
@@ -215,7 +227,7 @@ export default function Search() {
     <DishResultRow key={d.dishId + d.place.id} dish={d} onPress={openDish} />
   ));
   const spotRows = results.spots.map((p) => (
-    <SpotResultRow key={p.id} place={p} distanceM={distanceTo(p)} onPress={openPlace} />
+    <SpotResultRow key={p.id} place={p} distanceM={p.distanceM} onPress={openPlace} />
   ));
   const suggestedBlock =
     suggested.length > 0 ? (
@@ -289,7 +301,7 @@ export default function Search() {
     <SafeAreaView edges={['top']} style={styles.screen}>
       <View style={styles.top}>
         <View style={[styles.field, focused && styles.fieldFocused]}>
-          <Icon name="search" size={18} color={colors.dim} />
+          <Icon name="search" size={18} color={colors.smoke} />
           <TextInput
             accessibilityLabel="Search"
             placeholder="Dishes, spots, people"
@@ -372,7 +384,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ash,
   },
   fieldFocused: { borderColor: colors.emberGlow },
-  input: { flex: 1, fontFamily: fontFamily.ui, fontSize: 15, color: colors.bone, padding: 0 },
+  input: { flex: 1, fontFamily: fontFamily.uiMedium, fontSize: 16, color: colors.bone, padding: 0 },
   cancel: { fontFamily: fontFamily.uiSemiBold, fontSize: 15, color: colors.bone },
   tabs: {
     flexDirection: 'row',

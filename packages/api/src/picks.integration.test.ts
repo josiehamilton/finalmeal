@@ -98,6 +98,9 @@ describe('tags, places and dishes (local Supabase)', () => {
       source: 'custom',
       label: 'Bidwell St · Vancouver',
     });
+    // The server's distance from the Vancouver point, in metres.
+    expect(places[0]!.distanceM).toBeGreaterThan(0);
+    expect(places[0]!.distanceM).toBeLessThan(20000);
     expect(places[0]!.lat).toBeCloseTo(49.2905, 3);
     expect(places[0]!.lng).toBeCloseTo(-123.1366, 3);
 

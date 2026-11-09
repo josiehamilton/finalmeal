@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FinalMealClient } from './client';
 import { ApiError } from './errors';
-import { formatPlaceLabel, getPopularPlaces, readPoint, searchPlaces, toPlace } from './places';
+import {
+  formatPlaceLabel,
+  getPopularPlaces,
+  placeWhere,
+  readPoint,
+  searchPlaces,
+  toPlace,
+} from './places';
 
 const ROW = {
   id: 'p1',
@@ -14,6 +21,18 @@ const ROW = {
   country: 'CA',
   location: { type: 'Point', coordinates: [-123.1366, 49.2905] },
 };
+
+describe('placeWhere', () => {
+  it('is the area, else the street before the first comma, else null', () => {
+    expect(placeWhere({ area: 'Bidwell St', address: '780 Bidwell St, Vancouver' })).toBe(
+      'Bidwell St',
+    );
+    expect(placeWhere({ area: '  ', address: ' 780 Bidwell St , Vancouver, BC' })).toBe(
+      '780 Bidwell St',
+    );
+    expect(placeWhere({ area: null, address: null })).toBeNull();
+  });
+});
 
 describe('formatPlaceLabel', () => {
   it('uses the area and the city', () => {
@@ -111,6 +130,19 @@ describe('toPlace', () => {
 });
 
 describe('searchPlaces', () => {
+  it('has no distance without one from the server, or for a place pinned only to its city', async () => {
+    const retry = vi.fn().mockResolvedValue({
+      data: [
+        { place: ROW, distance_m: null },
+        { place: { ...ROW, id: 'p2', location_precision: 'city' }, distance_m: 500 },
+      ],
+      error: null,
+    });
+    const client = { rpc: vi.fn().mockReturnValue({ retry }) } as unknown as FinalMealClient;
+    const places = await searchPlaces(client, 'maru', { lat: 49.28, lng: -123.12 });
+    expect(places.map((p) => p.distanceM)).toEqual([null, null]);
+  });
+
   it('returns nothing for a blank query without a point, without asking the backend', async () => {
     const rpc = vi.fn();
     const client = { rpc } as unknown as FinalMealClient;
@@ -132,6 +164,7 @@ describe('searchPlaces', () => {
       { get: true },
     );
     expect(places.map((p) => p.name)).toEqual(['Marutama']);
+    expect(places[0]!.distanceM).toBe(12);
   });
 });
 

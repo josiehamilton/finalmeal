@@ -41,7 +41,7 @@ const mockDishes = jest.mocked(searchDishes);
 const mockPlaces = jest.mocked(searchPlaces);
 const client = { fake: 'client' };
 const HOME = { lat: 49.2827, lng: -123.1207 };
-const SPOT = { ...PLACE, lat: 49.2935, lng: -123.1207 };
+const SPOT = { ...PLACE, lat: 49.2935, lng: -123.1207, distanceM: 1201 as number | null };
 
 async function type(text: string) {
   await fireEvent.changeText(screen.getByLabelText('Search'), text);
@@ -150,11 +150,45 @@ describe('Search', () => {
 
     it('shows the place’s label when there is no distance', async () => {
       mockCity.mockResolvedValue(null);
+      mockPlaces.mockResolvedValue([{ ...SPOT, distanceM: null }]);
       await show();
       await type('ramen');
       await fireEvent.press(screen.getByRole('tab', { name: 'Spots' }));
       expect(await screen.findByText('Bidwell St · Vancouver')).toBeOnTheScreen();
       expect(mockPlaces).toHaveBeenCalledWith(client, 'ramen', undefined, 20);
+    });
+
+    it('shows a spinner, not the empty copy, while the home city loads, and People does not wait', async () => {
+      mockCity.mockReturnValue(new Promise(() => {}));
+      await show();
+      expect(screen.queryByText(/No suggestions yet/)).toBeNull();
+      expect(await screen.findByText('Mike Brennan')).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('tab', { name: 'Dishes' }));
+      await type('ramen');
+      expect(screen.getByTestId('search-loading')).toBeOnTheScreen();
+      expect(mockDishes).not.toHaveBeenCalled();
+    });
+
+    it('starts on a spinner before the first answer', async () => {
+      mockSuggested.mockReturnValue(new Promise(() => {}));
+      await show();
+      expect(screen.getByTestId('search-loading')).toBeOnTheScreen();
+      expect(screen.queryByText(/No suggestions yet/)).toBeNull();
+    });
+
+    it('does not ask again for people when the home city arrives', async () => {
+      await show();
+      await screen.findByText('Mike Brennan');
+      expect(mockSuggested).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a leading @ on the Dishes tab, and clears with the Clear button', async () => {
+      await show();
+      await fireEvent.press(screen.getByRole('tab', { name: 'Dishes' }));
+      await type('@ramen');
+      expect(mockDishes).toHaveBeenCalledWith(client, 'ramen', HOME, 20);
+      await fireEvent.press(screen.getByRole('button', { name: 'Clear' }));
+      expect(screen.getByLabelText('Search').props.value).toBe('');
     });
 
     it('opens a person', async () => {

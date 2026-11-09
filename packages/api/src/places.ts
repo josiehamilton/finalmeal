@@ -43,15 +43,20 @@ export interface PlaceRow {
   location_precision?: 'exact' | 'city';
 }
 
-/** "<area or street> · <city>": the street is the address up to the first comma. */
+/** The area, else the street (the address up to the first comma); null with neither. */
+export function placeWhere(p: { area: string | null; address: string | null }): string | null {
+  const area = p.area?.trim();
+  const street = p.address?.split(',')[0]?.trim();
+  return area || street || null;
+}
+
+/** "<area or street> · <city>". */
 export function formatPlaceLabel(p: {
   area: string | null;
   address: string | null;
   city: string;
 }): string {
-  const area = p.area?.trim();
-  const street = p.address?.split(',')[0]?.trim();
-  const where = area || street;
+  const where = placeWhere(p);
   return where ? `${where} · ${p.city}` : p.city;
 }
 
@@ -111,6 +116,9 @@ export function toPlace(row: PlaceRow): Place {
   };
 }
 
+/** A search hit: the place and its distance from the search point (null when there is none). */
+export type PlaceHit = Place & { distanceM: number | null };
+
 /**
  * Type-ahead search over places. `inCity` is the city's point (not the person's location): when
  * given, nearby places rank first. A blank query returns the nearest places to the point from any
@@ -122,7 +130,7 @@ export async function searchPlaces(
   q: string,
   inCity?: { lat: number; lng: number },
   limit = 12,
-): Promise<Place[]> {
+): Promise<PlaceHit[]> {
   const text = q.trim();
   if (text === '' && !inCity) return [];
   // GET, so the client's read timeout still bounds this call.
@@ -134,7 +142,15 @@ export async function searchPlaces(
     )
     .retry(false);
   throwIfError(error);
-  return (data ?? []).map((row) => toPlace(row.place as PlaceRow));
+  return (data ?? []).map((row) => {
+    const place = row.place as PlaceRow;
+    // A place pinned only to its city's centre has no real distance.
+    const exact = place.location_precision !== 'city';
+    return {
+      ...toPlace(place),
+      distanceM: exact && Number.isFinite(row.distance_m) ? row.distance_m : null,
+    };
+  });
 }
 
 /**

@@ -27,9 +27,10 @@ export {
   formatPlaceLabel,
   getPlace,
   getPopularPlaces,
+  placeWhere,
   searchPlaces,
 } from './places';
-export type { Place } from './places';
+export type { Place, PlaceHit } from './places';
 export { suggestDishes } from './dishes';
 export type { DishSuggestion } from './dishes';
 export {

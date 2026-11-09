@@ -11,7 +11,8 @@ import { SkullMark } from './SkullMark';
 
 /**
  * The top of the Feed tab (and of First landing): the skull and wordmark, Search and the
- * Notifications bell, which shows a dot while anything is unread. The count reloads when the screen regains focus and when a notification arrives.
+ * Notifications bell, which shows a dot while anything is unread. The count reloads when the
+ * screen regains focus and when a notification arrives.
  */
 export function FeedHeader() {
   const router = useRouter();

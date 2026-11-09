@@ -77,7 +77,7 @@ describe('PlaceSearch', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
-    mockSearch.mockResolvedValue([RESULT]);
+    mockSearch.mockResolvedValue([{ ...RESULT, distanceM: null }]);
     mockPopular.mockResolvedValue([RESULT]);
     mockGetCity.mockImplementation(async (_client, id) =>
       id === 'c9'

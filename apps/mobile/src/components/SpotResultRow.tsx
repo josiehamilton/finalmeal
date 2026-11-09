@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { placeWhere } from '@finalmeal/api';
 import type { Place } from '@finalmeal/api';
 import { formatDistance } from '@finalmeal/core';
 import { colors } from '@finalmeal/ui-tokens';
@@ -15,9 +16,7 @@ interface SpotResultRowProps {
 /** A spot in a list: a pin tile, its name, and `Bidwell St · 1.2 km` (the place's label without a distance). */
 export function SpotResultRow({ place, distanceM, onPress }: SpotResultRowProps) {
   const distance = formatDistance(distanceM);
-  const where = distance
-    ? [place.area ?? place.address, distance].filter(Boolean).join(' · ')
-    : place.label;
+  const where = distance ? [placeWhere(place), distance].filter(Boolean).join(' · ') : place.label;
   return (
     <Pressable
       accessibilityRole="button"
@@ -45,7 +44,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
   },
