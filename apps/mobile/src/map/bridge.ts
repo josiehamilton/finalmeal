@@ -1,4 +1,4 @@
-import type { LatLng, MapBounds } from './api-stand-ins';
+import type { LatLng, MapBounds } from '@finalmeal/api';
 
 export interface MapCamera {
   lat: number;
@@ -92,7 +92,9 @@ function parseLink(url: unknown): string | null {
   const match = LINK_PATTERN.exec(url);
   const host = match?.[1]?.toLowerCase();
   if (!host) return null;
-  return LINK_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`)) ? url : null;
+  return LINK_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`))
+    ? url
+    : null;
 }
 
 /** Reads a message from the map page. Anything that is not exactly an event is null. */

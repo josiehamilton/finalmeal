@@ -39,6 +39,12 @@ describe('formatPlaceLabel', () => {
 });
 
 describe('toPlace', () => {
+  it('is off the map only when the point is just the city centre', () => {
+    expect(toPlace({ ...ROW, location_precision: 'city' }).onMap).toBe(false);
+    expect(toPlace({ ...ROW, location_precision: 'exact' }).onMap).toBe(true);
+    expect(toPlace(ROW).onMap).toBe(true);
+  });
+
   it('maps a row, reading the point from GeoJSON (longitude first)', () => {
     expect(toPlace(ROW)).toEqual({
       id: 'p1',
@@ -52,6 +58,7 @@ describe('toPlace', () => {
       lat: 49.2905,
       lng: -123.1366,
       label: 'Bidwell St · Vancouver',
+      onMap: true,
     });
   });
 
@@ -140,7 +147,11 @@ describe('getPopularPlaces', () => {
     const rpc = vi.fn().mockReturnValue({ retry });
     const client = { rpc } as unknown as FinalMealClient;
     const places = await getPopularPlaces(client, 'c1', 6);
-    expect(rpc).toHaveBeenCalledWith('popular_places', { p_city_id: 'c1', p_lim: 6 }, { get: true });
+    expect(rpc).toHaveBeenCalledWith(
+      'popular_places',
+      { p_city_id: 'c1', p_lim: 6 },
+      { get: true },
+    );
     expect(retry).toHaveBeenCalledWith(false);
     expect(places.map((p) => p.name)).toEqual(['Marutama', 'Kin Kao']);
     expect(places[0]).toMatchObject({ lat: 49.2905, lng: -123.1366 });
@@ -151,11 +162,17 @@ describe('getPopularPlaces', () => {
     const rpc = vi.fn().mockReturnValue({ retry });
     const client = { rpc } as unknown as FinalMealClient;
     await expect(getPopularPlaces(client, 'c1')).resolves.toEqual([]);
-    expect(rpc).toHaveBeenCalledWith('popular_places', { p_city_id: 'c1', p_lim: 12 }, { get: true });
+    expect(rpc).toHaveBeenCalledWith(
+      'popular_places',
+      { p_city_id: 'c1', p_lim: 12 },
+      { get: true },
+    );
   });
 
   it('turns a backend failure into an ApiError', async () => {
-    const retry = vi.fn().mockResolvedValue({ data: null, error: { message: 'boom', code: '57014' } });
+    const retry = vi
+      .fn()
+      .mockResolvedValue({ data: null, error: { message: 'boom', code: '57014' } });
     const client = { rpc: vi.fn().mockReturnValue({ retry }) } as unknown as FinalMealClient;
     await expect(getPopularPlaces(client, 'c1')).rejects.toMatchObject({ name: 'ApiError' });
   });

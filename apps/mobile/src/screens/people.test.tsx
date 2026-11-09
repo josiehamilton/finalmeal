@@ -37,7 +37,10 @@ describe('Find people', () => {
       makeSuggested({ id: 'u5', username: 'devpatel', displayName: 'Dev Patel', topDish: null }),
     ]);
     mockSearch.mockResolvedValue([
-      makePerson({ id: 'u4', username: 'allimercer', displayName: 'Alli Mercer' }),
+      {
+        ...makePerson({ id: 'u4', username: 'allimercer', displayName: 'Alli Mercer' }),
+        followersCount: 0,
+      },
     ]);
   });
   afterEach(() => jest.useRealTimers());

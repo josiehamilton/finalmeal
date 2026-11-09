@@ -14,13 +14,19 @@ export interface Place {
   lng: number;
   /** "<area or street> · <city>", or just "<city>" when there is neither. */
   label: string;
+  /**
+   * Whether the place has a fixed point to pin on a map: false only when its point is the city's
+   * centre (`location_precision = 'city'`). A missing value counts as exact.
+   */
+  onMap: boolean;
 }
 
 /**
  * The columns of a `places` row that the app reads. Clients can never read `created_by`
  * (column grants), so a select or an embed of places must name these columns, never `*`.
  */
-export const PLACE_COLUMNS = 'id, source, name, area, address, city, region, country, location';
+export const PLACE_COLUMNS =
+  'id, source, name, area, address, city, region, country, location, location_precision';
 
 export interface PlaceRow {
   id: string;
@@ -33,6 +39,8 @@ export interface PlaceRow {
   country: string;
   /** A GeoJSON point: PostgREST serialises the geography column that way. */
   location: unknown;
+  /** `city` when the point is only the city's centre; absent counts as `exact`. */
+  location_precision?: 'exact' | 'city';
 }
 
 /** "<area or street> · <city>": the street is the address up to the first comma. */
@@ -99,6 +107,7 @@ export function toPlace(row: PlaceRow): Place {
     source: row.source,
     ...readPoint(row.location),
     label: formatPlaceLabel(row),
+    onMap: row.location_precision !== 'city',
   };
 }
 

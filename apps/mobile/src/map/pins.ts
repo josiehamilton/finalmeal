@@ -1,6 +1,5 @@
-import type { Pick, Place, SavedDish } from '@finalmeal/api';
-import { placeCallout } from './api-stand-ins';
-import type { DiscoverPlace } from './api-stand-ins';
+import type { DiscoverPlace, Pick, Place, SavedDish } from '@finalmeal/api';
+import { placeCallout } from '@finalmeal/core';
 import type { MapPin } from './bridge';
 
 /** `Marutama · 2 picks`, `Marutama · 1 pick`. */
@@ -10,7 +9,7 @@ function picksLabel(name: string, count: number): string {
 
 /** Whether a place has a fixed point: false only for `location_precision = 'city'` (`Place.onMap`). */
 function isOnMap(place: Place): boolean {
-  return (place as Place & { onMap?: boolean }).onMap !== false;
+  return place.onMap;
 }
 
 /** Discover's pins: one per place in view, in the order the server returned them. */

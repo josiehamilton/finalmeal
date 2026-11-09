@@ -109,6 +109,12 @@ describe('people wrappers', () => {
     expect(calls[0]).toMatchObject({ name: 'search_people', args: { p_q: 'ari', p_limit: 20 } });
   });
 
+  it('adds the follower count to a search hit', async () => {
+    const { client } = fakeClient(() => ({ data: [{ ...PERSON, followers_count: 567 }] }));
+    const [hit] = await searchPeople(client, 'ari');
+    expect(hit).toMatchObject({ username: 'arimitchell', followersCount: 567 });
+  });
+
   it('ignores a leading @ so a handle typed as shown still finds the person', async () => {
     const { client, calls } = fakeClient(() => ({ data: [PERSON] }));
     await searchPeople(client, ' @ari ');

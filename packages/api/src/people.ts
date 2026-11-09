@@ -19,6 +19,9 @@ export interface PersonRow extends PersonSummary {
   isMe: boolean;
 }
 
+/** A search hit: a person row plus how many people follow them. */
+export type PersonSearchRow = PersonRow & { followersCount: number };
+
 export interface SuggestedPerson extends PersonRow {
   /** Their number one Final Meal dish, when they have one. */
   topDish: string | null;
@@ -215,14 +218,17 @@ export async function searchPeople(
   client: FinalMealClient,
   q: string,
   limit = DEFAULT_PAGE,
-): Promise<PersonRow[]> {
+): Promise<PersonSearchRow[]> {
   const text = cleanQuery(q);
   if (text === '') return [];
   const { data, error } = await client
     .rpc('search_people', { p_q: text, p_limit: pageSize(limit) }, { get: true })
     .retry(false);
   throwIfError(error);
-  return ((data ?? []) as PersonRowData[]).map((row) => toPersonRow(client, row));
+  return ((data ?? []) as Array<PersonRowData & { followers_count: number }>).map((row) => ({
+    ...toPersonRow(client, row),
+    followersCount: row.followers_count,
+  }));
 }
 
 /** People worth following: trusted, public, not already followed or asked; near the home city first. */

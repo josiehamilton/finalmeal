@@ -30,6 +30,7 @@ const place = (
   lat: 0,
   lng: 0,
   label: `${area} · ${city}`,
+  onMap: true,
 });
 
 export const SEED_PLACES = {
@@ -68,7 +69,13 @@ type Row = [
 ];
 
 const ROWS: Row[] = [
-  [1, 'Pork Gyro', 'skewers', [food('Greek'), mine('Late night')], 'Delicious. I’d fly back for it.'],
+  [
+    1,
+    'Pork Gyro',
+    'skewers',
+    [food('Greek'), mine('Late night')],
+    'Delicious. I’d fly back for it.',
+  ],
   [2, 'Wagyu Beef Don', 'sushiItto', [food('Rice bowl'), diet('Gluten-free')]],
   [3, 'Plain Biryani', 'spicyTime', [food('Indian'), diet('Gluten-free'), diet('Vegan')]],
   [4, 'Lobster Roll', 'lukes', [food('Seafood')]],

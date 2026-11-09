@@ -59,10 +59,13 @@ export type {
   FollowState,
   PeopleListOptions,
   PersonRow,
+  PersonSearchRow,
   PersonSummary,
   ProfileView,
   SuggestedPerson,
 } from './people';
+export { getDishesInView, getPicksInView, normalizeBounds, searchDishes } from './discover';
+export type { DiscoverDish, DiscoverPlace, LatLng, MapBounds } from './discover';
 export { getFollowingFeed, getNearbyFeed, getPlacePickers } from './feed';
 export type { FeedCursor, FeedItem, FeedKind } from './feed';
 export { getMySaves, saveDish, unsaveDish } from './saves';

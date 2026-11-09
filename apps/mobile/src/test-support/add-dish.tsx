@@ -16,10 +16,23 @@ export const PLACE: Place = {
   lat: 49.29,
   lng: -123.13,
   label: 'Bidwell St · Vancouver',
+  onMap: true,
 };
 
-export const RAMEN: Tag = { id: 't1', kind: 'food_type', name: 'Ramen', slug: 'ramen', featured: true };
-export const VEGAN: Tag = { id: 't2', kind: 'dietary', name: 'Vegan', slug: 'vegan', featured: true };
+export const RAMEN: Tag = {
+  id: 't1',
+  kind: 'food_type',
+  name: 'Ramen',
+  slug: 'ramen',
+  featured: true,
+};
+export const VEGAN: Tag = {
+  id: 't2',
+  kind: 'dietary',
+  name: 'Vegan',
+  slug: 'vegan',
+  featured: true,
+};
 
 /** Shows the draft as JSON so a test can read what the screen put in it. */
 function Probe() {
@@ -37,6 +50,8 @@ export function withDraft(ui: ReactNode, initial: Partial<AddDishDraft> = {}) {
   );
 }
 
-export function readDraft(screen: { getByTestId: (id: string) => { props: { children?: unknown } } }) {
+export function readDraft(screen: {
+  getByTestId: (id: string) => { props: { children?: unknown } };
+}) {
   return JSON.parse(String(screen.getByTestId('draft').props.children)) as AddDishDraft;
 }

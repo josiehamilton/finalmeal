@@ -21,6 +21,7 @@ const PLACE: Place = {
   lat: 49.29,
   lng: -123.13,
   label: 'Bidwell St · Vancouver',
+  onMap: true,
 };
 const RAMEN: Tag = { id: 't1', kind: 'food_type', name: 'Ramen', slug: 'ramen', featured: true };
 const VEGAN: Tag = { id: 't2', kind: 'dietary', name: 'Vegan', slug: 'vegan', featured: true };
@@ -97,9 +98,9 @@ describe('addDishReducer', () => {
   it('toggles personal tags by name, ignoring case and extra spaces', () => {
     const on = addDishReducer(draft(), { type: 'togglePersonalTag', name: 'Rainy day' });
     expect(on.personalTags).toEqual(['Rainy day']);
-    expect(addDishReducer(on, { type: 'togglePersonalTag', name: ' rainy  DAY ' }).personalTags).toEqual(
-      [],
-    );
+    expect(
+      addDishReducer(on, { type: 'togglePersonalTag', name: ' rainy  DAY ' }).personalTags,
+    ).toEqual([]);
   });
 
   it('selects a personal tag once, however often it is added', () => {
@@ -148,7 +149,9 @@ describe('ctaFor', () => {
   });
 
   it('still reads Add to Final Meal while the count is unknown', () => {
-    expect(ctaFor(draft({ place: PLACE, dishName: 'Ramen' }), null).label).toBe('Add to Final Meal');
+    expect(ctaFor(draft({ place: PLACE, dishName: 'Ramen' }), null).label).toBe(
+      'Add to Final Meal',
+    );
   });
 });
 
@@ -178,7 +181,10 @@ describe('draftHasContent', () => {
     expect(draftHasContent(initialDraft)).toBe(false);
     expect(draftHasContent({ ...initialDraft, tier: 'honorable' })).toBe(false);
     expect(
-      draftHasContent({ ...initialDraft, searchCity: { id: 'c1', label: 'Vancouver', point: null } }),
+      draftHasContent({
+        ...initialDraft,
+        searchCity: { id: 'c1', label: 'Vancouver', point: null },
+      }),
     ).toBe(false);
   });
 

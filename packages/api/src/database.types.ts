@@ -1033,6 +1033,7 @@ export type Database = {
     };
     Functions: {
       _begin_pick_write: { Args: Record<PropertyKey, never>; Returns: string };
+      _blocked_with: { Args: { p_viewer: string }; Returns: string[] };
       _can_see: { Args: { p_owner: string; p_viewer: string }; Returns: boolean };
       _check_pick_photo: { Args: { p_path: string; p_uid: string }; Returns: undefined };
       _claim_final_slot: {
@@ -1040,6 +1041,76 @@ export type Database = {
         Returns: Record<string, unknown>;
       };
       _close_slot_gap: { Args: { p_slot: number; p_uid: string }; Returns: undefined };
+      _discover_dish_counts: {
+        Args: { p_dish_ids: string[]; p_viewer: string };
+        Returns: {
+          dish_id: string;
+          final_count: number;
+          honorable_count: number;
+          list_count: number;
+        }[];
+      };
+      _discover_dishes: {
+        Args: {
+          p_center_lat?: number;
+          p_center_lng?: number;
+          p_dietary_ids?: string[];
+          p_dish_ids?: string[];
+          p_east: number;
+          p_following_only?: boolean;
+          p_food_type_ids?: string[];
+          p_north: number;
+          p_place_id?: string;
+          p_radius_m?: number;
+          p_south: number;
+          p_tier?: Database['public']['Enums']['pick_tier'];
+          p_viewer: string;
+          p_west: number;
+          p_with_people?: boolean;
+        };
+        Returns: {
+          best_tier: Database['public']['Enums']['pick_tier'];
+          dish_id: string;
+          dish_name: string;
+          distance_m: number;
+          final_count: number;
+          honorable_count: number;
+          list_count: number;
+          people: Json;
+          photo_path: string;
+          pick_id: string;
+          place: Database['public']['Tables']['places']['Row'];
+        }[];
+      };
+      _discover_picks: {
+        Args: {
+          p_center_lat?: number;
+          p_center_lng?: number;
+          p_dietary_ids?: string[];
+          p_dish_ids?: string[];
+          p_east: number;
+          p_following_only?: boolean;
+          p_food_type_ids?: string[];
+          p_north: number;
+          p_place_id?: string;
+          p_radius_m?: number;
+          p_south: number;
+          p_tier?: Database['public']['Enums']['pick_tier'];
+          p_viewer: string;
+          p_west: number;
+        };
+        Returns: {
+          created_at: string;
+          dish_id: string;
+          owner_id: string;
+          owner_public: boolean;
+          owner_trusted: boolean;
+          pick_id: string;
+          place_id: string;
+          tier: Database['public']['Enums']['pick_tier'];
+          viewer_follows: boolean;
+        }[];
+      };
       _feed_card: {
         Args: { p_pick_id: string; p_viewer: string };
         Returns: {
@@ -1296,6 +1367,36 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      dishes_in_view: {
+        Args: {
+          p_center_lat?: number;
+          p_center_lng?: number;
+          p_dietary_ids?: string[];
+          p_east?: number;
+          p_following_only?: boolean;
+          p_food_type_ids?: string[];
+          p_limit?: number;
+          p_north?: number;
+          p_place_id?: string;
+          p_radius_m?: number;
+          p_south?: number;
+          p_tier?: Database['public']['Enums']['pick_tier'];
+          p_west?: number;
+        };
+        Returns: {
+          best_tier: Database['public']['Enums']['pick_tier'];
+          dish_id: string;
+          dish_name: string;
+          distance_m: number;
+          final_count: number;
+          honorable_count: number;
+          list_count: number;
+          people: Json;
+          photo_path: string;
+          pick_id: string;
+          place: Database['public']['Tables']['places']['Row'];
+        }[];
       };
       finish_geocode: {
         Args: {
@@ -1617,6 +1718,35 @@ export type Database = {
         };
       };
       normalize_dish_name: { Args: { input: string }; Returns: string };
+      picks_in_view: {
+        Args: {
+          p_center_lat?: number;
+          p_center_lng?: number;
+          p_dietary_ids?: string[];
+          p_east: number;
+          p_following_only?: boolean;
+          p_food_type_ids?: string[];
+          p_limit?: number;
+          p_north: number;
+          p_radius_m?: number;
+          p_south: number;
+          p_tier?: Database['public']['Enums']['pick_tier'];
+          p_west: number;
+        };
+        Returns: {
+          address: string;
+          area: string;
+          best_tier: Database['public']['Enums']['pick_tier'];
+          city: string;
+          lat: number;
+          list_count: number;
+          lng: number;
+          name: string;
+          pick_count: number;
+          place_id: string;
+          top_dish_name: string;
+        }[];
+      };
       place_pickers: {
         Args: { p_limit?: number; p_place_id: string };
         Returns: {
@@ -1702,11 +1832,28 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      search_dishes: {
+        Args: { p_lat?: number; p_limit?: number; p_lng?: number; p_q: string };
+        Returns: {
+          best_tier: Database['public']['Enums']['pick_tier'];
+          dish_id: string;
+          dish_name: string;
+          distance_m: number;
+          final_count: number;
+          honorable_count: number;
+          list_count: number;
+          people: Json;
+          photo_path: string;
+          pick_id: string;
+          place: Database['public']['Tables']['places']['Row'];
+        }[];
+      };
       search_people: {
         Args: { p_limit?: number; p_q: string };
         Returns: {
           avatar_path: string;
           display_name: string;
+          followers_count: number;
           follows_viewer: boolean;
           id: string;
           is_me: boolean;
