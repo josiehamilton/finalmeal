@@ -10,11 +10,13 @@ interface PersonRowProps {
   person: PersonRowData;
   /** The line under the name; the @handle when not given. */
   subtitle?: string;
+  /** The avatar's size in points; 44 when not given. */
+  avatarSize?: number;
   onOpen: (id: string) => void;
 }
 
 /** A person in a list: avatar, name, @handle (or a subtitle) and a Follow button. Tapping the row opens them. */
-export function PersonRow({ person, subtitle, onOpen }: PersonRowProps) {
+export function PersonRow({ person, subtitle, avatarSize = 44, onOpen }: PersonRowProps) {
   const follow = useFollow(person);
   return (
     <View style={styles.row}>
@@ -28,7 +30,7 @@ export function PersonRow({ person, subtitle, onOpen }: PersonRowProps) {
           <Avatar
             uri={person.avatarUrl}
             name={person.displayName}
-            size={44}
+            size={avatarSize}
             accessibilityLabel={`${person.displayName}’s photo`}
           />
           <View style={styles.text}>

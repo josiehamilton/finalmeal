@@ -48,8 +48,12 @@ Each item names the phase that closes it.
 
 ## Later phases: Phase 4 leftovers
 
-- **Phase 5:** Search replaces Find people behind the Feed's search icon; other people's profiles get a Map tab.
+- **Phase 5:** other people's profiles get a Map tab.
 - **Later:** a people list behind "On n Final Meals" (the row is not tappable yet); milestone ("Your Pork Gyro is now on 8 Final Meals") and invite ("joined from your invite") notifications; a Trending tab on the Feed.
+
+## Phase 6: sharing
+
+- Discover search's Shared lists section (DiscoverSearch board): search active `shared_lists` by title, show `@owner · <n> picks`.
 
 ## Phase 8: launch
 

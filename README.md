@@ -54,7 +54,7 @@ Sign-in codes expire after 10 minutes, and you can ask for a new one every 30 se
 **Following, feed and saves (Phase 4)**
 
 1. Sign in as `josiehamilton@example.com` (code from the local inbox). Feed › Following shows Ari's dethroning first (one card), then Pork Gyro and Tonkotsu Ramen. Tap Save on a card: it becomes `Saved`. Feed › Nearby shows Vancouver picks only.
-2. Tap the search icon on Feed to open Find people. Search by name or `@handle`, and follow someone. Tap a name to open their profile; tap a dish to open their pick (`On n Final Meals`, Save to try, Unsave).
+2. Tap the search icon on Feed to open Search (People, Dishes, Spots). On People, search by name or `@handle`, and follow someone. Tap a name to open their profile; tap a dish to open their pick (`On n Final Meals`, Save to try, Unsave).
 3. Open `@allimercer`: tap `Follow back`, then look at the followers and following lists. Open `@priyashah` (a private account): the button says `Requested` and the page says `This account is private`.
 4. The bell on Feed shows a dot. Activity lists what happened (follows, requests, saves, dethronings) with `Follow back`; `Mark all read` clears the dots. Settings › Notifications has four push switches; push itself starts with the first test build.
 5. The Saved tab shows what you saved to try, with chips and long-press to remove.

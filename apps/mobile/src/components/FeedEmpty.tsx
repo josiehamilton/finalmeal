@@ -96,7 +96,7 @@ export function FeedEmpty({ variant, cityName }: FeedEmptyProps) {
                 label="Find people"
                 variant="ghost"
                 size="compact"
-                onPress={() => router.push('/people')}
+                onPress={() => router.push('/search?from=feed')}
               />
             </View>
           </View>

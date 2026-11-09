@@ -46,10 +46,10 @@ describe('FeedHeader', () => {
     expect(screen.getByRole('button', { name: 'Notifications' })).toBeOnTheScreen();
   });
 
-  it('opens Find people from Search', async () => {
+  it('opens Search', async () => {
     await show();
     await fireEvent.press(screen.getByRole('button', { name: 'Search' }));
-    expect(mockRouter.push).toHaveBeenCalledWith('/people');
+    expect(mockRouter.push).toHaveBeenCalledWith('/search?from=feed');
   });
 
   it('opens Activity from the bell', async () => {

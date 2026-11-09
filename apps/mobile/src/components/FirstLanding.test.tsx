@@ -53,10 +53,10 @@ describe('First landing', () => {
     expect(screen.getByText('Welcome, Josie')).toBeOnTheScreen();
   });
 
-  it('has the Feed header’s Search (Find people) and Notifications, as the board does', async () => {
+  it('has the Feed header’s Search and Notifications, as the board does', async () => {
     await show();
     await fireEvent.press(screen.getByRole('button', { name: 'Search' }));
-    expect(mockRouter.push).toHaveBeenCalledWith('/people');
+    expect(mockRouter.push).toHaveBeenCalledWith('/search?from=feed');
     expect(screen.getByRole('button', { name: 'Notifications' })).toBeOnTheScreen();
   });
 

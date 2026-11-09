@@ -85,7 +85,7 @@ describe('FeedEmpty', () => {
     it('opens Find people', async () => {
       await show('following-nobody');
       await fireEvent.press(screen.getByRole('button', { name: 'Find people' }));
-      expect(mockRouter.push).toHaveBeenCalledWith('/people');
+      expect(mockRouter.push).toHaveBeenCalledWith('/search?from=feed');
     });
 
     it('lists the popular people near the home city with their number one dish', async () => {

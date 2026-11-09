@@ -10,9 +10,8 @@ import { Icon } from './Icon';
 import { SkullMark } from './SkullMark';
 
 /**
- * The top of the Feed tab (and of First landing): the skull and wordmark, Search (Find people,
- * until Phase 5 builds Search) and the Notifications bell, which shows a dot while anything is
- * unread. The count reloads when the screen regains focus and when a notification arrives.
+ * The top of the Feed tab (and of First landing): the skull and wordmark, Search and the
+ * Notifications bell, which shows a dot while anything is unread. The count reloads when the screen regains focus and when a notification arrives.
  */
 export function FeedHeader() {
   const router = useRouter();
@@ -62,7 +61,7 @@ export function FeedHeader() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Search"
-        onPress={() => router.push('/people')}
+        onPress={() => router.push('/search?from=feed')}
         style={styles.round}
       >
         <Icon name="search" size={21} color={colors.bone} />
