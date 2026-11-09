@@ -34,6 +34,8 @@ Each item names the phase that closes it.
 
 ## Phase 3 carry-forward: dishes and picks
 
+- **Phase 7:** Discover's counts are a live aggregate (`_discover_dish_counts` reads the picks of every dish in view on each pan, block-aware, so `dish_stats` cannot serve them as is). Measured on 30 000 places and 180 000 picks: a city-sized pan about 5 ms, a 300-place pan about 270 ms, but the world view about 2.8 s and a name search that matches tens of thousands of dishes about 4.7 s. Fine for the MVP; precompute (or cache per place) before a large launch.
+- **Phase 7:** a followed account that is `flagged` still shows in the Following feed, on its profile and in pick detail, but its picks are hidden and uncounted on Discover. Decide the rule for every surface with the other trust work.
 - **Phase 7:** `dish_stats` is a plain view that counts picks on every read. Make it a materialised view (refreshed on a schedule or by trigger) before dish pages get busy.
 - **Phase 7:** pick-photo storage has no per-person quota beyond the one-name rule (`<id>/pick-<unix-ms>.jpg`, 4 MiB each), like avatars; decide on a limit with the other abuse controls. Nothing yet limits how many dishes a new account can create, or how many tags a pick can carry (`add_pick` / `update_pick` take any number of personal tag names).
 - **Later:** a merged dish (`dishes.merged_into_id`) is refused by `add_pick` with `place_not_found` rather than followed to its target; follow the merge when dish merging is built.

@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(26);
+select plan(29);
 
 -- Runs on top of the dev seed plus the fixtures below. Rolled back at the end.
 --   Josie ...0001 (follows Mike, Ari, Dev)   Mike ...0002   Ari ...0003   Alli ...0004
@@ -108,6 +108,30 @@ select is(
   (select string_agg(dish_name, ',' order by ordinality) from public.search_dishes('ramen') with ordinality),
   'Ramen Bowl,Tonkotsu Ramen', 'a name that starts with the query beats one with a later word');
 select is((select count(*)::int from public.search_dishes('zeta', p_limit => 1)), 1, 'the limit is honoured');
+
+-- ---------------------------------------------------------------- the candidate cap
+-- More than 500 names in one match tier: 600 far-away 'Zqx n' dishes Josie can see, one long-named
+-- 'Zqx' dish nearby, and (query 'yqx') 600 dishes nobody has picked next to one real one.
+reset role;
+insert into public.dishes (place_id, name)
+select (select id from public.places where name = 'Sushi Dai'), 'Zqx ' || g from generate_series(1, 600) g;
+insert into public.dishes (place_id, name)
+select (select id from public.places where name = 'Kin Kao'), 'Yqx ' || g from generate_series(1, 600) g;
+insert into public.dishes (place_id, name) values
+  ((select id from public.places where name = 'Kin Kao'), 'Zqx Nearby Dish With A Very Long Name'),
+  ((select id from public.places where name = 'Kin Kao'), 'Yqx Real Dish With A Very Long Name');
+insert into public.picks (user_id, dish_id, tier, original_dish_name)
+select '00000000-0000-4000-8000-000000000001', d.id, 'honorable', d.name
+from public.dishes d where d.name like 'Zqx %' or d.name = 'Yqx Real Dish With A Very Long Name';
+set local role authenticated;
+select public.test_login('00000000-0000-4000-8000-000000000001');
+select is(
+  (select dish_name from public.search_dishes('zqx', 49.28, -123.12) limit 1),
+  'Zqx Nearby Dish With A Very Long Name', 'with more than 500 same-tier names, the dish within 50 km still comes first');
+select is((select count(*)::int from public.search_dishes('zqx', 49.28, -123.12)), 20, 'and the page is full');
+select is(
+  (select string_agg(dish_name, ',') from public.search_dishes('yqx')),
+  'Yqx Real Dish With A Very Long Name', 'dishes nobody has picked never use up the candidate slots');
 
 -- ---------------------------------------------------------------- search_people
 reset role;
