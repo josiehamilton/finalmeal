@@ -97,6 +97,49 @@ describe('Saved tab', () => {
       expect(screen.queryByTestId('place-picks-card')).toBeNull();
     });
 
+    it('re-frames when the filter changes, and closes a card with its close control', async () => {
+      await show();
+      await fireEvent.press(screen.getByRole('button', { name: 'Map view' }));
+      await emitMapEvent({ type: 'ready' });
+      const fits = () => sentCommands().filter((c) => c.type === 'fitPins').length;
+      const before = fits();
+      await fireEvent.press(chip('Honorable'));
+      expect(fits()).toBe(before + 1);
+      await emitMapEvent({ type: 'pinPress', id: 'p-callejon' });
+      await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+      expect(screen.queryByTestId('place-picks-card')).toBeNull();
+    });
+
+    it('says none can be pinned under All, and a card row without a via pick is not a link', async () => {
+      mockGet.mockResolvedValue(
+        makeSavedBoard().map((s) => ({ ...s, place: { ...s.place, onMap: false } })),
+      );
+      await show();
+      await fireEvent.press(screen.getByRole('button', { name: 'Map view' }));
+      expect(screen.getByText('None of these spots are on the map yet.')).toBeOnTheScreen();
+      await fireEvent.press(chip('Honorable'));
+      expect(screen.getByText('Nothing here with this filter.')).toBeOnTheScreen();
+    });
+
+    it('does not link a row whose pick is gone', async () => {
+      mockGet.mockResolvedValue([makeSavedBoard()[0]!].map((s) => ({ ...s, viaPickId: null, via: null })));
+      await show();
+      await fireEvent.press(screen.getByRole('button', { name: 'Map view' }));
+      await emitMapEvent({ type: 'pinPress', id: 'p-itto' });
+      expect(screen.queryByRole('button', { name: /Wagyu Beef Don/ })).toBeNull();
+    });
+
+    it('goes back to the grid after the last save is gone', async () => {
+      await show();
+      await fireEvent.press(screen.getByRole('button', { name: 'Map view' }));
+      mockGet.mockResolvedValue([]);
+      await act(async () => announceSavesChanged());
+      mockGet.mockResolvedValue(makeSavedBoard());
+      await act(async () => announceSavesChanged());
+      expect(screen.queryByTestId('saved-map')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Map view' })).toBeOnTheScreen();
+    });
+
     it('shows Nothing saved yet, and no view button, once the last save is gone', async () => {
       await show();
       await fireEvent.press(screen.getByRole('button', { name: 'Map view' }));

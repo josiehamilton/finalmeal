@@ -107,6 +107,14 @@ Not yet run on a device: the Phase 4 build was checked by the unit, database, AP
 
 Take a screenshot of every step and tell Claude about anything that looks wrong.
 
+### Device checklist (Phase 5, pending an idle Mac)
+
+Not yet run on a device. Maps inside scrolling screens (You, other profiles, Saved):
+
+1. On both the iPhone 17 and the Pixel 10, open You › Map. Drag the map vertically and horizontally: the map pans and the page stays put. Scroll the page by dragging the header or the chips, and pull down from the header to refresh. Pulling down on the map must not refresh.
+2. Pick a chip on the Map tab: the map re-frames to those pins. Pick All: it frames them all again.
+3. Do the same on a public profile's Map tab and on Saved's Map view.
+
 ## Everyday commands
 
 | Command | What it does |

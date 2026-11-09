@@ -23,6 +23,10 @@ interface PinMapCardProps {
   /** Drawn over the bottom of the map: the footer, or the card of a tapped pin. */
   overlay: ReactNode;
   height?: number;
+  /** Changes when the shown set changes (a filter), so the map frames its pins again. */
+  fitKey: string;
+  /** Told true while a finger is on the map: the page behind must not scroll then. */
+  onScrollLock?: (locked: boolean) => void;
   testID?: string;
 }
 
@@ -34,6 +38,8 @@ export function PinMapCard({
   onMapPress,
   overlay,
   height,
+  fitKey,
+  onScrollLock,
   testID,
 }: PinMapCardProps) {
   // The map opens at the first pin's place, or the world; the first set of pins then frames itself.
@@ -49,6 +55,9 @@ export function PinMapCard({
         selectedId={selectedId}
         insets={MAP_INSETS}
         fitOnFirstPins
+        fitKey={fitKey}
+        embedded
+        onTouchLock={onScrollLock}
         onPinPress={onPinPress}
         onMapPress={onMapPress}
       />
@@ -62,16 +71,25 @@ interface ProfileMapPanelProps {
   chipLabel: string | null;
   emptyText: string;
   onOpenPick: (id: string) => void;
+  /** The screen's ScrollView stops scrolling while this is true (a finger is on the map). */
+  onScrollLock?: (locked: boolean) => void;
 }
 
 /** The Map tab of a profile (the ProfileMap board): a summary, the map, and a footer or a pin's card. */
-export function ProfileMapPanel({ picks, chipLabel, emptyText, onOpenPick }: ProfileMapPanelProps) {
+export function ProfileMapPanel({ picks, chipLabel, emptyText, onOpenPick, onScrollLock }: ProfileMapPanelProps) {
   const [tapped, setTapped] = useState<string | null>(null);
   const pins = useMemo(() => pinsForPicks(picks), [picks]);
   // A filter or a refresh can take the tapped place away.
   const selectedId = tapped && pins.some((p) => p.id === tapped) ? tapped : null;
 
-  if (pins.length === 0) return <Text style={styles.empty}>{emptyText}</Text>;
+  if (pins.length === 0) {
+    // Picks without a point (a spot waiting for its address) are not "no picks".
+    return (
+      <Text style={styles.empty}>
+        {picks.length > 0 ? 'None of these spots are on the map yet.' : emptyText}
+      </Text>
+    );
+  }
 
   const here = selectedId ? picks.filter((p) => p.place.id === selectedId) : [];
   // Final Meals first; the sort is stable, so each tier keeps the order it came in.
@@ -93,11 +111,17 @@ export function ProfileMapPanel({ picks, chipLabel, emptyText, onOpenPick }: Pro
         pins={pins}
         selectedId={selectedId}
         height={MAP_HEIGHT}
+        fitKey={chipLabel ?? 'all'}
+        onScrollLock={onScrollLock}
         onPinPress={setTapped}
         onMapPress={() => setTapped(null)}
         overlay={
           selectedId && here[0] ? (
-            <PlacePicksCard placeName={here[0].place.name} rows={rows} />
+            <PlacePicksCard
+              placeName={here[0].place.name}
+              rows={rows}
+              onClose={() => setTapped(null)}
+            />
           ) : (
             <View style={styles.footer} testID="profile-map-footer">
               <Text style={styles.footerText} numberOfLines={1}>
@@ -125,6 +149,7 @@ export function ProfileMapPanel({ picks, chipLabel, emptyText, onOpenPick }: Pro
 const MAP_HEIGHT = 440;
 
 const styles = StyleSheet.create({
+  // The screens that show this pad their panel by 20; the summary and card undo that to set their own.
   panel: { marginHorizontal: -20, gap: 4 },
   summary: {
     paddingHorizontal: 20,

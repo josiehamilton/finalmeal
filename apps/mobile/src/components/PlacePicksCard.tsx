@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@finalmeal/ui-tokens';
 import { fontFamily } from '../lib/fonts';
+import { Icon } from './Icon';
 
 /** The most dishes a card lists before it says how many more there are. */
 const MAX_ROWS = 3;
@@ -17,17 +18,28 @@ export interface PlacePicksRow {
 interface PlacePicksCardProps {
   placeName: string;
   rows: PlacePicksRow[];
+  onClose: () => void;
 }
 
 /** What a tapped map pin shows in place of the footer: the place and up to three dishes there. */
-export function PlacePicksCard({ placeName, rows }: PlacePicksCardProps) {
+export function PlacePicksCard({ placeName, rows, onClose }: PlacePicksCardProps) {
   const shown = rows.slice(0, MAX_ROWS);
   const more = rows.length - shown.length;
   return (
-    <View style={styles.card} testID="place-picks-card">
-      <Text style={styles.place} numberOfLines={1}>
-        {placeName}
-      </Text>
+    <View style={styles.card} testID="place-picks-card" accessibilityLiveRegion="polite">
+      <View style={styles.head}>
+        <Text style={styles.place} numberOfLines={1} accessibilityRole="header">
+          {placeName}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          onPress={onClose}
+          style={styles.close}
+        >
+          <Icon name="close" size={18} color={colors.smoke} />
+        </Pressable>
+      </View>
       {shown.map((row) => (
         <Pressable
           key={row.key}
@@ -59,8 +71,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.glass,
     gap: 4,
   },
-  place: { fontFamily: fontFamily.uiBold, fontSize: 13, color: colors.bone },
-  row: { minHeight: 32, justifyContent: 'center' },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  close: { width: 44, height: 44, marginVertical: -12, marginRight: -14, alignItems: 'center', justifyContent: 'center' },
+  place: { flex: 1, fontFamily: fontFamily.uiBold, fontSize: 13, color: colors.bone },
+  row: { minHeight: 44, justifyContent: 'center' },
   dish: { fontFamily: fontFamily.ui, fontSize: 13, color: colors.bone },
   suffix: { color: colors.smoke },
   more: { fontFamily: fontFamily.ui, fontSize: 13, color: colors.smoke },

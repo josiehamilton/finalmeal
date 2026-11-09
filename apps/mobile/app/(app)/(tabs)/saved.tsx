@@ -59,6 +59,14 @@ export default function Saved() {
       void load();
     }, [load]),
   );
+  // With nothing saved the view button is gone, so the next save must not open on a map.
+  const savedCount = saves?.length;
+  useEffect(() => {
+    if (savedCount === 0) {
+      setMapView(false);
+      setTapped(null);
+    }
+  }, [savedCount]);
   const version = useSavesVersion();
   const seen = useRef(version);
   useEffect(() => {
@@ -152,12 +160,15 @@ export default function Saved() {
     body =
       pins.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyBody}>Nothing here with this filter.</Text>
+          <Text style={styles.emptyBody}>
+            {filter === 'all' ? 'None of these spots are on the map yet.' : 'Nothing here with this filter.'}
+          </Text>
         </View>
       ) : (
         <View style={styles.mapSlot}>
           <PinMapCard
             testID="saved-map"
+            fitKey={filter}
             pins={pins}
             selectedId={selectedId}
             onPinPress={setTapped}
@@ -166,6 +177,7 @@ export default function Saved() {
               selectedId && here[0] ? (
                 <PlacePicksCard
                   placeName={here[0].place.name}
+                  onClose={() => setTapped(null)}
                   rows={here.map((save) => ({
                     key: save.dish.id,
                     dishName: save.dish.name,

@@ -58,6 +58,8 @@ export default function You() {
   const [picks, setPicks] = useState<Pick[] | null>(null);
   const [picksLoading, setPicksLoading] = useState(true);
   const [chosenChip, setChosenChip] = useState<ChipOption | null>(null);
+  // A finger on the map moves the map, not the page: the page's scroll and pull-to-refresh pause.
+  const [mapTouched, setMapTouched] = useState(false);
   // Only the newest load may set the picks: an older, slower one must not overwrite it.
   const loadId = useRef(0);
 
@@ -173,11 +175,13 @@ export default function You() {
       </View>
       <ScrollView
         testID="you-scroll"
+        scrollEnabled={!mapTouched}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
+            enabled={!mapTouched}
             onRefresh={refresh}
             tintColor={colors.smoke}
             colors={[colors.emberGlow]}
@@ -243,6 +247,7 @@ export default function You() {
               chipLabel={chip?.label ?? null}
               emptyText="Your map fills in as you add dishes."
               onOpenPick={(id) => router.push(`/pick/${id}`)}
+              onScrollLock={setMapTouched}
             />
           ) : tab === 'final' ? (
             <FinalMealList picks={finals} dimmedIds={dimmedIds} onOpen={openPick} onAdd={addFinal} />

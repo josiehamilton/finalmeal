@@ -59,6 +59,8 @@ function OtherProfileBody({ view, refreshing, refreshError, onRefresh, onReload 
   const follow = useFollow(view);
   const [tab, setTab] = useState<ProfileTab>('final');
   const [chosenChip, setChosenChip] = useState<ChipOption | null>(null);
+  // A finger on the map moves the map, not the page: the page's scroll and pull-to-refresh pause.
+  const [mapTouched, setMapTouched] = useState(false);
   const [theirs, setTheirs] = useState<Pick[] | null>(null);
   const [mine, setMine] = useState<Pick[]>([]);
   const [picksError, setPicksError] = useState<string | null>(null);
@@ -136,11 +138,13 @@ function OtherProfileBody({ view, refreshing, refreshError, onRefresh, onReload 
 
   return (
     <ScrollView
+      scrollEnabled={!mapTouched}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
+          enabled={!mapTouched}
           onRefresh={onRefresh}
           tintColor={colors.smoke}
           colors={[colors.emberGlow]}
@@ -220,6 +224,7 @@ function OtherProfileBody({ view, refreshing, refreshError, onRefresh, onReload 
                 chipLabel={chip?.label ?? null}
                 emptyText="No picks on the map yet."
                 onOpenPick={(id) => router.push(`/pick/${id}`)}
+                onScrollLock={setMapTouched}
               />
             ) : tab === 'final' ? (
               finals.length > 0 ? (

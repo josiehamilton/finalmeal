@@ -7,7 +7,7 @@ import { makeFinals, makePick } from '../test-support/picks';
 import { announcePicksChanged, resetPickChanges } from '../state/pick-changes';
 import { pinsForPicks } from '../map/pins';
 import { filterPicks } from '@finalmeal/core';
-import { emitMapEvent, resetMapMock, sentCommands } from '../test-support/map';
+import { currentWebView, emitMapEvent, resetMapMock, sentCommands, webViewMounts } from '../test-support/map';
 import type { MapPin } from '../map/bridge';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), navigate: jest.fn() };
@@ -253,6 +253,54 @@ describe('You tab', () => {
       expect(screen.queryByText('Share these')).toBeNull();
     });
 
+    it('re-frames the pins when the chip changes, without remounting the map', async () => {
+      await render(<You />);
+      await screen.findByText('Pork Gyro');
+      await fireEvent.press(screen.getByRole('tab', { name: 'Map' }));
+      await emitMapEvent({ type: 'ready' });
+      const fits = () => sentCommands().filter((c) => c.type === 'fitPins').length;
+      const before = fits();
+      const mounts = webViewMounts();
+      await fireEvent.press(chip('Portland'));
+      expect(fits()).toBe(before + 1);
+      expect(webViewMounts()).toBe(mounts);
+    });
+
+    it('locks the page scroll and pull-to-refresh while a finger is on the map', async () => {
+      await render(<You />);
+      await screen.findByText('Pork Gyro');
+      await fireEvent.press(screen.getByRole('tab', { name: 'Map' }));
+      expect(screen.getByTestId('you-scroll').props.scrollEnabled).not.toBe(false);
+      await fireEvent(screen.getByTestId('profile-map'), 'touchStart');
+      expect(screen.getByTestId('you-scroll').props.scrollEnabled).toBe(false);
+      await fireEvent(screen.getByTestId('profile-map'), 'touchEnd');
+      expect(screen.getByTestId('you-scroll').props.scrollEnabled).toBe(true);
+      expect(
+        (currentWebView() as unknown as { nestedScrollEnabled?: boolean }).nestedScrollEnabled,
+      ).toBe(true);
+    });
+
+    it('closes a pin’s card with its close control, which is announced', async () => {
+      await render(<You />);
+      await screen.findByText('Pork Gyro');
+      await fireEvent.press(screen.getByRole('tab', { name: 'Map' }));
+      await emitMapEvent({ type: 'pinPress', id: 'pl-skewers' });
+      expect(screen.getByTestId('place-picks-card').props.accessibilityLiveRegion).toBe('polite');
+      await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+      expect(screen.queryByTestId('place-picks-card')).toBeNull();
+      expect(screen.getByTestId('profile-map-footer')).toBeOnTheScreen();
+    });
+
+    it('says the spots are not on the map when none of the picks can be pinned', async () => {
+      mockGetPicks.mockResolvedValue(
+        seedPicks().map((p) => ({ ...p, place: { ...p.place, onMap: false } })),
+      );
+      await render(<You />);
+      await screen.findByText('Pork Gyro');
+      await fireEvent.press(screen.getByRole('tab', { name: 'Map' }));
+      expect(screen.getByText('None of these spots are on the map yet.')).toBeOnTheScreen();
+    });
+
     it('footer says All picks without a chip', async () => {
       await render(<You />);
       await screen.findByText('Pork Gyro');
@@ -303,7 +351,7 @@ describe('You tab', () => {
       await fireEvent.press(screen.getByRole('tab', { name: 'Map' }));
       await emitMapEvent({ type: 'pinPress', id: here.id });
       const card = screen.getByTestId('place-picks-card');
-      expect(within(card).getAllByRole('button').map((b) => b.props.accessibilityLabel)).toEqual([
+      expect(within(card).getAllByRole('button', { name: /·/ }).map((b) => b.props.accessibilityLabel)).toEqual([
         'Gyoza · Final Meal',
         'Ramen 2 · Honorable',
         'Ramen 3 · Honorable',

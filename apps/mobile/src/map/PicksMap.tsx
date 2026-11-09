@@ -30,6 +30,12 @@ export interface PicksMapProps {
   onMapPress?: () => void;
   /** Frame the pins once, when the first non-empty set arrives. */
   fitOnFirstPins?: boolean;
+  /** Frame the pins again whenever this changes (a new filter), without remounting the map. */
+  fitKey?: string;
+  /** The map sits inside a scrolling parent: the WebView takes nested scrolling (Android). */
+  embedded?: boolean;
+  /** With `embedded`: true while a finger is on the map, false when it lifts, so the parent can stop scrolling. */
+  onTouchLock?: (locked: boolean) => void;
   testID?: string;
 }
 
@@ -97,6 +103,15 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
     fitted.current = true;
     send({ type: 'fitPins', maxZoom: FIT_MAX_ZOOM });
   }, [send]);
+
+  // A new fitKey frames the pins again. Not on mount: `fitOnFirstPins` does that.
+  const { fitKey } = props;
+  const seenFitKey = useRef(fitKey);
+  useEffect(() => {
+    if (seenFitKey.current === fitKey) return;
+    seenFitKey.current = fitKey;
+    if (latest.current.pins.length > 0) send({ type: 'fitPins', maxZoom: FIT_MAX_ZOOM });
+  }, [fitKey, send]);
 
   useImperativeHandle(ref, () => ({ flyTo: (camera) => send({ type: 'flyTo', camera }) }), [send]);
 
@@ -203,7 +218,13 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
   }
 
   return (
-    <View style={styles.fill} testID={testID}>
+    <View
+      style={styles.fill}
+      testID={testID}
+      onTouchStart={props.embedded ? () => props.onTouchLock?.(true) : undefined}
+      onTouchEnd={props.embedded ? () => props.onTouchLock?.(false) : undefined}
+      onTouchCancel={props.embedded ? () => props.onTouchLock?.(false) : undefined}
+    >
       {/* `<unknown>`: the package types `WebView<P = undefined>`, which turns every JSX prop into `never`. */}
       <WebView<unknown>
         key={attempt}
@@ -216,6 +237,7 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
         javaScriptEnabled
         domStorageEnabled
         scrollEnabled={false}
+        nestedScrollEnabled={props.embedded}
         bounces={false}
         overScrollMode="never"
         allowsLinkPreview={false}

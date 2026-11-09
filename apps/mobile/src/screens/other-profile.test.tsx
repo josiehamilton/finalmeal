@@ -156,7 +156,7 @@ describe('Other profile', () => {
     );
     await render(<OtherProfile />);
     await fireEvent.press(await screen.findByRole('tab', { name: 'Map' }));
-    expect(screen.getByText('No picks on the map yet.')).toBeOnTheScreen();
+    expect(screen.getByText('None of these spots are on the map yet.')).toBeOnTheScreen();
   });
 
   it('leaves out whichever of the city and bio is missing', async () => {
