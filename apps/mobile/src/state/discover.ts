@@ -176,10 +176,10 @@ export function useDiscover(home: LatLng | null): DiscoverState {
           setTruncated(picks.truncated);
           setDishes(cards);
           setStatus('ready');
-          // The pins and cards do not wait for the city. Until it is known the title says "here",
-          // so a label is never shown over another view's count.
+          // The pins and cards do not wait for the city. The previous name stays until the new
+          // lookup answers (no flicker on every pan); too wide to name drops it at once.
           const known = knownCity(view);
-          setCityName(known ?? null);
+          if (known !== undefined) setCityName(known);
           if (known === undefined) {
             void lookUpCity(view).then((name) => {
               if (mounted.current && request === viewRequest.current) setCityName(name);

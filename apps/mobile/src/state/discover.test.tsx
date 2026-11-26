@@ -337,7 +337,8 @@ describe('useDiscover', () => {
     });
     await settle(250);
     expect(result.current.places).toEqual(fresh);
-    expect(result.current.cityName).toBeNull();
+    // The previous name stays while the lookup runs, so the title does not flicker on every pan.
+    expect(result.current.cityName).toBe('Vancouver');
     await act(async () => slow.resolve({ id: 'c2', name: 'Tokyo' }));
     expect(result.current.cityName).toBe('Tokyo');
   });
@@ -355,7 +356,28 @@ describe('useDiscover', () => {
     });
     await settle(250);
     await act(async () => slow.resolve({ id: 'c2', name: 'Tokyo' }));
+    // Zoomed out too far to name a city: the stale Tokyo answer must not come back.
     expect(result.current.cityName).toBeNull();
+  });
+
+  it('never lets a stale lookup overwrite a newer one while the old name stays', async () => {
+    const { result } = await mount();
+    const first = deferred<{ id: string; name: string }>();
+    const second = deferred<{ id: string; name: string }>();
+    mockCity.mockReturnValueOnce(first.promise as never).mockReturnValueOnce(second.promise as never);
+    await act(async () => {
+      result.current.onRegionChange({ ...VANCOUVER_REGION, center: { lat: 35.68, lng: 139.69 } });
+    });
+    await settle(250);
+    await act(async () => {
+      result.current.onRegionChange({ ...VANCOUVER_REGION, center: { lat: 34.69, lng: 135.5 } });
+    });
+    await settle(250);
+    expect(result.current.cityName).toBe('Vancouver');
+    await act(async () => second.resolve({ id: 'c3', name: 'Osaka' }));
+    expect(result.current.cityName).toBe('Osaka');
+    await act(async () => first.resolve({ id: 'c2', name: 'Tokyo' }));
+    expect(result.current.cityName).toBe('Osaka');
   });
 
   it('measures a selection from the point it is given, and clears one with no dishes', async () => {
