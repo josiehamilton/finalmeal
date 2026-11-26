@@ -59,8 +59,14 @@ Each item names the phase that closes it.
 
 - Discover search's Shared lists section (DiscoverSearch board): search active `shared_lists` by title, show `@owner · <n> picks`.
 
+## Later: Phase 5 leftovers
+
+- **Later:** a dish page behind dish search (today a dish opens one pick of it, or the map).
+
 ## Phase 8: launch
 
+- Schedule `geocode-places` with `push-dispatch` (cron or a database webhook on new custom places); until then run `pnpm geocode`.
+- Set `GEOCODER` (and the provider key) in production once Josie chooses a provider; until then custom spots stay off the map.
 - Expo push sender, and schedule `push-dispatch` (cron or a database webhook on `push_outbox`). Phase 4 queues pushes and the function delivers them through the `log` sender only. Also prune old `push_outbox` rows (sent, failed and skipped) and old `follow_push_log` and `save_push_log` rows, and decide what to do with rows left in `sending` when a dispatch dies midway (nothing re-queues them yet) and with `failed` rows (no retry yet).
 - `KeyboardAvoider` (apps/mobile) adds `StatusBar.currentHeight` on Android to match `measureInWindow`. Verify it on real devices with cutouts, a hidden status bar and landscape; add an Android-platform unit test and an unmount listener-removal assertion.
 - iOS keyboard padding jumps instead of easing; consider animating it with the keyboard's duration.

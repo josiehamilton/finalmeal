@@ -61,6 +61,14 @@ Sign-in codes expire after 10 minutes, and you can ask for a new one every 30 se
 6. Sign out and sign in as `priyashah@example.com` (also in the local inbox). Activity shows requests from Josie and Sam: approve Josie. Back as Josie, Priya's profile and picks now show.
 7. A brand-new account lands on First landing with Nearby picks for its home city; adding a dish from it returns there. After you switch tabs, Feed shows `An empty table.` with Popular people to follow.
 
+**Discover, Search and maps (Phase 5)**
+
+1. Sign in as `josiehamilton@example.com`. The Discover tab opens on Vancouver: a dark map with skull pins (one per spot) and bone dots, and a sheet that says `<n> picks near Vancouver`. Pan and zoom and the pins and sheet follow. Tap a pin to see the dishes picked there (the sheet shows who picked them); tap the map to clear it. `List view` lists every dish in view.
+2. Chips: `All`, `Final Meals` and `Honorable` are one choice; `Following` is a separate on/off chip. `Filters` has Distance (1–99 km, or Any, measured from the map's centre), food types and dietary tags; `Show <n> picks` applies them and `Reset` clears them. The map never asks for your location: it starts on your home city.
+3. Search: the magnifier on Discover finds dishes and spots (a spot moves the map there); the one on Feed has People, Dishes and Spots tabs.
+4. Maps also show on You › Map, on other people's profiles and on Saved › Map view; First landing's `See the map` opens Discover.
+5. Custom spots added by street address have no pin until `pnpm geocode` runs (it calls the `geocode-places` function once; on a local stack it uses the mock geocoder, so no key or network is needed). Pull Discover and the pin appears. Spots marked "No fixed address" never get a pin. Production geocoding waits for a provider (`docs/needs-from-josie.md`).
+
 Seeded logins: `josiehamilton@example.com` (public, has followers and saves), `priyashah@example.com` (private, with pending follow requests from Josie and Sam). Others: `arimitchell`, `mikebrennan`, `allimercer`, `devpatel`, `samokafor` at `@example.com`.
 
 ### Device checklist (Phase 3, pending an idle Mac)
@@ -107,18 +115,34 @@ Not yet run on a device: the Phase 4 build was checked by the unit, database, AP
 
 Take a screenshot of every step and tell Claude about anything that looks wrong.
 
-### Device checklist (Phase 5, pending an idle Mac)
+### Device checklist (Phase 5 (pending an idle Mac))
 
-Not yet run on a device. Maps inside scrolling screens (You, other profiles, Saved):
+Not yet run on a device: the Phase 5 build was checked by the unit, database, API and web tests only. Run `pnpm db:reset </dev/null && pnpm env:local` first, keep one Expo server, take a screenshot of every step, and sign in as `josiehamilton@example.com` (code from the local inbox).
 
-1. On both the iPhone 17 and the Pixel 10, open You › Map. Drag the map vertically and horizontally: the map pans and the page stays put. Scroll the page by dragging the header or the chips, and pull down from the header to refresh. Pulling down on the map must not refresh.
-2. Pick a chip on the Map tab: the map re-frames to those pins. Pick All: it frames them all again.
-3. Do the same on a public profile's Map tab and on Saved's Map view.
+**iPhone 17**
 
-Discover, extra checks:
+1. Discover opens on Vancouver with the dark map, skull pins and bone dots, the legend, and `<n> picks near Vancouver`. Pan and zoom: pins and the sheet follow. The attribution `ⓘ` shows above the sheet and opens in the browser.
+2. Tap Kin Kao: the pin grows with its ring and `Kin Kao · <n> lists`; the sheet shows Khao Soi with avatars and the tier counts. Tap the map: it clears.
+3. Chips: `Final Meals`, `Honorable`, `Following`. Filters: Sushi + Noodles + Gluten-free, 25 km, then `Show <n> picks`; the Filters dot shows; `Reset`. The slider works in Expo Go.
+4. List view lists every in-view dish; open one.
+5. Search from Discover: `ramen` shows Dishes and Spots; tap Marutama and the map flies there. From the Feed's search icon: People (`al`), Dishes, Spots tabs; follow someone.
+6. You → Map with a chip; @allimercer → Map; Saved → Map view.
+7. Add a custom spot with a street address in Vancouver; it has no pin. Run `pnpm geocode`, pull Discover (pan a little): the pin appears near its address area. A "No fixed address" spot never gets a pin.
+8. Turn the Mac's Wi-Fi off and reopen Discover: `The map didn’t load.` with `Try again`; Wi-Fi back on, `Try again` loads it.
+9. Sign in as a new user without a home city (skip it in onboarding): Discover starts at the world view with `Set your home city to start the map there.`; no location prompt appears anywhere.
 
-4. Sheet-height shifts: each time the in-view sheet changes height (the "Zoom in to see every pick." note appears, or it switches between picks, empty and error), the map is re-padded and the view can shift by half the change. Confirm it is not jarring.
-5. Tap a pin near the bottom of the map: the selected-spot sheet is taller than the map's padding, so the pin can sit under it. Confirm it stays visible or decide how to lift it.
+**Pixel 10**
+
+10. Repeat 1, 2, 3 and 5 in Expo Go, and confirm the WebView map renders (WebGL) and the slider works.
+
+Extra checks on the maps inside scrolling screens (You, other profiles, Saved):
+
+11. On both phones, open You › Map. Drag the map vertically and horizontally: the map pans and the page stays put. Scroll the page by dragging the header or the chips, and pull down from the header to refresh. Pulling down on the map must not refresh.
+12. Pick a chip on the Map tab: the map re-frames to those pins. Pick All: it frames them all again. Do the same on a public profile's Map tab and on Saved's Map view.
+13. Sheet-height shifts: each time the in-view sheet changes height (the "Zoom in to see every pick." note appears, or it switches between picks, empty and error), the map is re-padded and the view can shift by half the change. Confirm it is not jarring.
+14. Tap a pin near the bottom of the map: the selected-spot sheet is taller than the map's padding, so the pin can sit under it. Confirm it stays visible or decide how to lift it.
+
+Take a screenshot of every step and tell Claude about anything that looks wrong.
 
 ## Everyday commands
 

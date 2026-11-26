@@ -17,7 +17,7 @@ A running list, newest needs added as they come up. Nothing here blocks today's 
 | 7 | **Expo account** | Cloud builds for iPhone and Android | Phase 8 | Sign up at expo.dev. |
 | 8 | **Email sending service** (e.g. Resend) | Sending real sign-in codes from your domain | Phase 8 (needs the domain) | Sign up when we get there; Claude walks you through it. |
 | 9 | **Sentry account** (free tier) | Crash reports from the app and web | Phase 8 | Sign up at sentry.io. |
-| 9b | **Geocoding service** (recommended: Geoapify, free tier; alternative: OpenCage) | Puts custom spots (added by address) on the map in production. Locally a mock geocoder is used. | Before launch (Phase 8) | Sign up and put the key in the production settings when we get there; Claude will say exactly where. Never paste it in chat. |
+| 9b | **Geocoding provider account** (recommended: Geoapify, free tier; alternative: OpenCage) | Puts custom spots on the map in production. Locally a mock geocoder is used. | Needed by Phase 8 | Key goes in Supabase secrets as `GEOAPIFY_API_KEY`, never in chat. Claude will say exactly where when we get there. |
 
 ## Design
 
@@ -50,6 +50,11 @@ A running list, newest needs added as they come up. Nothing here blocks today's 
 | 29 | Discover details: the selected-spot sheet has a small × close button (the board has none; needed when the map fails or with a screen reader); zoomed far out (below city zoom), the title says "N picks here" instead of naming a city; new labels "Show picks", "Loading", "Close", and "No picks here yet." in List view. | Any time | As described |
 | 30 | Search details: a spot with no fixed point (a food truck, or an address not yet found) shows its city instead of a distance and moves Discover to that city; Dishes and Spots show no hint text before you type. | Any time | As described |
 | 31 | Profile and Saved maps: the footer lists cities busiest first (e.g. "Sushi · Tokyo, Vancouver, New York"); Saved's map says "None of these spots are on the map yet." when none of your saves has an exact spot. | Any time | As described |
+| 32 | **Geocoding provider** (Phase 5 decision 6): Claude recommends Geoapify (free tier fits early use, results may be stored, OpenStreetMap data with attribution), with OpenCage as the alternative; Claude re-checks their current terms when you choose. Until then production geocoding is off and custom spots stay off the map. | Before testers (Phase 8) | Geoapify |
+| 33 | **Discover chips** (Phase 5 decision 8): All / Final Meals / Honorable is one choice; `Following` is a separate on/off chip showing only people you follow. The Filters dot counts distance and tags only. | Any time | As described |
+| 34 | **Search taps and suggestions** (Phase 5 decisions 10, 11): a dish opens one pick of it (yours, then a friend's, then a public one), or the map when none is open to you; a spot moves the Discover map there. "Suggested for you" keeps the Phase 4 `#1 · <dish>` lines; the board's reasons ("Also has…", "Followed by…", "Popular in…") aren't built. | Any time | As described |
+| 35 | **Selected pin and List view** (Phase 5 decisions 12, 13): the sheet lists every matching dish at that spot, and its counts ("Honorable for 6 people · Final Meal for 2") are trusted counts across everyone, not just the filter. List view (no board) is a full list of the dishes in view, styled like search rows, with `Map view` to go back. | Any time | As described |
+| 36 | **Maps elsewhere and new copy** (Phase 5 decisions 14, 15): profile Map tabs show a short place card when you tap a pin; Saved's `Map view` button switches between the grid and a map; First landing's `See the map` opens Discover; `Share these` stays hidden until Phase 6. New copy not on the canvas: `No picks here yet.` / `Move the map or zoom out to find more.`, `No picks match these filters.` / `Reset filters`, `Zoom in to see every pick.`, `Set your home city to start the map there.`, `The map didn’t load.`, `Search dishes, spots and people.`, `No matches for “<q>”.`, `No picks on the map yet.`, `Show 1 pick` / `No picks match`, `All picks`, and the Filters `More` chip. | Any time | As described |
 
 ## Done
 
