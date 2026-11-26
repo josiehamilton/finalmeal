@@ -91,6 +91,8 @@ describe('MAP_PAGE_SCRIPT', () => {
       attributionControl: { compact: true },
       dragRotate: false,
       pitchWithRotate: false,
+      touchPitch: false,
+      maxPitch: 0,
       interactive: true,
     });
   });

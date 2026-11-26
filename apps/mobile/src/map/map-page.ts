@@ -372,6 +372,8 @@ export const MAP_PAGE_SCRIPT: string = String.raw`
         attributionControl: { compact: true },
         dragRotate: false,
         pitchWithRotate: false,
+        touchPitch: false,
+        maxPitch: 0,
         interactive: cfg.interactive,
       });
     } catch (e) {
