@@ -78,8 +78,11 @@ describe('Discover (against the seeded local backend)', () => {
   });
 
   it('returns a follower count with people search', async () => {
-    const found = await searchPeople(client, 'ali');
-    expect(found.length).toBeGreaterThan(0);
-    expect(typeof found[0]!.followersCount).toBe('number');
+    // The seeded @allimercer ("Alli Mercer"), not a prefix like 'ali' that only matches whatever
+    // other test files happen to have created at the time.
+    const found = await searchPeople(client, 'alli');
+    const alli = found.find((p) => p.username === 'allimercer');
+    expect(alli).toBeDefined();
+    expect(typeof alli!.followersCount).toBe('number');
   });
 });
