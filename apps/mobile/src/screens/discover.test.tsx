@@ -442,6 +442,18 @@ describe('Discover tab: Filters', () => {
     expect(screen.getByRole('button', { name: 'Show 1 pick' })).toBeOnTheScreen();
   });
 
+  it('clears the count while a changed draft is being recounted', async () => {
+    await show();
+    await openFilters();
+    await settle(300);
+    expect(screen.getByRole('button', { name: 'Show 12 picks' })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Sushi' }));
+    expect(screen.queryByRole('button', { name: 'Show 12 picks' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Show picks' })).toBeOnTheScreen();
+    await settle(300);
+    expect(screen.getByRole('button', { name: /^Show \d+ picks$/ })).toBeOnTheScreen();
+  });
+
   it('throws the draft away when the backdrop is tapped', async () => {
     await show();
     await openFilters();

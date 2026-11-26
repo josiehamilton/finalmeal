@@ -105,6 +105,10 @@ describe('the map and the current location', () => {
  */
 const DISCOVER_FILES = [
   'app/(app)/(tabs)/discover.tsx',
+  // Search (from the Feed and from Discover) measures from the home city or the map's centre.
+  'app/(app)/search.tsx',
+  'src/components/SearchField.tsx',
+  'src/components/SpotResultRow.tsx',
   'src/state/discover.ts',
   ...readdirSync(join(root, 'src/components'))
     .filter(
@@ -119,6 +123,8 @@ describe('Discover and the current location', () => {
     for (const expected of [
       'app/(app)/(tabs)/discover.tsx',
       'src/state/discover.ts',
+      'app/(app)/search.tsx',
+      'src/components/SpotResultRow.tsx',
       'src/components/DiscoverTopBar.tsx',
       'src/components/DiscoverSheet.tsx',
       'src/components/DiscoverDishCard.tsx',

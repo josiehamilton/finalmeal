@@ -140,6 +140,8 @@ function FiltersBody({ filters, region, popular, known, onApply, onClose }: Body
   useEffect(() => {
     if (!region) return;
     let current = true;
+    // The old count belongs to the old draft: show `Show picks` until the new one is back.
+    setCount(null);
     const timer = setTimeout(() => {
       getPicksInView(getSupabase(), region.bounds, draft, region.center).then(
         ({ places }) => {
