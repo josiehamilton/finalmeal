@@ -201,7 +201,9 @@ export function useDiscover(home: LatLng | null): DiscoverState {
       lastSelection.current = () => loadSelection(id, using, from);
       clearSelectionError();
       const center = from ?? regionRef.current?.center ?? home;
-      getDishesInView(getSupabase(), null, using, center, { placeId: id }).then(
+      // One place's dishes: the Distance filter would drop a place that is far from the point
+      // distances are measured from (a Search focus), so only displayed distances use it.
+      getDishesInView(getSupabase(), null, { ...using, radiusKm: null }, center, { placeId: id }).then(
         (cards) => {
           if (!mounted.current || request !== selectRequest.current) return;
           if (cards.length === 0) {

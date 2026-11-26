@@ -92,6 +92,7 @@ export function DiscoverSheet({
           <Text style={styles.title} accessibilityRole="header">
             Set your home city to start the map there.
           </Text>
+          {truncated ? <Text style={styles.note}>Zoom in to see every pick.</Text> : null}
           <View style={styles.outline}>
             <PrimaryButton variant="ghost" size="compact" label="Choose home city" onPress={onChooseHomeCity} />
           </View>

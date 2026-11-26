@@ -10,7 +10,7 @@ import {
 import type { DiscoverFilters } from '@finalmeal/core';
 import { DEFAULT_DISCOVER_FILTERS } from '@finalmeal/core';
 import Discover from '../../app/(app)/(tabs)/discover';
-import { FOCUS_ZOOM, WORLD_CAMERA } from '../map/camera';
+import { FOCUS_ZOOM, HOME_ZOOM, WORLD_CAMERA } from '../map/camera';
 import { pinsForDiscover } from '../map/pins';
 import {
   VANCOUVER_REGION,
@@ -180,6 +180,14 @@ describe('Discover tab: the map and the in-view sheet', () => {
     expect(screen.getByText('Zoom in to see every pick.')).toBeOnTheScreen();
   });
 
+  it('asks to zoom in at the world view too, when places were cut', async () => {
+    mockProfile = makeProfile({ homeCity: null });
+    mockPicks.mockResolvedValue({ places: makeDiscoverPlaces(), truncated: true });
+    await show();
+    expect(screen.getByText('Set your home city to start the map there.')).toBeOnTheScreen();
+    expect(screen.getByText('Zoom in to see every pick.')).toBeOnTheScreen();
+  });
+
   it('shows the friendly copy with Try again when loading fails, and recovers', async () => {
     mockPicks.mockRejectedValueOnce(new ApiError('x', 'network'));
     await show();
@@ -330,6 +338,21 @@ describe('Discover tab: the chip row, search and focus', () => {
       { lat: 49.2827, lng: -123.1207 },
       { placeId: 'pl-kinkao' },
     );
+  });
+});
+
+describe('Discover tab: a spot with no pin', () => {
+  it('moves the map to its city at the city zoom and selects nothing', async () => {
+    mockParams = { lat: '49.26', lng: '-123.1' };
+    await show();
+    expect(sentCommands()).toContainEqual({
+      type: 'flyTo',
+      camera: { lat: 49.26, lng: -123.1, zoom: HOME_ZOOM },
+    });
+    expect(mockRouter.setParams).toHaveBeenCalledWith({ placeId: undefined, lat: undefined, lng: undefined });
+    expect(mockDishes).not.toHaveBeenCalledWith(client, null, expect.anything(), expect.anything(), {
+      placeId: expect.anything(),
+    });
   });
 });
 

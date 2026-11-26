@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
+import { placeWhere } from '@finalmeal/api';
 import type { DiscoverDish } from '@finalmeal/api';
 import { formatDistance, tierCountsLabel } from '@finalmeal/core';
 import { colors, radii } from '@finalmeal/ui-tokens';
@@ -20,7 +21,7 @@ interface SelectedPlaceSheetProps {
 /** `Kin Kao · Main St · 1.8 km`: the place, where it is, how far; parts that are missing are left out. */
 export function whereLine(dish: DiscoverDish): string {
   const { place } = dish;
-  return [place.name, place.area ?? place.address, formatDistance(dish.distanceM)]
+  return [place.name, placeWhere(place), formatDistance(dish.distanceM)]
     .filter((part): part is string => !!part)
     .join(' · ');
 }

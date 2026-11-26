@@ -195,9 +195,13 @@ export default function Search() {
   }, [query, tab, discover, rankNear, ready, tries]);
 
   function openPlace(place: Place) {
+    // A spot with no fixed point (city precision, no address) has no pin to select: Discover
+    // only moves to its city.
     router.navigate({
       pathname: '/discover',
-      params: { placeId: place.id, lat: place.lat, lng: place.lng },
+      params: place.onMap
+        ? { placeId: place.id, lat: place.lat, lng: place.lng }
+        : { lat: place.lat, lng: place.lng },
     });
   }
 

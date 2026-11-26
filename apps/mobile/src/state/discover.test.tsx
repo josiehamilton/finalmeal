@@ -380,6 +380,22 @@ describe('useDiscover', () => {
     expect(result.current.cityName).toBe('Osaka');
   });
 
+  it('does not apply the Distance filter to a single-place lookup', async () => {
+    const { result } = await mount();
+    const filters = { ...DEFAULT_DISCOVER_FILTERS, radiusKm: 5 };
+    await act(async () => {
+      result.current.setFilters(filters);
+    });
+    await settle(250);
+    await act(async () => {
+      result.current.select('pl-kinkao', { lat: 1, lng: 2 });
+    });
+    await settle();
+    expect(mockDishes).toHaveBeenLastCalledWith(client, null, { ...filters, radiusKm: null }, { lat: 1, lng: 2 }, {
+      placeId: 'pl-kinkao',
+    });
+  });
+
   it('measures a selection from the point it is given, and clears one with no dishes', async () => {
     const { result } = await mount();
     await act(async () => {

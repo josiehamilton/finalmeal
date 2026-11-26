@@ -312,6 +312,18 @@ describe('Search', () => {
       expect(await screen.findByText('No matches for “zzz”.')).toBeOnTheScreen();
     });
 
+    it('moves Discover to the city of a spot with no pin, without a place to focus', async () => {
+      mockDishes.mockResolvedValue([]);
+      mockPlaces.mockResolvedValue([{ ...SPOT, onMap: false }]);
+      await show();
+      await type('ramen');
+      await fireEvent.press(await screen.findByText('Marutama Ramen'));
+      expect(mockRouter.navigate).toHaveBeenCalledWith({
+        pathname: '/discover',
+        params: { lat: 49.2935, lng: -123.1207 },
+      });
+    });
+
     it('sends a spot to Discover', async () => {
       mockDishes.mockResolvedValue([]);
       await show();

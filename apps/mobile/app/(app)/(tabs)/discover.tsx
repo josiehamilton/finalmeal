@@ -100,12 +100,13 @@ function DiscoverScreen({ home, hasHomeCity }: DiscoverScreenProps) {
   const { placeId, lat, lng } = params;
   const setParams = router.setParams;
   useEffect(() => {
-    if (!placeId) return;
+    if (!placeId && !(lat && lng)) return;
     const la = parseFloat(lat ?? '');
     const ln = parseFloat(lng ?? '');
     const at = Number.isFinite(la) && Number.isFinite(ln) ? { lat: la, lng: ln } : null;
-    if (at) mapRef.current?.flyTo({ ...at, zoom: FOCUS_ZOOM });
-    setFocus({ id: placeId, from: centreRef.current ?? home });
+    // No place id: a spot with no pin. Move to its city and select nothing.
+    if (at) mapRef.current?.flyTo({ ...at, zoom: placeId ? FOCUS_ZOOM : HOME_ZOOM });
+    if (placeId) setFocus({ id: placeId, from: centreRef.current ?? home });
     setParams({ placeId: undefined, lat: undefined, lng: undefined });
   }, [placeId, lat, lng, setParams, home]);
 
