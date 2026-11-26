@@ -215,12 +215,17 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
     onTouchLock?.(false);
   }, [onTouchLock]);
   const holdLock = useCallback(() => {
+    // No timer means the lock is not held (first touch, or the lease expired mid-gesture): take it again.
     if (lockTimer.current) clearTimeout(lockTimer.current);
+    else onTouchLock?.(true);
     lockTimer.current = setTimeout(releaseLock, TOUCH_LOCK_TIMEOUT_MS);
-  }, [releaseLock]);
+  }, [releaseLock, onTouchLock]);
+  // Unmounting while the lock is held must not leave the parent locked.
+  const releaseOnUnmount = useRef(releaseLock);
+  releaseOnUnmount.current = releaseLock;
   useEffect(
     () => () => {
-      if (lockTimer.current) clearTimeout(lockTimer.current);
+      if (lockTimer.current) releaseOnUnmount.current();
     },
     [],
   );
@@ -244,14 +249,7 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
     <View
       style={styles.fill}
       testID={testID}
-      onTouchStart={
-        props.embedded
-          ? () => {
-              onTouchLock?.(true);
-              holdLock();
-            }
-          : undefined
-      }
+      onTouchStart={props.embedded ? holdLock : undefined}
       onTouchMove={props.embedded ? holdLock : undefined}
       onTouchEnd={props.embedded ? releaseLock : undefined}
       onTouchCancel={props.embedded ? releaseLock : undefined}

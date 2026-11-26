@@ -26,7 +26,12 @@ const REGION: MapRegion = {
 };
 
 async function setup(overrides: Partial<PicksMapProps> = {}) {
-  const props: PicksMapProps = { initialCamera: CAMERA, pins: PINS, selectedId: null, ...overrides };
+  const props: PicksMapProps = {
+    initialCamera: CAMERA,
+    pins: PINS,
+    selectedId: null,
+    ...overrides,
+  };
   const view = await render(<PicksMap {...props} />);
   return { props, ...view };
 }
@@ -81,7 +86,9 @@ describe('PicksMap', () => {
     const { rerender, props } = await setup();
     await emitMapEvent({ type: 'ready' });
     const before = sentCommands().length;
-    await rerender(<PicksMap {...props} pins={[PINS[0]!]} selectedId="a" insets={{ top: 10, bottom: 200 }} />);
+    await rerender(
+      <PicksMap {...props} pins={[PINS[0]!]} selectedId="a" insets={{ top: 10, bottom: 200 }} />,
+    );
     expect(sentCommands().slice(before)).toEqual([
       { type: 'setInsets', top: 10, bottom: 200 },
       { type: 'setPins', pins: [PINS[0]] },
@@ -130,7 +137,9 @@ describe('PicksMap', () => {
     await emitRawMapMessage('not json');
     await emitRawMapMessage('{"type":"explode"}');
     await emitRawMapMessage('{"type":"pinPress","id":7}');
-    await emitRawMapMessage('{"type":"region","region":{"bounds":{"west":0,"south":95,"east":1,"north":96},"center":{"lat":0,"lng":0},"zoom":3}}');
+    await emitRawMapMessage(
+      '{"type":"region","region":{"bounds":{"west":0,"south":95,"east":1,"north":96},"center":{"lat":0,"lng":0},"zoom":3}}',
+    );
     expect(handlers.onRegionChange).not.toHaveBeenCalled();
     expect(handlers.onPinPress).not.toHaveBeenCalled();
     expect(handlers.onMapPress).not.toHaveBeenCalled();
@@ -327,7 +336,9 @@ describe('PicksMap', () => {
       await rerender(<PicksMap {...props} fitOnFirstPins pins={PINS} />);
       await rerender(<PicksMap {...props} fitOnFirstPins pins={[PINS[0]!]} />);
       const commands = sentCommands();
-      expect(commands.filter((c) => c.type === 'fitPins')).toEqual([{ type: 'fitPins', maxZoom: 14 }]);
+      expect(commands.filter((c) => c.type === 'fitPins')).toEqual([
+        { type: 'fitPins', maxZoom: 14 },
+      ]);
       const fit = commands.findIndex((c) => c.type === 'fitPins');
       expect(commands[fit - 1]).toEqual({ type: 'setPins', pins: PINS });
     });
@@ -354,17 +365,47 @@ describe('PicksMap: embedded scroll lock', () => {
     const onTouchLock = jest.fn();
     await setup({ embedded: true, onTouchLock, testID: 'map' });
     const box = screen.getByTestId('map');
-    fireEvent(box, 'touchStart');
+    await fireEvent(box, 'touchStart');
     expect(onTouchLock).toHaveBeenLastCalledWith(true);
-    fireEvent(box, 'touchEnd');
+    await fireEvent(box, 'touchEnd');
     expect(onTouchLock).toHaveBeenLastCalledWith(false);
     onTouchLock.mockClear();
-    fireEvent(box, 'touchStart');
-    act(() => jest.advanceTimersByTime(TOUCH_LOCK_TIMEOUT_MS - 100));
-    fireEvent(box, 'touchMove');
-    act(() => jest.advanceTimersByTime(TOUCH_LOCK_TIMEOUT_MS - 100));
+    await fireEvent(box, 'touchStart');
+    await act(async () => jest.advanceTimersByTime(TOUCH_LOCK_TIMEOUT_MS - 100));
+    await fireEvent(box, 'touchMove');
+    await act(async () => jest.advanceTimersByTime(TOUCH_LOCK_TIMEOUT_MS - 100));
     expect(onTouchLock).toHaveBeenCalledTimes(1);
-    act(() => jest.advanceTimersByTime(200));
+    await act(async () => jest.advanceTimersByTime(200));
     expect(onTouchLock).toHaveBeenLastCalledWith(false);
+  });
+
+  it('locks again when a move arrives after the lease expired, and unlocks on end', async () => {
+    const onTouchLock = jest.fn();
+    const view = await setup({ embedded: true, onTouchLock, testID: 'map' });
+    const box = view.getByTestId('map');
+    await fireEvent(box, 'touchStart');
+    await act(async () => jest.advanceTimersByTime(TOUCH_LOCK_TIMEOUT_MS + 100));
+    expect(onTouchLock).toHaveBeenLastCalledWith(false);
+    onTouchLock.mockClear();
+    await fireEvent(box, 'touchMove');
+    expect(onTouchLock).toHaveBeenLastCalledWith(true);
+    await fireEvent(box, 'touchEnd');
+    expect(onTouchLock).toHaveBeenLastCalledWith(false);
+  });
+
+  it('releases a held lock when the map unmounts', async () => {
+    const onTouchLock = jest.fn();
+    const view = await setup({ embedded: true, onTouchLock, testID: 'map' });
+    await fireEvent(view.getByTestId('map'), 'touchStart');
+    onTouchLock.mockClear();
+    await view.unmount();
+    expect(onTouchLock).toHaveBeenLastCalledWith(false);
+  });
+
+  it('does not call the lock on unmount when none is held', async () => {
+    const onTouchLock = jest.fn();
+    const view = await setup({ embedded: true, onTouchLock, testID: 'map' });
+    await view.unmount();
+    expect(onTouchLock).not.toHaveBeenCalled();
   });
 });
