@@ -11,7 +11,7 @@ import {
 } from '../test-support/map';
 import type { MapPin, MapRegion } from './bridge';
 import { MAP_LOAD_TIMEOUT_MS } from './map-page';
-import { PicksMap } from './PicksMap';
+import { PicksMap, TOUCH_LOCK_TIMEOUT_MS } from './PicksMap';
 import type { PicksMapHandle, PicksMapProps } from './PicksMap';
 
 const CAMERA = { lat: 49.28, lng: -123.12, zoom: 12 };
@@ -343,5 +343,28 @@ describe('PicksMap', () => {
       await emitMapEvent({ type: 'ready' });
       expect(sentCommands().some((c) => c.type === 'fitPins')).toBe(false);
     });
+  });
+});
+
+describe('PicksMap: embedded scroll lock', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('locks on touch, unlocks on end, and unlocks by itself if the end never arrives', async () => {
+    const onTouchLock = jest.fn();
+    await setup({ embedded: true, onTouchLock, testID: 'map' });
+    const box = screen.getByTestId('map');
+    fireEvent(box, 'touchStart');
+    expect(onTouchLock).toHaveBeenLastCalledWith(true);
+    fireEvent(box, 'touchEnd');
+    expect(onTouchLock).toHaveBeenLastCalledWith(false);
+    onTouchLock.mockClear();
+    fireEvent(box, 'touchStart');
+    act(() => jest.advanceTimersByTime(TOUCH_LOCK_TIMEOUT_MS - 100));
+    fireEvent(box, 'touchMove');
+    act(() => jest.advanceTimersByTime(TOUCH_LOCK_TIMEOUT_MS - 100));
+    expect(onTouchLock).toHaveBeenCalledTimes(1);
+    act(() => jest.advanceTimersByTime(200));
+    expect(onTouchLock).toHaveBeenLastCalledWith(false);
   });
 });

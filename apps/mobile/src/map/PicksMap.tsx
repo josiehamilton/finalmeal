@@ -12,6 +12,9 @@ import { buildMapHtml, MAP_LOAD_TIMEOUT_MS } from './map-page';
 /** How far `fitOnFirstPins` zooms in: close enough to read the street, never tighter than that. */
 const FIT_MAX_ZOOM = 14;
 
+/** If no touch event arrives for this long, the embedded map lets go of the page's scroll lock. */
+export const TOUCH_LOCK_TIMEOUT_MS = 2500;
+
 export interface PicksMapHandle {
   flyTo(camera: MapCamera): void;
 }
@@ -202,6 +205,26 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
     return () => clearTimeout(timer);
   }, [status, attempt, fail]);
 
+  // On Android the WebView can take over a gesture, so the end of a touch may never reach us.
+  // The lock is a short lease, renewed by every touch event, so it can never freeze the page.
+  const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { onTouchLock } = props;
+  const releaseLock = useCallback(() => {
+    if (lockTimer.current) clearTimeout(lockTimer.current);
+    lockTimer.current = null;
+    onTouchLock?.(false);
+  }, [onTouchLock]);
+  const holdLock = useCallback(() => {
+    if (lockTimer.current) clearTimeout(lockTimer.current);
+    lockTimer.current = setTimeout(releaseLock, TOUCH_LOCK_TIMEOUT_MS);
+  }, [releaseLock]);
+  useEffect(
+    () => () => {
+      if (lockTimer.current) clearTimeout(lockTimer.current);
+    },
+    [],
+  );
+
   function tryAgain() {
     const { insets: currentInsets, pins: currentPins, selectedId: currentSelected } = latest.current;
     ready.current = false;
@@ -221,9 +244,17 @@ export const PicksMap = forwardRef<PicksMapHandle, PicksMapProps>(function Picks
     <View
       style={styles.fill}
       testID={testID}
-      onTouchStart={props.embedded ? () => props.onTouchLock?.(true) : undefined}
-      onTouchEnd={props.embedded ? () => props.onTouchLock?.(false) : undefined}
-      onTouchCancel={props.embedded ? () => props.onTouchLock?.(false) : undefined}
+      onTouchStart={
+        props.embedded
+          ? () => {
+              onTouchLock?.(true);
+              holdLock();
+            }
+          : undefined
+      }
+      onTouchMove={props.embedded ? holdLock : undefined}
+      onTouchEnd={props.embedded ? releaseLock : undefined}
+      onTouchCancel={props.embedded ? releaseLock : undefined}
     >
       {/* `<unknown>`: the package types `WebView<P = undefined>`, which turns every JSX prop into `never`. */}
       <WebView<unknown>

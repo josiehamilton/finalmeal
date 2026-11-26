@@ -81,8 +81,8 @@ function parseRegion(v: unknown): MapRegion | null {
   };
 }
 
-/** The attribution links the map shows: OpenFreeMap, OpenStreetMap and MapLibre, and their subdomains. */
-const LINK_HOSTS = ['openfreemap.org', 'openstreetmap.org', 'maplibre.org'];
+/** The attribution links the map shows: OpenFreeMap, OpenMapTiles, OpenStreetMap and MapLibre, and their subdomains. */
+const LINK_HOSTS = ['openfreemap.org', 'openmaptiles.org', 'openstreetmap.org', 'maplibre.org'];
 const MAX_LINK_LENGTH = 2048;
 const LINK_PATTERN = /^https:\/\/([a-z0-9][a-z0-9.-]*)(\/[^\s]*)?$/i;
 

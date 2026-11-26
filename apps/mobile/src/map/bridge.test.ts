@@ -85,6 +85,8 @@ describe('parseMapEvent', () => {
       'https://www.openfreemap.org/about?x=1#y',
       'https://www.openstreetmap.org/copyright',
       'https://maplibre.org/maplibre-gl-js/docs/',
+      'https://www.openmaptiles.org/',
+      'https://openmaptiles.org',
     ])('accepts %s', (url) => {
       expect(parse({ type: 'openLink', url })).toEqual({ type: 'openLink', url });
     });
@@ -93,6 +95,7 @@ describe('parseMapEvent', () => {
       'http://maplibre.org/',
       'https://evil.example/',
       'https://openstreetmap.org.evil.example/',
+      'https://evil-openmaptiles.org/',
       'https://evil-openstreetmap.org/',
       'https://maplibre.org@evil.example/',
       'https://user:pw@maplibre.org/',
