@@ -115,7 +115,7 @@ Not yet run on a device: the Phase 4 build was checked by the unit, database, AP
 
 Take a screenshot of every step and tell Claude about anything that looks wrong.
 
-### Device checklist (Phase 5 (pending an idle Mac))
+### Device checklist (Phase 5, pending an idle Mac)
 
 Not yet run on a device: the Phase 5 build was checked by the unit, database, API and web tests only. Run `pnpm db:reset </dev/null && pnpm env:local` first, keep one Expo server, take a screenshot of every step, and sign in as `josiehamilton@example.com` (code from the local inbox).
 

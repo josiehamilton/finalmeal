@@ -30,3 +30,9 @@ Task 8: brief written (task-8-brief.md); waiting for local stack
 Task 8: dispatched (base a4f950b, sonnet) with Step 0 = CI fix
 Ruling: the red CI test (`returns a follower count with people search`) was a wrong test assumption, not a `search_people` bug: it searched `ali`, which matches no seeded person (Alli Mercer is `all…`), so it passed only when another integration file had already created an "Alice" (push test, in parallel, or leftovers from an earlier run). The test now searches `alli` and asserts the seeded `@allimercer` comes back with a numeric follower count — cost if wrong: none (test-only change).
 Task 8: device Steps 1–2 pending an idle Mac; local checks all green (see commit); docs updated.
+
+## Final review fixes
+Ruling: after a Search focus, distances are measured from the map centre before the jump (otherwise every distance reads 0 m) — a place Search sends you to is flown to and centred, so measuring from the new centre would show 0 m for it — cost if wrong: a distance reads from the old centre rather than the new one; no data effect.
+Ruling: the Discover title keeps the previous city name until the next lookup answers (and drops a stale answer) — a ~1 km cache key made nearly every pan flicker to "picks here" — cost if wrong: for a moment the title can name the city of the view just left.
+Ruling: a single-place lookup (selecting a pin or a Search focus) ignores the Distance filter; displayed distances still come from the old centre — cost if wrong: a place just outside the radius can be selected from Search.
+Ruling: a spot with no pin only moves Discover to its city (city zoom, nothing selected) — matches needs-list row 30 — cost if wrong: none.
